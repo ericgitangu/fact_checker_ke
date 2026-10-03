@@ -87,3 +87,8 @@ The "two runtimes" decision above is the **launch** posture, not the end state. 
 | Expo native modules (share extension, widgets) | **Swift/Kotlin** | ADR-0010 | The native showcase; share-to-app is the core intake UX | Phase 1 store builds |
 
 Enablers already in place: moon (ADR-0014) orchestrates arbitrary toolchains — Rust/Go tasks join the same graph, cache and `moon ci`; the deploy rail (ADR-0016) ships containers by digest, language-agnostic. **Rule retained:** a slot opens only when its trigger fires with an observed measurement or a live workflow need — never speculatively. Wave-4 interfaces (embedder, chunker) must stay Protocol-shaped so a Rust implementation can swap in without touching callers.
+
+### Containerization benchmark: the `wave` project [V-OBSERVED 2026-10-03]
+`~/Development/wave` is the house reference for two patterns the polyglot roadmap will reuse:
+- **Rust-in-Python images:** `backend/Dockerfile.lambda` multi-stage builds a PyO3 Rust `.so` into a Python Lambda container (`linux/amd64`), with Rust `#[cfg(test)]` + pytest side by side — the packaging template for the Rust slots above (chunker, C2PA verifier) if they ship embedded rather than as standalone services; the PyO3 0.23 ↔ Python-version ABI pin is the known trap it documents.
+- **Cost arc as precedent:** wave's always-on SageMaker endpoint (~$86/mo) → 59-min auto-stop scheduler → finally an in-process library at $0. Same trajectory the plan-guard (ADR-0016) enforces here from day one: the cheapest ML component is the one that runs inside a process you already pay for.
