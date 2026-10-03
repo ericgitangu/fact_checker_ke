@@ -48,27 +48,29 @@ export class EditorClient {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  /** NOT YET IMPLEMENTED: `GET /v1/editor/drafts`. */
+  /** `GET /v1/editor/queue` — the real backend route (services/api
+   * routes/editor.ts) returns `{ items: EditorDraftSummary[] }`. */
   async listDrafts(): Promise<EditorDraftSummary[]> {
-    const res = await this.fetchImpl(`${this.baseUrl}/v1/editor/drafts`);
+    const res = await this.fetchImpl(`${this.baseUrl}/v1/editor/queue`);
     if (!res.ok) {
       throw new EditorClientError(`Failed to list drafts: ${res.status}`, res.status);
     }
-    const body = (await res.json()) as EditorDraftSummary[];
-    return body;
+    const body = (await res.json()) as { items: EditorDraftSummary[] };
+    return body.items;
   }
 
-  /** NOT YET IMPLEMENTED: `POST /v1/editor/checks/:id/publish`. */
+  /** `POST /v1/editor/checks/:id/approve` — approves the AI draft as-is,
+   * which publishes it (services/api routes/editor.ts). */
   async publish(checkId: string): Promise<void> {
-    const res = await this.fetchImpl(`${this.baseUrl}/v1/editor/checks/${encodeURIComponent(checkId)}/publish`, {
+    const res = await this.fetchImpl(`${this.baseUrl}/v1/editor/checks/${encodeURIComponent(checkId)}/approve`, {
       method: "POST",
     });
     if (!res.ok) {
-      throw new EditorClientError(`Failed to publish check ${checkId}: ${res.status}`, res.status);
+      throw new EditorClientError(`Failed to approve check ${checkId}: ${res.status}`, res.status);
     }
   }
 
-  /** NOT YET IMPLEMENTED: `POST /v1/editor/checks/:id/correct`. */
+  /** `POST /v1/editor/checks/:id/correct` — editor overrides rating/summary, then publishes. */
   async correct(checkId: string, payload: CorrectPayload): Promise<void> {
     const res = await this.fetchImpl(`${this.baseUrl}/v1/editor/checks/${encodeURIComponent(checkId)}/correct`, {
       method: "POST",
