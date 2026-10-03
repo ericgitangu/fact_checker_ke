@@ -46,3 +46,19 @@ Revisit if a second editor joins (upgrades the "process rule" to a code-enforced
 | AT-0030-3 | Any funnel post flagged `ai_disclosed: true` in the audit table has a corresponding on-platform disclosure (description-panel text for YouTube, label metadata for TikTok) verified by a manual spot-check before each posting batch | RED |
 | AT-0030-4 | The funding-transparency page's rendered output includes a funnel-revenue line item whenever the funnel audit table has any row with non-zero attributed revenue | RED |
 | AT-0030-5 | No published check page or funnel post renders copy of the form "<handle> verified" or "<handle> is a liar" — only claim-dated rating copy, checked by a snapshot/regex test over rendered check and funnel-post templates | RED |
+
+## Implementation notes (2026-10-03)
+
+A process reference doc consolidating this ADR's three enforcement rules
+(source restriction, editorial independence from funnel metrics, audit
+trail) and the AI-disclosure checklist now exists at
+[`docs/architecture/creator-funnel-firewall.md`](../architecture/creator-funnel-firewall.md)
+— a day-to-day checklist companion to this ADR's evidence/decision
+record, cross-linked from
+[`docs/architecture/security-and-compliance.md`](../architecture/security-and-compliance.md).
+
+This is documentation only. The audit-table schema, the queue
+lint/static-analysis check (AT-0030-2), and the funding-transparency page
+line item (AT-0030-4) are code/data changes out of scope for this pass —
+all five acceptance tests (AT-0030-1 through AT-0030-5) remain **RED**,
+unclaimed here. This ADR's status is left as `Proposed`.
