@@ -1,6 +1,12 @@
+import { useState } from "react";
 import { WaitlistForm } from "./waitlist-form";
+import { BrandMark } from "./components/brand-mark";
+import { TypedClaim } from "./components/typed-claim";
+import { ExternalLinkIcon, MoonIcon, ShieldCheckIcon, SunIcon } from "./components/icons";
+import { useTheme } from "./use-theme";
 
 const GITHUB_URL = "https://github.com/ericgitangu";
+const SAMPLE_CLAIM = "“Unemployment in Kenya fell to 2% last year.”";
 
 /**
  * Marketing site. Design concept "On the record" (see index.css header):
@@ -10,24 +16,39 @@ const GITHUB_URL = "https://github.com/ericgitangu";
  */
 function App(): React.JSX.Element {
   const methodologyUrl = `${import.meta.env.VITE_WEB_URL}/methodology`;
+  const [theme, toggleTheme] = useTheme();
+  const [claimTyped, setClaimTyped] = useState(false);
 
   return (
     <>
       <header className="nav">
         <a className="wordmark" href="#top" aria-label="fact_checker_ke home">
-          <span className="wordmark-mark" aria-hidden="true">
-            fc
-          </span>
+          <BrandMark size={32} />
           <span className="wordmark-text">fact_checker_ke</span>
         </a>
         <nav className="nav-links" aria-label="Primary">
-          <a href={methodologyUrl}>Methodology</a>
+          <a href={methodologyUrl}>
+            Methodology
+            <ExternalLinkIcon className="link-icon" />
+          </a>
           <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
             GitHub
+            <ExternalLinkIcon className="link-icon" />
           </a>
           <a className="nav-join" href="#waitlist">
             Join the waitlist
           </a>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={theme === "dark"}
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <SunIcon size={17} /> : <MoonIcon size={17} />}
+          </button>
         </nav>
       </header>
 
@@ -58,11 +79,11 @@ function App(): React.JSX.Element {
           <figure className="checkcard" aria-label="Sample fact-check">
             <figcaption className="checkcard-tag">Sample fact-check</figcaption>
             <p className="checkcard-claim">
-              &ldquo;Unemployment in Kenya fell to 2% last year.&rdquo;
+              <TypedClaim text={SAMPLE_CLAIM} onDone={() => setClaimTyped(true)} />
             </p>
             <p className="checkcard-source-claim">viral on TikTok &mdash; 1.2M views</p>
             <div className="verdict verdict-misleading">
-              <span className="verdict-stamp">Misleading</span>
+              <span className={`verdict-stamp${claimTyped ? " stamp-ready" : ""}`}>Misleading</span>
             </div>
             <p className="checkcard-rationale">
               KNBS puts the 2024 unemployment rate near 5.6%. The 2% figure
@@ -82,7 +103,10 @@ function App(): React.JSX.Element {
                 </dd>
               </div>
             </dl>
-            <p className="checkcard-review">Reviewed by an editor before publishing</p>
+            <p className="checkcard-review">
+              <ShieldCheckIcon size={15} />
+              Reviewed by an editor before publishing
+            </p>
           </figure>
         </section>
 
