@@ -11,6 +11,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 FAIL=0
+
+# site:build's production guard (apps/site/vite.config.ts) requires a valid
+# VITE_API_URL at build time. Supply dev placeholders for the whole suite,
+# exactly as .github/workflows/ci.yml and the pre-push hook do -- without
+# this, AT-0014-1 fails on any cold cache (found 2026-10-03 re-verification).
+export VITE_API_URL="${VITE_API_URL:-http://localhost:8080}"
+export VITE_WEB_URL="${VITE_WEB_URL:-http://localhost:3000}"
 pass() { echo "PASS  $1"; }
 fail() { echo "FAIL  $1: $2"; FAIL=1; }
 
@@ -56,9 +63,14 @@ echo "SKIP  AT-0014-3 (verified manually: docker build output captured in PR, no
 # cache MISS, proving the env var is a real cache input -- turbo.json had
 # no equivalent for this).
 echo "== AT-0014-4: env var is a task cache input for site:build =="
-VITE_WEB_URL="http://localhost:3000" VITE_API_URL="http://localhost:8080" moon run site:build --force >/tmp/at-0014-4-populate.log 2>&1
-RUN_A=$(VITE_WEB_URL="http://localhost:3000" VITE_API_URL="http://localhost:8080" moon run site:build 2>&1)
-RUN_B=$(VITE_WEB_URL="http://localhost:3000" VITE_API_URL="http://localhost:9999" moon run site:build 2>&1)
+# Unique per-run URLs: moon's cache is persistent across invocations, so a
+# fixed probe value (e.g. 9999) is already cached on the second run of this
+# script and reports a bogus HIT (found 2026-10-03 re-verification).
+AT4_PORT_A=$((20000 + RANDOM % 10000))
+AT4_PORT_B=$((30000 + RANDOM % 10000))
+VITE_API_URL="http://localhost:${AT4_PORT_A}" moon run site:build --force >/tmp/at-0014-4-populate.log 2>&1
+RUN_A=$(VITE_API_URL="http://localhost:${AT4_PORT_A}" moon run site:build 2>&1)
+RUN_B=$(VITE_API_URL="http://localhost:${AT4_PORT_B}" moon run site:build 2>&1)
 HIT_A=$(echo "$RUN_A" | grep -c "site:build (cached" || true)
 HIT_B=$(echo "$RUN_B" | grep -c "site:build (cached" || true)
 if [ "$HIT_A" -ge 1 ] && [ "$HIT_B" -eq 0 ]; then
@@ -69,7 +81,7 @@ else
   echo "--- RUN_B ---"; echo "$RUN_B" | tail -5
 fi
 # Leave the cache in the state the rest of the suite / moon ci expects.
-VITE_WEB_URL="http://localhost:3000" VITE_API_URL="http://localhost:8080" moon run site:build --force >/dev/null 2>&1 || true
+moon run site:build --force >/dev/null 2>&1 || true
 
 # --- AT-0014-5: drift gate fails when a zod enum changes without regenerating.
 # Real-world scenario: a developer adds a value to a zod enum in
