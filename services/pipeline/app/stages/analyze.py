@@ -72,6 +72,25 @@ async def run_analyze_hop(
     submitted_text = request.content.quote if is_video_url else (request.content.text or "")
     attribution = "unverified" if is_video_url else None
 
+    # SEC-4 (security-hardening finding #4, 2026-10-04): a video-URL
+    # submission with NO quote at all has no checkable text whatsoever --
+    # `submitted_text` would be None/empty here, and the pre-fix code fell
+    # through to `submitted_text or ""`, sending an EMPTY
+    # <untrusted_submission> block to the LLM and "analyzing" nothing.
+    # Short-circuit before any LLM call, independent of which third-party
+    # platform the URL is from (works regardless of platform detection),
+    # and return an explicit, typed "needs a quote" outcome instead of a
+    # fabricated/empty analysis.
+    if is_video_url and not (submitted_text or "").strip():
+        return AnalyzeResult(
+            language="unknown",
+            translation_en="",
+            claims=[],
+            attribution=attribution,
+            usage=UsageRecord(stage="analyze", model="none", input_tokens=0, output_tokens=0, usd=0.0),
+            needs_quote=True,
+        )
+
     cache_key = f"analyze:{request.submission_id}:{content_hash(submitted_text or '')}"
     cached = store.get(cache_key)
     if cached is not None:
