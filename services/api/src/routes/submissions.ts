@@ -24,4 +24,12 @@ export async function submissionRoutes(
 
     return reply.status(202).send({ id: submission.id });
   });
+
+  app.get<{ Params: { id: string } }>("/v1/submissions/:id", async (request, reply) => {
+    const result = await deps.submissions.getById(request.params.id);
+    if (!result.ok) {
+      return reply.status(404).send({ error: "not_found", message: result.error.message });
+    }
+    return reply.status(200).send(result.value);
+  });
 }
