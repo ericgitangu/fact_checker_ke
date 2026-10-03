@@ -1,0 +1,45 @@
+# Root .dockerignore — build context for the API image (context = repo root,
+# needed so pnpm workspace deps in packages/core resolve). Keeps the context
+# small and avoids leaking secrets/editor state into the build.
+
+# VCS / editor / agent state
+**/.git
+**/.gitignore
+.github
+.claude
+.vscode
+.idea
+**/.DS_Store
+
+# Node / pnpm / Turbo build artifacts (rebuilt inside the image)
+**/node_modules
+**/.pnpm-store
+**/.turbo
+**/dist
+**/.next
+**/out
+**/*.tsbuildinfo
+
+# Python artifacts — irrelevant to the API image, excluded for size
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+
+# Secrets — never send into a build context
+.env
+.env.*
+!.env.example
+
+# Logs
+**/*.log
+
+# Workspace members not needed to build @fact-checker-ke/api.
+# (services/api's Dockerfile only COPYs packages/core, services/api,
+# pnpm-workspace.yaml and the root manifests/lockfile.)
+apps
+services/pipeline
+docs
+db

@@ -82,3 +82,72 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+  docker-images:
+    name: Build & scan container images (no push)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Base images are Docker Hardened Images (dhi.io). The Community tier
+      # is free, but the registry still gates pulls behind `docker login
+      # dhi.io` — use the same Docker Hub account/PAT as any other Docker
+      # Hub pull.
+      - name: Log in to dhi.io
+        uses: docker/login-action@v3
+        with:
+          registry: dhi.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build API image (linux/amd64, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/api/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: fact-checker-ke/api:ci
+
+      - name: Build pipeline image (linux/amd64, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: services/pipeline
+          file: services/pipeline/Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: fact-checker-ke/pipeline:ci
+
+      - name: Trivy scan — API image (fail on CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: fact-checker-ke/api:ci
+          severity: CRITICAL
+          exit-code: "1"
+
+      - name: Trivy scan — API image (report HIGH, non-blocking)
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: fact-checker-ke/api:ci
+          severity: HIGH
+          exit-code: "0"
+
+      - name: Trivy scan — pipeline image (fail on CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: fact-checker-ke/pipeline:ci
+          severity: CRITICAL
+          exit-code: "1"
+
+      - name: Trivy scan — pipeline image (report HIGH, non-blocking)
+        if: always()
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: fact-checker-ke/pipeline:ci
+          severity: HIGH
+          exit-code: "0"
