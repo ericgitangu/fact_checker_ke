@@ -1,0 +1,26 @@
+{
+  "name": "@fact-checker-ke/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./messages/en.json": "./messages/en.json",
+    "./messages/sw.json": "./messages/sw.json"
+  },
+  "scripts": {
+    "lint": "eslint src --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json --outDir dist"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.19.0",
+    "@typescript-eslint/parser": "^8.19.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "vitest": "^5.0.3"
+  }
+}

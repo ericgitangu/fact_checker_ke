@@ -1,0 +1,11 @@
+$schema: 'https://moonrepo.dev/schemas/project.yml'
+
+# lint/typecheck/test/build are inherited from .moon/tasks/node.yml and
+# proxy to this project's own package.json scripts. No dependsOn on `core`
+# needed -- this package has no runtime dependency on @fact-checker-ke/core,
+# only on the plain JSON message catalogs it ships itself.
+
+tasks:
+  build:
+    outputs:
+      - 'dist/**'
