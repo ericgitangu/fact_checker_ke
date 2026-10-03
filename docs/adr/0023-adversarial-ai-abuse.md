@@ -111,3 +111,6 @@ Revisit if the Sheng eval F1 threshold can't be met with available training exam
 Implementation notes section apply here too (in-memory CheckStore/cache,
 regex-based dedup signals, TEMPORARY hop request models, env-gated real
 embedder).
+
+---
+**See ADR-0031:** admission/confidence thresholds here are calibration-derived and per-risk-tier; no confidence gates auto-publish until measured-calibrated on held-out data.

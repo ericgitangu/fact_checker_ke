@@ -129,3 +129,6 @@ Landing AT-0004-A/AT-0004-B closes the services/api half of the gap the original
 - `GET /v1/checks/:id` (`services/api/src/routes/checks.ts`) redacts `rating` to `null` whenever a check is still a draft AND any of its claims is `namedPerson: true` — regardless of whether that claim's attribution is confirmed yet, since it's the editor's **approval** (not attribution confirmation alone) that makes a verdict publishable (ADR-0025 §5's gate, `services/api/src/lib/editorial.ts#approveCheck`).
 - The editor-side confirmation action (`POST /v1/editor/claims/:claimId/confirm-attribution`) and the publish gate that refuses to approve a check with any `unverified` named-person claim are both new in this wave (ADR-0025's implementation notes have the full gate description).
 - **Still owned by apps/web, not this wave:** the actual editor UI for watching the embed at the cited timestamp and clicking "confirm" — this wave only ships the API endpoint that records the confirmation; nothing here claims a UI exists.
+
+---
+**See ADR-0031:** the binary-verdict + always-human-gate model here is refined to calibrated confidence-weighted guidance with risk-tiered auto-publish (the human gate shrinks as calibration proves out; named-person hard-negatives stay gated).
