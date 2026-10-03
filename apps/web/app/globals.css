@@ -24,22 +24,44 @@
   --paper-2: #f2f1ea;
   --ink: #15181b;
   --ink-2: #585f66;
-  --ink-3: #8a9198;
+  /*
+   * ADR-0028 AT-0028-2 a11y fix: was #8a9198, measured 3.05:1 against
+   * --paper and 2.82:1 against --paper-2 -- both below WCAG 2.2 AA's
+   * 4.5:1 for normal text (this token sizes down to ~13-14px in the
+   * source-tier byline, pipeline "pending" state, and the Maandamano
+   * "cancelled" chip, none of which qualify for the 3:1 "large text"
+   * exception). Darkened (same hue) to #696e74, which measures 4.92:1 /
+   * 4.54:1 against the same two backgrounds respectively -- contrast
+   * ratios computed with the real WCAG relative-luminance formula against
+   * these exact hex values, not eyeballed.
+   */
+  --ink-3: #696e74;
   --rule: #e4e3dc;
   --rule-strong: #d2d0c6;
 
-  /* verdict system — the only saturated colour tied to a fact-check rating */
-  --true: #0e8a4f;
+  /*
+   * verdict system — the only saturated colour tied to a fact-check
+   * rating. ADR-0028 AT-0028-2 a11y fix: every one of these except
+   * --false measured BELOW 4.5:1 against its own `-tint` background at
+   * the verdict-stamp/verdict-chip font sizes actually used (1.05rem/700
+   * and 0.82rem/600 -- both under the 18.66px-bold "large text" AA
+   * exception, so 4.5:1 applies, not 3:1): --true 3.84:1, --mostly
+   * 3.00:1, --misleading 3.18:1, --unproven 4.16:1, --notcheckable
+   * 4.22:1 (only --false, at 4.93:1, already passed). Each is darkened
+   * here (same hue) to >=4.5:1 against its unchanged tint background;
+   * ratios below are the real computed values for these exact hex pairs.
+   */
+  --true: #0d7c47; /* was #0e8a4f (3.84:1) -> 4.59:1 vs --true-tint */
   --true-tint: #e7f2ec;
-  --mostly: #6f9a16;
+  --mostly: #577811; /* was #6f9a16 (3.00:1) -> 4.61:1 vs --mostly-tint */
   --mostly-tint: #f1f5e3;
-  --misleading: #c07400;
+  --misleading: #9c5e00; /* was #c07400 (3.18:1) -> 4.55:1 vs --misleading-tint */
   --misleading-tint: #f8eedd;
   --false: #c8102e;
   --false-tint: #fbe6ea;
-  --unproven: #6b7280;
+  --unproven: #666c7a; /* was #6b7280 (4.16:1) -> 4.52:1 vs --unproven-tint */
   --unproven-tint: #eceef0;
-  --notcheckable: #7d64a8;
+  --notcheckable: #7860a1; /* was #7d64a8 (4.22:1) -> 4.51:1 vs --notcheckable-tint */
   --notcheckable-tint: #efecf5;
 
   /* night band (maandamano — "the live street") */
@@ -52,7 +74,10 @@
   /* maandamano status chips — NOT verdict colours, see header comment */
   --status-neutral: #585f66;
   --status-neutral-tint: #eceeef;
-  --status-amber: #9a6b16;
+  /* ADR-0028 AT-0028-2 a11y fix: was #9a6b16, 4.05:1 vs --status-amber-tint
+     (below the 4.5:1 AA floor at this chip's font size) -> darkened
+     (same hue) to #8f6414, 4.54:1 against the unchanged tint. */
+  --status-amber: #8f6414;
   --status-amber-tint: #f6eedc;
   --status-slate: #46525c;
   --status-slate-tint: #e9edef;

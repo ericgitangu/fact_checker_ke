@@ -69,15 +69,22 @@ export function MediaDropzone({
       <h3 style={{ fontSize: "1rem" }}>{t("upload.heading")}</h3>
 
       {state.status === "idle" && (
-        <div
+        // AXE: "nested-interactive" + "label" (both fixed together, real
+        // violations caught by apps/web/app/page.a11y.test.tsx before this
+        // fix) -- the old markup was a `role="button" tabIndex={0}` <div>
+        // wrapping a real, focusable `<input type="file">`: two nested
+        // interactive controls, and the hidden input had no accessible
+        // name of its own. A native <label> wrapping the input fixes both:
+        // the label's text content becomes the input's accessible name
+        // (no separate aria-label needed), clicking anywhere in the label
+        // natively activates the (visually hidden) input, and there is
+        // only ONE interactive/focusable element in the subtree (the
+        // input itself) rather than a decorative div pretending to be a
+        // button around a real one. No onClick/onKeyDown "click the
+        // input" shim is needed any more -- that's what <label> is for.
+        <label
           className="media-dropzone"
           data-dragover={dragOver}
-          role="button"
-          tabIndex={0}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
-          }}
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
@@ -104,7 +111,7 @@ export function MediaDropzone({
             className="sr-only"
             onChange={(e) => handleFiles(e.target.files)}
           />
-        </div>
+        </label>
       )}
 
       {state.status === "selected" && (

@@ -3,6 +3,15 @@
 import { defaultCache } from "@serwist/turbopack/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { CacheFirst, NetworkFirst, NetworkOnly, Serwist } from "serwist";
+import {
+  DYNAMIC_CACHE_NAME,
+  STATIC_CHROME_CACHE_NAME,
+  OFFLINE_FALLBACK_URL,
+  isDocumentRequest,
+  isDynamicRoute,
+  isMaandamanoRoute,
+  isStaticChromeRoute,
+} from "./sw-caching-policy";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -44,25 +53,19 @@ const serwist = new Serwist({
   navigationPreload: true,
   runtimeCaching: [
     {
-      matcher: ({ url }: { url: URL }) => url.pathname.startsWith("/maandamano"),
+      matcher: isMaandamanoRoute,
       handler: new NetworkOnly(),
     },
     {
-      matcher: ({ url }: { url: URL }) =>
-        url.pathname.startsWith("/checks/") ||
-        url.pathname.startsWith("/submissions/") ||
-        url.pathname.startsWith("/api/submissions"),
+      matcher: isDynamicRoute,
       handler: new NetworkFirst({
-        cacheName: "fck-dynamic",
+        cacheName: DYNAMIC_CACHE_NAME,
         networkTimeoutSeconds: 4,
       }),
     },
     {
-      matcher: ({ url }: { url: URL }) =>
-        url.pathname.startsWith("/_next/static") ||
-        url.pathname.startsWith("/icon-") ||
-        url.pathname === "/manifest.webmanifest",
-      handler: new CacheFirst({ cacheName: "fck-static-chrome" }),
+      matcher: isStaticChromeRoute,
+      handler: new CacheFirst({ cacheName: STATIC_CHROME_CACHE_NAME }),
     },
     ...defaultCache,
   ],
@@ -75,10 +78,8 @@ const serwist = new Serwist({
   fallbacks: {
     entries: [
       {
-        url: "/~offline",
-        matcher({ request }) {
-          return request.destination === "document";
-        },
+        url: OFFLINE_FALLBACK_URL,
+        matcher: isDocumentRequest,
       },
     ],
   },
