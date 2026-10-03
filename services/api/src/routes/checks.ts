@@ -14,6 +14,18 @@ export async function checkRoutes(
 
     const check = result.value;
 
+    // AT-0004-A/AT-0004-B (ADR-0004 amendment #6 / ADR-0025 §5): a draft
+    // naming a person is disclosure, not publication (ADR-0021) -- the
+    // submitter sees evidence/sources only, `rating: null`, until an
+    // editor confirms every named-person claim's quote attribution AND
+    // approves (services/api/src/lib/editorial.ts#approveCheck flips
+    // `isDraft` to false only after that gate clears). This redaction
+    // applies to ANY draft with a named-person claim, not only an
+    // unconfirmed one — the editor's approval (not just attribution
+    // confirmation) is what makes a rating publishable at all.
+    const hasNamedPersonClaim = check.claims.some((c) => c.namedPerson);
+    const responseBody = check.isDraft && hasNamedPersonClaim ? { ...check, rating: null } : check;
+
     // ADR-0018 caching table: "Published checks only" get the shared,
     // long-lived cache entry; drafts are `private, no-store`. Version
     // is the check's `publishedAt` for now — a dedicated monotonic
@@ -34,6 +46,6 @@ export async function checkRoutes(
       reply.header("Cache-Control", NO_STORE_CACHE_CONTROL);
     }
 
-    return reply.status(200).send(check);
+    return reply.status(200).send(responseBody);
   });
 }
