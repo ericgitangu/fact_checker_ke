@@ -30,7 +30,7 @@ import { requireIntegrationDatabaseUrl } from "./integration-env.js";
 const connectionString = requireIntegrationDatabaseUrl();
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-function currentCodeFor(secret: string): string {
+function secretKeyFor(secret: string): Buffer {
   let bits = 0;
   let value = 0;
   const bytes: number[] = [];
@@ -44,7 +44,18 @@ function currentCodeFor(secret: string): string {
       bits -= 8;
     }
   }
-  return hotp(Buffer.from(bytes), Math.floor(Date.now() / 1000 / 30));
+  return Buffer.from(bytes);
+}
+function currentCodeFor(secret: string): string {
+  return hotp(secretKeyFor(secret), Math.floor(Date.now() / 1000 / 30));
+}
+// SEC-3 (security-hardening finding #3, 2026-10-04): TOTP codes are now
+// single-use (replay-protected, see lib/auth/service.ts). A test that
+// verifies enrollment with one code and then logs in must use a
+// DIFFERENT, not-yet-consumed code -- one step ahead, still inside the
+// module's +/-1 drift window.
+function nextStepCodeFor(secret: string): string {
+  return hotp(secretKeyFor(secret), Math.floor(Date.now() / 1000 / 30) + 1);
 }
 
 describe.skipIf(!connectionString)("Editorial review gate + moderation live demo (ADR-0004/0020/0024/0025)", () => {
@@ -91,10 +102,10 @@ describe.skipIf(!connectionString)("Editorial review gate + moderation live demo
     // override, AT-0025-3) -- grant admin directly rather than editor.
     const grant = existingAdmin
       ? await auth.grantRole({ id: existingAdmin.id, role: "admin" }, editorId, "admin")
-      : await auth.grantRole(null, editorId, "admin");
+      : await auth.grantRole({ id: editorId, role: null }, editorId, "admin");
     if (!grant.ok) throw new Error(`setup: role grant failed: ${grant.error.message}`);
 
-    const login = await auth.login(email, password, currentCodeFor(enrolled.value.secret));
+    const login = await auth.login(email, password, nextStepCodeFor(enrolled.value.secret));
     if (!login.ok) throw new Error("setup: login failed");
     editorToken = login.value.token;
   });
@@ -236,7 +247,7 @@ describe.skipIf(!connectionString)("Editorial review gate + moderation live demo
     if (!verified.ok) throw new Error("setup failed");
     const grant = await auth.grantRole({ id: editorId, role: "admin" }, registered.value.id, "moderator");
     expect(grant.ok).toBe(true);
-    const login = await auth.login(email, password, currentCodeFor(enrolled.value.secret));
+    const login = await auth.login(email, password, nextStepCodeFor(enrolled.value.secret));
     if (!login.ok) throw new Error("setup failed");
 
     const queue = await app.inject({ method: "GET", url: "/v1/editor/queue", headers: { authorization: `Bearer ${login.value.token}` } });
