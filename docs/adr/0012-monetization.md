@@ -30,3 +30,9 @@ Revisit once there is verified AdMob/AdSense policy research, or at 10k MAU.
 - **Apple:** the US-only external-checkout carve-out (May 2025) **does not extend to Kenya**. iOS subscriptions must use IAP **[V2-SECONDARY]**.
 - **Google:** alternative/user-choice billing rollout phases **don't list Kenya** before the rest-of-world phase (30 Sep 2027) **[V2-SECONDARY]**. Play Billing is required.
 - Web (PWA) subscriptions can use any processor (for example M-Pesa via a PSP). Price parity and the inability to link from the apps are **[I]**.
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #15 (README/hygiene wave, medium severity; cross-reference only — the substantive change is in ADR-0015).
+
+- **ADR-0015's trigger for moving off Vercel Hobby is broadened** from "ads or payments ship" to also cover sponsors, grants and operating as an incorporated entity — all of which Vercel's fair-use terms treat as commercial use (red-team C-15). This ADR's monetization sequencing (no ads until Phase 3, Pro subscription in Phase 2) is unchanged; see ADR-0015's amendments for the hosting-tier consequence.

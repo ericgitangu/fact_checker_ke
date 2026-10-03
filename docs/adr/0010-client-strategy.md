@@ -11,7 +11,7 @@ Your preference is native Swift and Kotlin. You also want DRY code across web an
 
 ## Options
 1. **Native Swift and Kotlin.** Three codebases for one developer, and no code shared with the web. Rejected for now. It remains a valid Phase 3 path for a flagship native feature.
-2. **Expo (React Native) in a pnpm/Turborepo monorepo with the Next.js PWA.** Recommended.
+2. **Expo (React Native) in a pnpm/Turborepo monorepo with the Next.js PWA.** ~~Turborepo~~ _(superseded — see ADR-0014: moonrepo replaces Turborepo)_ Recommended.
 3. **PWA only, plus TWA (Android) and a thin wrapper (iOS).** Fastest, but Apple 4.2 (minimum functionality) risks rejecting wrappers **[GAP]**.
 
 ## Decision (proposed): Option 2
@@ -46,3 +46,9 @@ Revisit if an RN limitation blocks a core feature, such as background audio capt
 - **D-U-N-S is the critical path.** Google says up to 30 days. Apple org enrollment takes 2-4 weeks **[V2-SECONDARY]**. **Apply for D-U-N-S this weekend.** Realistic floor to both stores: 3-4 weeks.
 - **Play News & Magazines self-declaration** is required if the app uses news branding **[V2-SECONDARY]**.
 - Apple review-time figures conflict (90% within 24h vs a 1.5-day average) **[GAP]**.
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #15 (README/hygiene wave, medium severity).
+
+- The monorepo-tooling choice in Option 2 above (Turborepo) is superseded by ADR-0014 (moonrepo replaces Turborepo), marked inline above. This ADR's client-strategy decision (Expo + Next.js PWA + shared `packages/core`) is otherwise unaffected.
