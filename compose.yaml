@@ -30,5 +30,40 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      platforms:
+        - linux/amd64
+    profiles: ["app"]
+    environment:
+      PORT: "8080"
+      NODE_ENV: development
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pipeline:
+    build:
+      context: services/pipeline
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    profiles: ["app"]
+    environment:
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "/app/.venv/bin/python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz').status==200 else 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   pgdata:

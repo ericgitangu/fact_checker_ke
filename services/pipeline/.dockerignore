@@ -1,0 +1,18 @@
+# services/pipeline/.dockerignore — build context for the pipeline image
+# (context = services/pipeline; the pipeline is a standalone uv project with
+# no workspace deps on the pnpm monorepo, so it doesn't need the repo root).
+
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.mypy_cache
+.git
+.env
+.env.*
+!.env.example
+*.log
+tests
+.DS_Store
