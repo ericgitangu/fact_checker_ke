@@ -1,0 +1,79 @@
+/*
+ * Self-contained styles for <Wordmark>. Deliberately independent of any
+ * consuming app's own token system (no var(--ink) etc.) so this package
+ * renders correctly in both apps/site (Vite, plain CSS) and apps/web
+ * (Next.js, Tailwind v4) without dragging either app's design tokens
+ * along — only React + this one stylesheet, imported by wordmark.tsx.
+ */
+.fck-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  line-height: 1;
+}
+
+.fck-wordmark-mark {
+  flex: none;
+  border-radius: 22%;
+}
+
+.fck-wordmark-text {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Sizes control type scale + mark size (mark size is a prop, not CSS). */
+.fck-wordmark-sm .fck-wordmark-text {
+  font-size: 0.85rem;
+}
+.fck-wordmark-md .fck-wordmark-text {
+  font-size: 1rem;
+}
+.fck-wordmark-lg .fck-wordmark-text {
+  font-size: 1.3rem;
+}
+
+/* Variant text colour — hardcoded (not theme-token-driven) so the
+   component renders correctly wherever it's dropped, independent of the
+   host app's CSS variables. */
+.fck-wordmark-light .fck-wordmark-text {
+  color: #15181b;
+}
+.fck-wordmark-dark .fck-wordmark-text {
+  color: #f1f3ef;
+}
+.fck-wordmark-mono .fck-wordmark-text {
+  color: currentColor;
+}
+
+/* The name + its superscript flag flow as one inline unit so the flag
+   hugs the end of "...ke" rather than floating off as a separate element. */
+.fck-wordmark-nametag {
+  display: inline;
+  white-space: nowrap;
+}
+
+/*
+ * The waving Kenyan flag — a subtle superscript tucked at the tip of "ke",
+ * like a trademark/national mark on the name. Small by design; it waves via
+ * the SVG cloth filter (reduced-motion safe) without competing with the type.
+ */
+.fck-wordmark-flag {
+  display: inline-block;
+  width: auto;
+  vertical-align: super;
+  margin-left: 0.08em;
+  filter: drop-shadow(0 0.5px 1px rgba(10, 12, 14, 0.3));
+  overflow: visible;
+}
+
+.fck-wordmark-sm .fck-wordmark-flag {
+  height: 0.58em;
+}
+.fck-wordmark-md .fck-wordmark-flag {
+  height: 0.66em;
+}
+.fck-wordmark-lg .fck-wordmark-flag {
+  height: 0.8em;
+}
