@@ -10,11 +10,21 @@ export const SubmissionInputSchema = z
   .object({
     url: z.string().url().optional(),
     text: z.string().min(1).max(20_000).optional(),
+    /**
+     * ADR-0002 (accepted): for third-party video URLs we never download audio.
+     * The submitter pastes the exact quote and where it occurs; we check that text.
+     */
+    quote: z.string().min(1).max(5_000).optional(),
+    timestampSec: z.number().int().nonnegative().max(86_400).optional(),
     submittedBy: z.string().min(1).max(200).optional(),
   })
   .refine((data) => Boolean(data.url) !== Boolean(data.text), {
     message: "Provide exactly one of `url` or `text`.",
     path: ["url"],
+  })
+  .refine((data) => !(data.text && (data.quote || data.timestampSec !== undefined)), {
+    message: "`quote`/`timestampSec` only apply to `url` submissions.",
+    path: ["quote"],
   });
 export type SubmissionInput = z.infer<typeof SubmissionInputSchema>;
 
