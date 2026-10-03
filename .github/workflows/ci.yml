@@ -9,6 +9,27 @@ jobs:
   node:
     name: Node (lint, typecheck, test, build)
     runs-on: ubuntu-latest
+    services:
+      # Real Postgres + pgvector for packages/db and services/api
+      # integration tests (DATABASE_URL_TEST below) — not used by the
+      # default unit-test task, which still runs against in-memory
+      # doubles per services/api/src/repositories/in-memory.ts.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: fact_checker_ke
+          POSTGRES_PASSWORD: fact_checker_ke
+          POSTGRES_DB: fact_checker_ke
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fact_checker_ke"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL_TEST: postgres://fact_checker_ke:fact_checker_ke@localhost:5432/fact_checker_ke
+      DATABASE_URL_DIRECT: postgres://fact_checker_ke:fact_checker_ke@localhost:5432/fact_checker_ke
     steps:
       - uses: actions/checkout@v4
 
@@ -30,11 +51,17 @@ jobs:
       - name: Typecheck
         run: pnpm turbo run typecheck
 
-      - name: Test
-        run: pnpm turbo run test
-
       - name: Build
         run: pnpm turbo run build
+
+      - name: Run migrations against the service-container Postgres
+        run: pnpm --filter @fact-checker-ke/db db:migrate
+
+      - name: Test (unit, in-memory doubles)
+        run: pnpm turbo run test
+
+      - name: Test (integration, real Postgres)
+        run: pnpm --filter @fact-checker-ke/api test:integration
 
   pipeline:
     name: Python pipeline (uv, pytest)

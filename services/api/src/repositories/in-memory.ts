@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { Check, Submission } from "@fact-checker-ke/core";
-import type { CheckRepository, RepoResult, SubmissionRepository } from "./types.js";
+import type { Check, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
+import type { CheckRepository, RepoResult, SubmissionRepository, WaitlistRepository } from "./types.js";
 
 /**
  * In-memory implementation used for the skeleton and tests. Not safe across
@@ -50,5 +50,17 @@ export class InMemoryCheckRepository implements CheckRepository {
       return { ok: false, error: { kind: "not_found", message: `Check ${id} not found` } };
     }
     return { ok: true, value: found };
+  }
+}
+
+export class InMemoryWaitlistRepository implements WaitlistRepository {
+  private readonly emails = new Set<string>();
+
+  async join(input: WaitlistSignupInput): Promise<RepoResult<WaitlistSignupResult>> {
+    if (this.emails.has(input.email)) {
+      return { ok: true, value: { status: "already_joined" } };
+    }
+    this.emails.add(input.email);
+    return { ok: true, value: { status: "joined" } };
   }
 }
