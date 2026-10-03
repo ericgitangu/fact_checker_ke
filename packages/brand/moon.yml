@@ -1,0 +1,12 @@
+$schema: 'https://moonrepo.dev/schemas/project.yml'
+
+# lint/typecheck/test/build are inherited from .moon/tasks/node.yml and
+# proxy to this project's own package.json scripts. No dependsOn needed --
+# this package has no runtime dependency on any other workspace package
+# (react/react-dom are peerDependencies, resolved by whichever app consumes
+# it), mirroring packages/i18n's moon.yml.
+
+tasks:
+  build:
+    outputs:
+      - 'dist/**'
