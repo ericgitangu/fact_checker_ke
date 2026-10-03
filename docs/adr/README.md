@@ -170,7 +170,7 @@ Evidence-based state of every ADR after the weekend build merged to `main`. "Imp
 | 0001 scope & phasing | Accepted | Phasing drives the build; Phase-0 PWA + site shipped |
 | 0002 content ingestion | Implemented | User-submitted links + quote/timestamp flow live (blocker-1/2 fixed) |
 | 0003 outbound bots | Proposed | Blocked: platform API access + X automation approval |
-| 0004 verification pipeline | Implemented | Human review gate live (AT-0004-A/B green); RAG/citation guards in pipeline |
+| 0004 verification pipeline | Implemented | Human review gate live (AT-0004-A/B green); RAG/citation guards in pipeline; quote-less video URLs short-circuit before any LLM call (`needs_quote`), no fabricated empty analysis |
 | 0005 speech & language | Partial | ASR Round A done (Chirp_2 7.8%); Round B needs human Sheng clips; STT not wired to live |
 | 0006 synthetic media | Implemented | Triage (C2PA + detector-as-triage), never "deepfake" on score alone |
 | 0007 maandamano | Partial | Tracker UI + night band live; kill-switch *mechanism* (flag+ISR purge) RED |
@@ -186,15 +186,15 @@ Evidence-based state of every ADR after the weekend build merged to `main`. "Imp
 | 0017 event-driven core | Implemented | Outbox + 3-layer idempotency + state machine (AT green, 33/33 integ) |
 | 0018 SSE + caching | Implemented | SSE live-verified, caching, device tokens (AT green) |
 | 0019 test strategy | Implemented | AT suites + RED/GREEN + red-team gates in use |
-| 0020 identity/auth/roles | Implemented | Self-hosted auth + MFA + audit log (hardening PR in review) |
+| 0020 identity/auth/roles | Implemented | Self-hosted auth + MFA + audit log; security-hardening merged — bootstrap admin grant is self-target-only, TOTP codes single-use (replay-proof via `totp_used_codes`) |
 | 0021 data protection | Partial | Retention sweep + DSAR stub; cross-border basis needs advocate |
 | 0022 observability | Partial | Infra alerts + 4 runbooks; app-emitted DLQ/quota metrics RED |
 | 0023 adversarial AI | Implemented | Delimited untrusted blocks, citation integrity, injection fixtures |
-| 0024 trust & safety | Implemented | Comments moderation (comment-on-draft gate in hardening PR) |
+| 0024 trust & safety | Implemented | Comments moderation; comment-on-draft gate merged (403 on unpublished/draft checks, before demonstration-state logic) |
 | 0025 editorial ops | Implemented | Review queue/approve/correct/right-of-reply (AT green) |
 | 0026 OSS boundary/licence | Implemented | Apache-2.0 LICENSE + SECURITY/CONTRIBUTING/COC; GitHub push-protection on |
 | 0027 user media uploads | Partial | Processing (EXIF strip/hash/scan) done; signed GCS upload RED |
-| 0028 client UX baseline | Partial | EN/SW i18n live; a11y audit + offline SW tests RED |
+| 0028 client UX baseline | Implemented | EN/SW i18n live; a11y audit GREEN (axe on home/submit/check/maandamano/editor + independently-recomputed WCAG AA contrast across the verdict palette) + offline SW tests GREEN; visible keyboard focus restored on the dropzone. Residual: `@fact-checker-ke/brand` not independently a11y-audited; SW install/activate lifecycle not exercised e2e |
 | 0029 cost model | Accepted | Doc complete; advocate retainer amount a GAP |
 | 0030 creator funnel | Accepted | Firewall process doc; audit-table schema RED |
 | 0031 confidence-weighted | Proposed | Owner-accepted direction; risk-tier + calibration + publish-policy NOT built |
