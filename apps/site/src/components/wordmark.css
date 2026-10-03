@@ -1,0 +1,106 @@
+/*
+ * Self-contained styles for <Wordmark>. Deliberately independent of
+ * apps/site's index.css token system (no var(--ink) etc.) so the component
+ * can be lifted verbatim into a shared packages/brand package for apps/web
+ * without dragging this app's design tokens along — only React + this one
+ * stylesheet.
+ */
+.fck-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  line-height: 1;
+}
+
+.fck-wordmark-mark {
+  flex: none;
+  border-radius: 22%;
+}
+
+.fck-wordmark-textwrap {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.22em;
+}
+
+.fck-wordmark-text {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Sizes control type scale + mark size (mark size is a prop, not CSS). */
+.fck-wordmark-sm .fck-wordmark-text {
+  font-size: 0.85rem;
+}
+.fck-wordmark-md .fck-wordmark-text {
+  font-size: 1rem;
+}
+.fck-wordmark-lg .fck-wordmark-text {
+  font-size: 1.3rem;
+}
+
+/* Variant text colour — hardcoded (not theme-token-driven) so the
+   component renders correctly wherever it's dropped, independent of the
+   host app's CSS variables. */
+.fck-wordmark-light .fck-wordmark-text {
+  color: #15181b;
+}
+.fck-wordmark-dark .fck-wordmark-text {
+  color: #f1f3ef;
+}
+.fck-wordmark-mono .fck-wordmark-text {
+  color: currentColor;
+}
+
+/*
+ * Kenyan tricolour accent: a restrained, thin rule under the wordmark text
+ * — never the flag itself. Black / red / green bars (official order),
+ * hairline white fimbriation between them, matching the real flag's
+ * proportions at a scale that reads as "a considered detail" rather than
+ * "a flag pasted on a logo". A neutral, semi-transparent outer ring keeps
+ * the black bar visible on both a light and a near-black page background
+ * (a flat black bar would nearly vanish against dark-theme --paper).
+ */
+.fck-wordmark-tricolour {
+  display: flex;
+  height: 0.16em;
+  min-height: 2px;
+  border-radius: 1px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(128, 134, 130, 0.4);
+}
+
+.fck-wordmark-sm .fck-wordmark-tricolour {
+  width: 2.6em;
+}
+.fck-wordmark-md .fck-wordmark-tricolour {
+  width: 3.1em;
+}
+.fck-wordmark-lg .fck-wordmark-tricolour {
+  width: 3.6em;
+}
+
+.fck-wordmark-tricolour span {
+  flex: 1 1 0;
+}
+.fck-wordmark-tricolour span + span {
+  margin-left: 1px;
+  box-shadow: -1px 0 0 0 #fff;
+}
+
+.fck-wordmark-tricolour .fck-band-black {
+  background: #0a0a0a;
+}
+.fck-wordmark-tricolour .fck-band-red {
+  background: #bb0000;
+}
+.fck-wordmark-tricolour .fck-band-green {
+  background: #006600;
+}
+
+@media (prefers-contrast: more) {
+  .fck-wordmark-tricolour {
+    box-shadow: 0 0 0 1px currentColor;
+  }
+}
