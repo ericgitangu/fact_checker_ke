@@ -29,7 +29,7 @@ Several of these are blocked by external timelines that no amount of engineering
 - **Marketing SPA:** what the app is, the methodology, a link to the GitHub repo, and a waitlist.
 - **PWA, "Check a link":**
   1. The user pastes a URL (YouTube, X, TikTok, Threads, news article) or text.
-  2. The pipeline transcribes it, extracts claims and grounds them with RAG.
+  2. The pipeline transcribes it, extracts claims and grounds them with RAG. ~~(for third-party YouTube/TikTok video, no audio is transcribed — the user supplies the quote and timestamp)~~ _(superseded — see "Red-team amendments")_
   3. It returns a draft analysis with cited sources.
   4. Output is labelled "AI-assisted analysis — not a verdict". The published "verdict" tier needs human review (ADR-0004).
 - **Maandamano page, read-only:** advisories curated by an editor (date, area, status, sources), plus a coarse area-level map with no live user geolocation (ADR-0007).
@@ -64,3 +64,14 @@ Several of these are blocked by external timelines that no amount of engineering
 
 ## Review trigger
 Revisit if Play grants production access early or Meta App Review clears early, or if a funded partner such as PesaCheck or Code for Africa offers editorial capacity.
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #9.
+
+- **Strike "transcribes it" for video URLs.** For third-party YouTube/TikTok video, ADR-0002's decision update (accepted) means no audio is downloaded or transcribed; the user supplies the quoted text and timestamp, and the official embed is shown for context. Phase 0's "Check a link" flow description above is stale for video and is superseded by ADR-0002 §"Decision update" and ADR-0005 §"Research round 2".
+- **U2 (near-real-time on live streams/speech) is redefined:** "Live mode shows existing published checks and context cards beside licensed embeds. A new named-person False verdict never ships in live mode." This resolves the contradiction between near-real-time politician checks and the ADR-0008 §3 right-of-reply window — live mode surfaces prior published work, it does not publish new verdicts live.
+- **Use-case coverage findings carried in from the red-team report (informational, not new decisions):**
+  - U1 (check creator/politician claims): Partial — works for text platforms (X, Threads); unsafe for video until quote attribution is verified by an editor before any rating renders (see ADR-0004 amendments).
+  - U2 (near-real-time live streams/speech): Fails for third-party content as originally scoped; redefined above.
+  - U9 (OSS/stores/PWA/SPA, launch soon): Partial — D-U-N-S is the critical path (3-4 weeks), and the repo is about to go public with remote CI gates off (see ADR-0013/0016 amendments).

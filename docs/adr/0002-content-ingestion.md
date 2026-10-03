@@ -63,3 +63,10 @@ Revisit if Meta App Review is approved, or if TikTok opens a commercial or non-p
 ## Decision update (2026-10-03): ACCEPTED, video transcript path
 
 Option **(a)** was accepted by the product owner. For third-party YouTube and TikTok videos, the user supplies the quoted text and timestamp. We fact-check that text and show the official embed for context. No audio is downloaded. Options (b) (apply to YouTube for written approval) and (c) (partner broadcasters via owner OAuth) remain the scaling path and are tracked separately.
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #6 (also applied to ADR-0004 step 1).
+
+- **A user-supplied quote carries `attribution: unverified`.** Nothing in this ADR today verifies that a submitted quote/timestamp pair is real: a submitter can invent words, attribute them to a named person, and get a check page built on a fabrication (red-team C-1). The editor must confirm the quote against the embed at the stated timestamp before any rating is published (see ADR-0004 step 7 amendment, AT-0004-A/AT-0004-B).
+- **UI copy requirement:** wherever a video/audio URL is checked via user-supplied quote, the UI must state *"We checked the quote you provided, not the video audio."* This makes the ADR-0002 round-2 descoping (no audio fetch from YouTube/TikTok) honest to end users, which the original decision text above did not require.
