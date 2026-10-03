@@ -17,6 +17,11 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 FAIL=0
+
+# These suites invoke vitest directly (bypassing moon's task graph), so a
+# stale packages/{core,db}/dist silently poisons them — observed 2026-10-03
+# as a bogus invalid_signature. Build workspace deps first.
+pnpm exec moon run core:build db:build >/dev/null
 pass() { echo "PASS  $1"; }
 fail() { echo "FAIL  $1: $2"; FAIL=1; }
 
