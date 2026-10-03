@@ -1,0 +1,191 @@
+{
+  "round": "A",
+  "dataset": "google/fleurs config=sw_ke split=test",
+  "licence": "CC-BY-4.0 (public read-speech, reference transcripts; not user content)",
+  "selection": "first N distinct FLEURS `id` values (ascending), one row per id (lowest original dataset index on ties) -- `id` is a sentence id, not a unique row id: 175/487 ids in this split have >1 recording (different speakers reading the same sentence), confirmed empirically after an initial naive sort-by-id run silently collided clip_ids and overwrote wav files for 11 of 30 clips",
+  "n_clips": 30,
+  "normaliser": "lowercase, strip punctuation, collapse whitespace, NFC (asr_eval/normalize.py)",
+  "coverage_gap": "Round A is CLEAN READ SPEECH ONLY. It contains 0 Sheng/code-switched and 0 noisy/crowd clips. AT-0005-1 requires >=10 of each and stays RED until Round B (Bunge/Citizen TV/creator TikTok clips) is built.",
+  "clips": [
+    {
+      "clip_id": "fleurs_sw_ke_01660",
+      "reference_raw": "Uroma ulikuwa na kipengele kikubwa cha maamuzi ya kitamaduni yaliyochochewa na waandishi kama vile Goethe, Fichte na Schlegel.",
+      "reference_norm": "uroma ulikuwa na kipengele kikubwa cha maamuzi ya kitamaduni yaliyochochewa na waandishi kama vile goethe fichte na schlegel",
+      "duration_s": 16.44
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01661",
+      "reference_raw": "Hakuweka kiwango cha kukatwa, akisema itafanywa kulingana na pato la kiuchumi la China.",
+      "reference_norm": "hakuweka kiwango cha kukatwa akisema itafanywa kulingana na pato la kiuchumi la china",
+      "duration_s": 12.78
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01662",
+      "reference_raw": "Aloi kimsingi ni mchanganyiko wa metali mbili au zaidi. Usisahau kwamba kuna elementi nyingi kwenye jedwali la elementi.",
+      "reference_norm": "aloi kimsingi ni mchanganyiko wa metali mbili au zaidi usisahau kwamba kuna elementi nyingi kwenye jedwali la elementi",
+      "duration_s": 12.48
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01663",
+      "reference_raw": "Bonde la Cochamo – eneo kuu la makusudio ya ukweaji nchini Chile, lijulikanalo kama Yosemite ya Marekani Kusini, na kuta kubwa anuwai za matale na majabali.",
+      "reference_norm": "bonde la cochamo eneo kuu la makusudio ya ukweaji nchini chile lijulikanalo kama yosemite ya marekani kusini na kuta kubwa anuwai za matale na majabali",
+      "duration_s": 20.7
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01664",
+      "reference_raw": "Funganya poda mbili kavu kisha, kwa mikono safi yenye unyevu, ziingize kwenye mpira.",
+      "reference_norm": "funganya poda mbili kavu kisha kwa mikono safi yenye unyevu ziingize kwenye mpira",
+      "duration_s": 11.94
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01665",
+      "reference_raw": "Hati hiyo, kulingana na fununu, itarejelea mzozo wa mipaka, ambayo Palestina inataka iwe na msingi wa mipaka kabla ya Vita vya 1967 vya Mashariki ya Kati.",
+      "reference_norm": "hati hiyo kulingana na fununu itarejelea mzozo wa mipaka ambayo palestina inataka iwe na msingi wa mipaka kabla ya vita vya 1967 vya mashariki ya kati",
+      "duration_s": 16.74
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01666",
+      "reference_raw": "Pia pengine ungetaka kushauriana na ushauri wa serikali bali na yako, lakini ushauri wao umeundiwa raia wao.",
+      "reference_norm": "pia pengine ungetaka kushauriana na ushauri wa serikali bali na yako lakini ushauri wao umeundiwa raia wao",
+      "duration_s": 11.88
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01667",
+      "reference_raw": "Kwa ujumla, tabia mbili zinaweza kuibuka wakati wasimamizi wanaanza kuwaongoza wenzao wa awali. Kwa upande mmoja watajaribu kujinasibisha kama ‘‘mmojawapo wa wanaume’’ (au wanawake).",
+      "reference_norm": "kwa ujumla tabia mbili zinaweza kuibuka wakati wasimamizi wanaanza kuwaongoza wenzao wa awali kwa upande mmoja watajaribu kujinasibisha kama mmojawapo wa wanaume au wanawake",
+      "duration_s": 16.44
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01668",
+      "reference_raw": "Inaweza kuwa manufaa kwa mtu kununua Kadi Mbugani, ambayo hutoa kiingilio kwa baadhi ya mbuga za Afrika Kusini au Mbuga zote za Kitaifa za Afrika Kusini.",
+      "reference_norm": "inaweza kuwa manufaa kwa mtu kununua kadi mbugani ambayo hutoa kiingilio kwa baadhi ya mbuga za afrika kusini au mbuga zote za kitaifa za afrika kusini",
+      "duration_s": 14.46
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01669",
+      "reference_raw": "Mkuu wa polisi Chandra Shekar Solanki alisema mshtakiwa alitokea mahakamani na uso uliofunikwa.",
+      "reference_norm": "mkuu wa polisi chandra shekar solanki alisema mshtakiwa alitokea mahakamani na uso uliofunikwa",
+      "duration_s": 10.02
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01671",
+      "reference_raw": "Bunge lilianza kufadhili kikundi chenye nia chafu katika mwaka wa kifedha wa 2005 na kuaini kuwa FBI lazima itoe makachero kumi kwa ponografia ya watu wazima.",
+      "reference_norm": "bunge lilianza kufadhili kikundi chenye nia chafu katika mwaka wa kifedha wa 2005 na kuaini kuwa fbi lazima itoe makachero kumi kwa ponografia ya watu wazima",
+      "duration_s": 20.64
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01672",
+      "reference_raw": "Uwe mwangalifu kitambaa kisiwe moto sana (kwani inaweza kusababisha urukaji, au katika hali mbaya zaidi, kuchoma).",
+      "reference_norm": "uwe mwangalifu kitambaa kisiwe moto sana kwani inaweza kusababisha urukaji au katika hali mbaya zaidi kuchoma",
+      "duration_s": 13.86
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01674",
+      "reference_raw": "Katika baadhi ya maeneo mengine kuchemsha maji kwa dakika moja kunatosha, kwingineko dakika kadhaa zitahitajika.",
+      "reference_norm": "katika baadhi ya maeneo mengine kuchemsha maji kwa dakika moja kunatosha kwingineko dakika kadhaa zitahitajika",
+      "duration_s": 8.76
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01675",
+      "reference_raw": "Nomino zote, ikiwemo Sie kwa wewe, daima huanza kwa herufi kubwa, hata katika katikati mwa sentensi.",
+      "reference_norm": "nomino zote ikiwemo sie kwa wewe daima huanza kwa herufi kubwa hata katika katikati mwa sentensi",
+      "duration_s": 14.4
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01676",
+      "reference_raw": "Kama ilivyo na Mbuga zote za Wanyama za Kitaifa Kusini mwa Afrika, kuna malipo ya kila siku ya uhifadhi na kiingilio.",
+      "reference_norm": "kama ilivyo na mbuga zote za wanyama za kitaifa kusini mwa afrika kuna malipo ya kila siku ya uhifadhi na kiingilio",
+      "duration_s": 13.56
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01677",
+      "reference_raw": "Siku hizi, wadudu pekee ambao hawawezi kukunja mabawa yao kwenda nyuma ni kerengende na kipupe.",
+      "reference_norm": "siku hizi wadudu pekee ambao hawawezi kukunja mabawa yao kwenda nyuma ni kerengende na kipupe",
+      "duration_s": 10.32
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01678",
+      "reference_raw": "Oliver Sacks, katika gazeti lake Hotuba ya Rais, alionyesha namna watu ambao hawawezi kuelewa hotuba kutokana na uharibifu wa ubongo hata hivyo wana uwezo kwa kutathmini ukweli kwa usahihi.",
+      "reference_norm": "oliver sacks katika gazeti lake hotuba ya rais alionyesha namna watu ambao hawawezi kuelewa hotuba kutokana na uharibifu wa ubongo hata hivyo wana uwezo kwa kutathmini ukweli kwa usahihi",
+      "duration_s": 18.24
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01679",
+      "reference_raw": "Aerosmith wameghairi maonyesho yaliyobaki katika ziara yao.",
+      "reference_norm": "aerosmith wameghairi maonyesho yaliyobaki katika ziara yao",
+      "duration_s": 10.26
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01680",
+      "reference_raw": "Mwanariadha wa mambo anuwai, simbamarara anaweza kupanda (ingawa si vizuri), kuogelea, kuruka mbali sana na kuvuta kwa nguvu mara tano ya zile za mwanamume mwenye nguvu.",
+      "reference_norm": "mwanariadha wa mambo anuwai simbamarara anaweza kupanda ingawa si vizuri kuogelea kuruka mbali sana na kuvuta kwa nguvu mara tano ya zile za mwanamume mwenye nguvu",
+      "duration_s": 17.82
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01681",
+      "reference_raw": "Haiko peke yake hata hivyo, majaribio, na jaribio ni upimaji ambao hutumiwa kuondoa nadharia moja au mbili zinazowezekana, kuuliza maswali, na kufanya uchunguzi pia huongoza utafiti wa kisayansi.",
+      "reference_norm": "haiko peke yake hata hivyo majaribio na jaribio ni upimaji ambao hutumiwa kuondoa nadharia moja au mbili zinazowezekana kuuliza maswali na kufanya uchunguzi pia huongoza utafiti wa kisayansi",
+      "duration_s": 19.08
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01683",
+      "reference_raw": "Kungali kuna wanaume na wanawake wengi walio hai walioishi muda wao hapa, na wengine wengi ambao wapendwa wao waliuawa au walifanyishwa kazi hadi kufa, Wayahudi na wasio Wayahudi vilevile.",
+      "reference_norm": "kungali kuna wanaume na wanawake wengi walio hai walioishi muda wao hapa na wengine wengi ambao wapendwa wao waliuawa au walifanyishwa kazi hadi kufa wayahudi na wasio wayahudi vilevile",
+      "duration_s": 24.12
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01684",
+      "reference_raw": "Apia ni mji mkuu wa Samoa. Mji huo uko kwenye kisiwa cha Upolu na lina watu chini ya 40,000.",
+      "reference_norm": "apia ni mji mkuu wa samoa mji huo uko kwenye kisiwa cha upolu na lina watu chini ya 40 000",
+      "duration_s": 11.52
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01685",
+      "reference_raw": "Kwa mfano, umbizo la upigaji picha tuli wa kawaida zaidi duniani ni milimita 35, ambayo ndiyo iliyokuwa saizi kuu ya filamu katika zama za sinema za kikale.",
+      "reference_norm": "kwa mfano umbizo la upigaji picha tuli wa kawaida zaidi duniani ni milimita 35 ambayo ndiyo iliyokuwa saizi kuu ya filamu katika zama za sinema za kikale",
+      "duration_s": 19.56
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01686",
+      "reference_raw": "Kama matokeo, mchakato wa shirika kufanya kazi pamoja kushinda kizuizi unaweza kupelekea mchakato mpya mbunifu wa kuhudumia mahitaji ya wateja.",
+      "reference_norm": "kama matokeo mchakato wa shirika kufanya kazi pamoja kushinda kizuizi unaweza kupelekea mchakato mpya mbunifu wa kuhudumia mahitaji ya wateja",
+      "duration_s": 13.44
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01687",
+      "reference_raw": "Mabadiliko ya uchangaji ya utengaji na uchanganyaji tena huku na huko kati ya vidimbwi hivyo viwili kwa kila kizazi.",
+      "reference_norm": "mabadiliko ya uchangaji ya utengaji na uchanganyaji tena huku na huko kati ya vidimbwi hivyo viwili kwa kila kizazi",
+      "duration_s": 11.52
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01688",
+      "reference_raw": "Kazi ya Jeshi la wanamaji kwa kiasili imekuwa ni kuhakikisha kuwa nchi yako ina uwezo wa kusafirisha watu na bidhaa zako, wakati huo huo, kuzuia uwezo wa adui wako wa kuhamisha watu wake na bidhaa.",
+      "reference_norm": "kazi ya jeshi la wanamaji kwa kiasili imekuwa ni kuhakikisha kuwa nchi yako ina uwezo wa kusafirisha watu na bidhaa zako wakati huo huo kuzuia uwezo wa adui wako wa kuhamisha watu wake na bidhaa",
+      "duration_s": 19.68
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01689",
+      "reference_raw": "Uropa ni bara ambalo ni dogo kiasi lakini lina nchi nyingi huru. Katika hali ya kawaida, kusafiri kupitia nchi nyingi kungemaanisha kulazimika kufanya maombi ya visa na udhibiti wa pasipoti mara nyingi.",
+      "reference_norm": "uropa ni bara ambalo ni dogo kiasi lakini lina nchi nyingi huru katika hali ya kawaida kusafiri kupitia nchi nyingi kungemaanisha kulazimika kufanya maombi ya visa na udhibiti wa pasipoti mara nyingi",
+      "duration_s": 20.34
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01690",
+      "reference_raw": "Tunakubaliana na taarifa ya USOC kwamba masilahi ya wanariadha na vilabu vyetu, na spoti yao, huenda yakashughulikiwa vyema kwa kusonga mbele na mabadiliko ya maana ndani ya shirika letu, badala ya kughairi vyeti.",
+      "reference_norm": "tunakubaliana na taarifa ya usoc kwamba masilahi ya wanariadha na vilabu vyetu na spoti yao huenda yakashughulikiwa vyema kwa kusonga mbele na mabadiliko ya maana ndani ya shirika letu badala ya kughairi vyeti",
+      "duration_s": 21.0
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01691",
+      "reference_raw": "Katika baadhi ya njia, kampuni kubwa zina ndege zao wenyewe, lakini kwa njia nyingine na kampuni ndogo kulikuwa na shida.",
+      "reference_norm": "katika baadhi ya njia kampuni kubwa zina ndege zao wenyewe lakini kwa njia nyingine na kampuni ndogo kulikuwa na shida",
+      "duration_s": 9.84
+    },
+    {
+      "clip_id": "fleurs_sw_ke_01692",
+      "reference_raw": "Kulingana na shirika la nyuklia la Japan, mionzi, cesiamu na iodini zimetambuliwa kiwandani.",
+      "reference_norm": "kulingana na shirika la nyuklia la japan mionzi cesiamu na iodini zimetambuliwa kiwandani",
+      "duration_s": 13.74
+    }
+  ]
+}
