@@ -17,12 +17,6 @@
   border-radius: 22%;
 }
 
-.fck-wordmark-textwrap {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 0.22em;
-}
-
 .fck-wordmark-text {
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -54,53 +48,26 @@
 }
 
 /*
- * Kenyan tricolour accent: a restrained, thin rule under the wordmark text
- * — never the flag itself. Black / red / green bars (official order),
- * hairline white fimbriation between them, matching the real flag's
- * proportions at a scale that reads as "a considered detail" rather than
- * "a flag pasted on a logo". A neutral, semi-transparent outer ring keeps
- * the black bar visible on both a light and a near-black page background
- * (a flat black bar would nearly vanish against dark-theme --paper).
+ * The waving Kenyan flag that terminates the lockup — the ONE expressive
+ * element of the brand. Sized relative to the wordmark text, lifted off the
+ * page with a soft drop shadow so it reads as cloth in front of the surface,
+ * not a sticker on it.
  */
-.fck-wordmark-tricolour {
-  display: flex;
-  height: 0.16em;
-  min-height: 2px;
-  border-radius: 1px;
-  overflow: hidden;
-  box-shadow: 0 0 0 1px rgba(128, 134, 130, 0.4);
+.fck-wordmark-flag {
+  flex: none;
+  display: block;
+  width: auto;
+  margin-left: 0.15em;
+  filter: drop-shadow(0 1px 1.5px rgba(10, 12, 14, 0.35));
+  overflow: visible;
 }
 
-.fck-wordmark-sm .fck-wordmark-tricolour {
-  width: 2.6em;
+.fck-wordmark-sm .fck-wordmark-flag {
+  height: 1.15em;
 }
-.fck-wordmark-md .fck-wordmark-tricolour {
-  width: 3.1em;
+.fck-wordmark-md .fck-wordmark-flag {
+  height: 1.45em;
 }
-.fck-wordmark-lg .fck-wordmark-tricolour {
-  width: 3.6em;
-}
-
-.fck-wordmark-tricolour span {
-  flex: 1 1 0;
-}
-.fck-wordmark-tricolour span + span {
-  margin-left: 1px;
-  box-shadow: -1px 0 0 0 #fff;
-}
-
-.fck-wordmark-tricolour .fck-band-black {
-  background: #0a0a0a;
-}
-.fck-wordmark-tricolour .fck-band-red {
-  background: #bb0000;
-}
-.fck-wordmark-tricolour .fck-band-green {
-  background: #006600;
-}
-
-@media (prefers-contrast: more) {
-  .fck-wordmark-tricolour {
-    box-shadow: 0 0 0 1px currentColor;
-  }
+.fck-wordmark-lg .fck-wordmark-flag {
+  height: 1.85em;
 }
