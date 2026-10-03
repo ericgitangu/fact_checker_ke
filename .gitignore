@@ -64,3 +64,5 @@ infra/terraform/**/plan.json
 infra/terraform/**/*.tfplan
 infra/terraform/**/.token
 infra/terraform/**/.envrc
+.vercel
+.env*
