@@ -65,3 +65,12 @@ Final `fact-checker-ke/api` image: 229MB (vs. 206MB pre-ADR-0014), non-root (uid
 **Tech debt / known gaps surfaced, not hidden**:
 - `pipeline:lint` (`uv run ruff check .`) is new to CI — it wasn't run before (CI only ran `mypy`+`pytest`). It found 2 pre-existing issues (`RUF100` unused `noqa`, `RUF023` unsorted `__slots__`); both fixed with `ruff check --fix` as part of this change (trivial, safe, not behavioral).
 - `services/api/src/repositories/postgres.ts` briefly appeared to fail strict typecheck during verification (Drizzle pgEnum columns typed as `string` instead of a literal union) — this is the exact "a zod v4 type change broke Drizzle pgEnum's" incident ADR-0013 names as prior art. It was NOT reproducible on a clean, forced `moon ci` run or `moon run api:typecheck --force` (confirmed GREEN both ways); the one failing run is attributed to a stale `packages/db/dist` from an earlier manual build step during this same debugging session, not a real defect. No code changes were made for it. Flagged here in case it recurs.
+
+## Integrator re-verification (2026-10-03)
+
+Wave-1's GREEN report did not survive independent re-runs; three findings, all fixed in `fix(tooling): make AT-0014 suite idempotent and env-complete`:
+1. **AT-0014-1 was cache-masked.** `moon ci` without `VITE_API_URL` fails on a cold cache (site's production guard). The env was present in CI but missing from the AT script and the pre-push hook; both now export dev placeholders.
+2. **AT-0014-4 was not idempotent.** moon's cache persists across invocations, so the fixed probe URL reported a bogus HIT on the script's second run; probes are now unique per run. ADR-0019's "run the suite twice" rule exists precisely for this class.
+3. **Concurrent moon invocations corrupted `.moon/cache/states/workspaceGraph.json`** (json::parse_file, missing field `projects`), producing misleading downstream errors. Remedy: `rm -rf .moon/cache` (gitignored, safe). Operational rule: never run two moon instances against one workspace concurrently; AT suites must own the workspace exclusively while running.
+
+Final state: AT-0014 and AT-0013 suites GREEN on two consecutive exclusive runs each.
