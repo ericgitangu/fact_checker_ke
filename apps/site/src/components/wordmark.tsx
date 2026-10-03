@@ -59,8 +59,12 @@ export function Wordmark({
         tone={variant === "mono" ? "mono" : "gradient"}
         className="fck-wordmark-mark"
       />
-      {showText && <span className="fck-wordmark-text">fact_checker_ke</span>}
-      {showText && variant !== "mono" && <WavingFlag className="fck-wordmark-flag" />}
+      {showText && (
+        <span className="fck-wordmark-nametag">
+          <span className="fck-wordmark-text">fact_checker_ke</span>
+          {variant !== "mono" && <WavingFlag className="fck-wordmark-flag" />}
+        </span>
+      )}
     </span>
   );
 }
