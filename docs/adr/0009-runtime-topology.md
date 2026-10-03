@@ -11,7 +11,7 @@ The brief wants Fastify, FastAPI, Rust and Go, EDA, serverless and multi-tenant,
 3. **TypeScript only.** Viable, but the Python audio and ML ecosystem (ffmpeg wrappers, eval tooling, future XLS-R fine-tuning) is stronger.
 
 ## Decision (proposed): Option 2
-- **apps/web:** Next.js (App Router) PWA. **apps/site:** the marketing SPA. Hosting: Cloud Run (GCP preference) or Vercel. Decide on cost **[GAP]**.
+- **apps/web:** Next.js (App Router) PWA. **apps/site:** the marketing SPA. Hosting: Cloud Run (GCP preference) or Vercel. ~~Decide on cost [GAP].~~ _(resolved — see ADR-0015: Vercel for apps/web and apps/site, Cloud Run for services/api and services/pipeline)_
 - **services/api:** Fastify (TypeScript) on Cloud Run with min-instances=0. It handles submissions, the read API, auth and the ClaimReview output.
 - **services/pipeline:** FastAPI (Python) on Cloud Run with min-instances=0. It runs normalize, STT, claim extraction, retrieval and draft verdict as separate idempotent endpoints.
 - **Events:** QStash. Each stage publishes the next with a content-hash dedup key, retries and a DLQ. No Pub/Sub or Kafka (cost and ops) **[I]**. QStash free-tier limits are a **[GAP]**, so verify them before relying on it.
@@ -61,4 +61,12 @@ Option **(a)** was accepted by the product owner. The pipeline runs as **two QSt
 1. `analyze` = normalize + claim extraction
 2. `verify` = retrieve + draft verdict
 
-Each hop is idempotent on content hash, with the idempotency state in Redis. This keeps the QStash free tier (1,000 messages/day) at roughly 500 submissions a day before retries. Revisit at about 300 submissions a day.
+Each hop is idempotent on content hash, with the idempotency state in Redis. ~~(idempotency state in Redis)~~ _(superseded — see "Red-team amendments": idempotency per ADR-0017 §2, Postgres is the source of truth, Redis is a pre-check only)_ This keeps the QStash free tier (1,000 messages/day) at roughly 500 submissions a day before retries. ~~Revisit at about 300 submissions a day.~~ _(superseded — see "Red-team amendments": the 500/day estimate omits the sweeper, retries and failure callbacks)_
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #1, #2, #13 (blocker/high severity, persistence wave).
+
+- **Amendment #1 [blocker]:** Idempotency state lives per ADR-0017 §2 — **Postgres is the source of truth**; Redis is a pre-check only (`SET NX` with TTL to shed obvious duplicates before opening a DB transaction). This corrects the stale "idempotency state in Redis" line above, which contradicts ADR-0017 and would mislead the persistence wave.
+- **Amendment #2 [blocker]:** Add a QStash quota ledger: `daily messages = 2 × subs + retries + sweeps + callbacks`. The "~500 submissions/day" estimate above (and the "~300/day" review trigger) is wrong because it omits the ADR-0017 sweeper, failure callbacks and retries (red-team C-3). The sweeper runs at most hourly (not every 5 min — see ADR-0017 amendments). Alert at 70% of the 1,000 msg/day free-tier ceiling. Cloud Tasks is the resolved overflow path once its free tier is confirmed (previously `[GAP]`).
+- **Amendment #13 [high]:** Add alerting on: DLQ non-empty, outbox oldest unpublished row older than 15 minutes, QStash/Neon/Upstash usage over 70% of free-tier quota, and elevated error rate (Sentry free tier or Cloud Error Reporting). Today only GCP/Anthropic billing budgets exist; nothing alerts on the DLQ (kept only 3 days) or outbox lag.

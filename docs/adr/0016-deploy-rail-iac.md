@@ -71,11 +71,22 @@ flowchart LR
 Revisit if Actions is restored (move the rail to CI), on the first failed promotion (post-mortem the rail), or when a second environment (staging) is justified.
 
 ## Acceptance tests
-| ID | Behaviour |
-|---|---|
-| AT-0016-1 | plan-guard fails a plan with `min_instance_count = 1` and passes the real prod plan |
-| AT-0016-2 | After the rail, `gcloud run services describe` shows min=0 on every service |
-| AT-0016-3 | A failed candidate smoke leaves 100% traffic on the previous revision (forced-failure drill) |
-| AT-0016-4 | A migration containing `DROP COLUMN` without a `-- contract:` marker fails CI |
-| AT-0016-5 | `terraform plan` on an unchanged tree reports no changes (state matches the imported Neon/Upstash) |
-| AT-0016-6 | No secret value appears in `terraform show -json` output (grep check) |
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0016-1 | plan-guard fails a plan with `min_instance_count = 1` and passes the real prod plan | RED |
+| AT-0016-2 | After the rail, `gcloud run services describe` shows min=0 on every service | RED |
+| AT-0016-3 | A failed candidate smoke leaves 100% traffic on the previous revision (forced-failure drill) | RED |
+| AT-0016-4 | A migration containing `DROP COLUMN` without a `-- contract:` marker fails CI | RED |
+| AT-0016-5 | `terraform plan` on an unchanged tree reports no changes (state matches the imported Neon/Upstash) | RED |
+| AT-0016-6 | No secret value appears in `terraform show -json` output (grep check) | RED |
+| AT-0016-1b | The plan-guard rejects `google_compute_global_forwarding_rule`, `url_map` and `backend_service` (global load-balancer resources, which are always-on). | RED |
+| AT-0016-7 | `healthz` doesn't touch the DB. The sweeper interval is at least 60 minutes. A 24h idle soak shows Neon suspended. | RED |
+| AT-0016-8 | The WIF provider condition pins `repository_owner` and `ref == refs/heads/main`, and a fork-PR workflow can't mint a token. GitHub push protection is on. | RED |
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #4 (blocker severity, Terraform wave).
+
+- **Neon wake budget.** Nothing that touches the DB — healthz, uptime pings, or a sub-hourly sweeper — may run more often than Neon's 5-minute idle-suspend window, or the DB never scales to zero (red-team C-4: at a 5-minute cadence, 0.25 CU × 730h ≈ 182 CU-h, above the 100 CU-h free limit). `healthz` must not touch the DB; the ADR-0017 sweeper interval is at least 60 minutes (see ADR-0017 amendments). `prevent_destroy` on Neon/Upstash resources (already decided above) stands unchanged.
+- **Plan-guard extended to global load-balancer resources** (`google_compute_global_forwarding_rule`, `url_map`, `backend_service`), closing the gap where a Cloud Run custom-domain fallback in `africa-south1` (if global LB is needed because regional domain mapping isn't supported there — unverified, red-team C-16 `[I-ext]`) would slip an always-on ~$18/mo resource past the existing guard list.
+- **WIF condition pinned** to `repository_owner` and `ref == refs/heads/main`, so a fork-PR workflow (`pull_request_target` or a loose WIF condition) cannot mint deploy credentials once GitHub Actions billing is restored and the repo is public (red-team C-12). GitHub push protection must be on before the repo goes public (see ADR-0013 amendments).
