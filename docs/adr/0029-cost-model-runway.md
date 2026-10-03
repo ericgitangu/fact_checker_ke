@@ -1,6 +1,6 @@
 # ADR-0029: Cost model and runway
 
-**Status:** Accepted (cost floor acknowledged; advocate retainer still [GAP], owner, 2026-10-03) · **Date:** 2026-10-03
+**Status:** Accepted (cost floor acknowledged; advocate retainer still [GAP]; STT line corrected to Chirp_2 post Round-A, owner, 2026-10-03) · **Date:** 2026-10-03
 
 ## Problem
 Red-team U8/E10: there is no cost or runway model anywhere in the ADR set. Known costs are scattered (Vercel Pro in ADR-0015, STT in ADR-0005, X posting in ADR-0003, ODPC in ADR-0008), free tiers are scattered (ADR-0009), and revenue is at least 3 months out (ADR-0012 Phase 2) while some costs start at launch. A solo founder needs to know, in one place, what binds first and what a "sustainable" subscriber/sponsor count looks like.
@@ -80,3 +80,45 @@ Revisit on the first advocate quote, on the first month of real QStash/Redis/Clo
 | AT-0029-2 | A budget alert fires at 70% of the QStash daily message quota (ties to ADR-0009/0017 amendment D-13) | RED |
 | AT-0029-3 | The release checklist (ADR-0015 AT-0015-4) blocks a Pro-tier switch decision on an explicit sponsor/subscriber count check, not a date | RED |
 | AT-0029-4 | A runway calculation (fixed floor ÷ net monthly revenue) is recomputed and stored whenever Pro pricing or the advocate retainer amount changes, not hardcoded | RED |
+
+## Correction (2026-10-03): STT line, post ADR-0005 Round A
+
+The worked example's STT line (§"Variable cost per check") used an AWS
+Transcribe placeholder rate (**$0.024/min**, low-volume tier, tagged
+**[U]**) because no ASR provider had been benchmarked yet when this ADR
+was first drafted. AWS Transcribe was never actually a candidate the
+pipeline implements against — it was a cost-reference figure only.
+
+[ADR-0005](0005-speech-and-language.md) has since run its Round A
+benchmark on a 30-clip Kenyan eval set. Result: **GCP STT v2 Chirp_2 is
+the provisional ASR winner** — 7.8% WER vs. Gemini 2.5 Flash's 18.4% WER,
+and Gemini additionally produced a silent empty transcript on one
+politically sensitive clip (a disqualifying failure mode for a political
+fact-checker). **Gemini is not the default** — it remains only a cheap
+secondary/fallback pending Round B (Sheng/noisy-audio clips).
+
+This ADR's STT variable-cost line is corrected accordingly:
+
+- **Use Chirp_2's rate, ~$0.016/min (GCP STT v2, [V2-SECONDARY] — re-price
+  against the GCP console before relying on it for a budget decision),
+  not the AWS Transcribe $0.024/min placeholder.**
+- Re-run the worked example: STT at 20% of checks carrying audio, avg 2
+  min: `0.2 × 2 × $0.016 = $0.0064` (previously $0.0096 at the AWS
+  Transcribe placeholder rate) — **blended cost per submitted check
+  revises down to ≈ $0.019**, list price, uncached.
+- Note for the record: ADR-0005 (line ~102, written between Round A's
+  provider benchmark landing and this correction) states a *different*
+  correction — "~$0.00225/min (Gemini) not $0.016/min (Chirp assumption)"
+  — asserting Gemini as the cheaper default. That line predates Round A's
+  result and is itself now stale per Round A's own findings recorded
+  immediately below it in the same document (Chirp_2 won on WER and on
+  the silent-failure safety check; Gemini did not). ADR-0005 is owned by
+  a concurrent agent and is not edited here — this correction is recorded
+  on the cost-model side only, so a reader of *this* ADR isn't misled by
+  the superseded Gemini-default assumption. If ADR-0005's own text is
+  later reconciled, re-check this section against it.
+- Treat both the $0.016/min Chirp_2 figure and this revised $0.019
+  blended estimate as **provisional** pending ADR-0005 Round B (Sheng,
+  code-switched, and noisy/crowd audio — none of which Round A's clean
+  FLEURS clips tested) and pending the still-[GAP] advocate retainer,
+  which remains the single largest unknown fixed cost in this model.

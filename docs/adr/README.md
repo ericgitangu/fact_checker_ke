@@ -15,38 +15,45 @@ Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 
 
 ## Index
 
-| # | Title | Blocks weekend? |
-|---|---|---|
-| [0001](0001-scope-and-phasing.md) | Product scope and delivery phasing | defines it |
-| [0002](0002-content-ingestion.md) | Content ingestion: user-submitted links, no bulk scraping **(Accepted)** | yes |
-| [0003](0003-outbound-publishing-bots.md) | Outbound publishing and the "counter-truth" bot | no (deferred) |
-| [0004](0004-verification-pipeline.md) | Claim verification pipeline (RAG + human verdicts) | yes |
-| [0005](0005-speech-and-language.md) | Speech-to-text and translation (Swahili/Sheng/English) | yes |
-| [0006](0006-synthetic-media.md) | Synthetic media and deepfake handling | no (triage only) |
-| [0007](0007-maandamano-tracker.md) | Maandamano tracker: safety, legal and data model | partial |
-| [0008](0008-legal-compliance.md) | Legal entity, ODPC registration and editorial policy | yes (gates accounts and comments) |
-| [0009](0009-runtime-topology.md) | Runtime topology, data stores and event flow **(Accepted)** | yes |
-| [0010](0010-client-strategy.md) | Client strategy: PWA first, Expo monorepo for stores | yes |
-| [0011](0011-ai-cost-controls.md) | LLM routing and cost controls | yes |
-| [0012](0012-monetization.md) | Monetization sequencing | no (deferred) |
-| [0013](0013-git-workflow.md) | Git workflow and branch hygiene | process |
-| [0014](0014-monorepo-tooling-moon.md) | Monorepo tooling: moonrepo replaces Turborepo | tooling |
-| [0015](0015-deployment-topology.md) | Deployment topology: Cloud Run backend, Vercel frontends and BFF | yes |
-| [0016](0016-deploy-rail-iac.md) | Atomic deploy rail and IaC (Terraform), scale-to-zero only | yes |
-| [0017](0017-event-driven-core.md) | Event-driven core: outbox, idempotency, ACID | yes |
-| [0018](0018-realtime-and-caching.md) | Near-real-time status (SSE) and caching | no (poll fallback) |
-| [0019](0019-test-strategy-redteam.md) | Test strategy: ADR-derived TDD and red-team gates | process |
-| [0020](0020-identity-auth-roles.md) | Identity, auth and roles | red-team gap |
-| [0021](0021-data-protection-lifecycle.md) | Data protection lifecycle | red-team gap |
-| [0022](0022-observability-incident-response.md) | Observability and incident response | red-team gap |
-| [0023](0023-adversarial-ai-abuse.md) | Adversarial AI and abuse | red-team gap |
-| [0024](0024-trust-safety-moderation.md) | Trust and safety, and moderation | red-team gap |
-| [0025](0025-editorial-operations-capacity.md) | Editorial operations and capacity | red-team gap |
-| [0026](0026-open-source-boundary-licence.md) | Open-source boundary and licence | red-team gap |
-| [0027](0027-user-media-uploads.md) | User media uploads | red-team gap |
-| [0028](0028-client-ux-baseline.md) | Client UX baseline — i18n, accessibility, low bandwidth, offline | red-team gap |
-| [0029](0029-cost-model-runway.md) | Cost model and runway | red-team gap |
-| [0030](0030-creator-funnel-conflict-of-interest.md) | Creator funnel and conflict-of-interest firewall | red-team gap |
+| # | Title | Blocks weekend? | Status (2026-10-03) |
+|---|---|---|---|
+| [0001](0001-scope-and-phasing.md) | Product scope and delivery phasing | defines it | Proposed |
+| [0002](0002-content-ingestion.md) | Content ingestion: user-submitted links, no bulk scraping **(Accepted)** | yes | Accepted |
+| [0003](0003-outbound-publishing-bots.md) | Outbound publishing and the "counter-truth" bot | no (deferred) | Proposed |
+| [0004](0004-verification-pipeline.md) | Claim verification pipeline (RAG + human verdicts) | yes | Proposed (implementation notes on file) |
+| [0005](0005-speech-and-language.md) | Speech-to-text and translation (Swahili/Sheng/English) | yes | Proposed (Round A ASR benchmark run; Chirp_2 provisional winner) |
+| [0006](0006-synthetic-media.md) | Synthetic media and deepfake handling | no (triage only) | Proposed |
+| [0007](0007-maandamano-tracker.md) | Maandamano tracker: safety, legal and data model | partial | Proposed |
+| [0008](0008-legal-compliance.md) | Legal entity, ODPC registration and editorial policy | yes (gates accounts and comments) | Proposed — pending advocate sign-off |
+| [0009](0009-runtime-topology.md) | Runtime topology, data stores and event flow **(Accepted)** | yes | Accepted |
+| [0010](0010-client-strategy.md) | Client strategy: PWA first, Expo monorepo for stores | yes | Proposed |
+| [0011](0011-ai-cost-controls.md) | LLM routing and cost controls | yes | Proposed — pricing figures [GAP] |
+| [0012](0012-monetization.md) | Monetization sequencing | no (deferred) | Proposed |
+| [0013](0013-git-workflow.md) | Git workflow and branch hygiene | process | Accepted — implemented (lefthook, commitlint, branch ruleset) |
+| [0014](0014-monorepo-tooling-moon.md) | Monorepo tooling: moonrepo replaces Turborepo | tooling | Accepted — implemented |
+| [0015](0015-deployment-topology.md) | Deployment topology: Cloud Run backend, Vercel frontends and BFF | yes | Accepted — implemented (Vercel rail; see `docs/runbooks/vercel-deploy.md`) |
+| [0016](0016-deploy-rail-iac.md) | Atomic deploy rail and IaC (Terraform), scale-to-zero only | yes | Accepted — implemented |
+| [0017](0017-event-driven-core.md) | Event-driven core: outbox, idempotency, ACID | yes | Accepted — implemented |
+| [0018](0018-realtime-and-caching.md) | Near-real-time status (SSE) and caching | no (poll fallback) | Accepted — implemented |
+| [0019](0019-test-strategy-redteam.md) | Test strategy: ADR-derived TDD and red-team gates | process | Accepted — process set; reference doc at `docs/architecture/testing-strategy.md` |
+| [0020](0020-identity-auth-roles.md) | Identity, auth and roles | red-team gap | Accepted — anonymous-token slice implemented; editor/admin RBAC wave not yet implemented |
+| [0021](0021-data-protection-lifecycle.md) | Data protection lifecycle | red-team gap | Proposed — pending advocate sign-off |
+| [0022](0022-observability-incident-response.md) | Observability and incident response | red-team gap | Proposed — runbooks at `docs/runbooks/**` now in place (AT-0022-4); alerting/code still open |
+| [0023](0023-adversarial-ai-abuse.md) | Adversarial AI and abuse | red-team gap | Proposed — implementation notes on file |
+| [0024](0024-trust-safety-moderation.md) | Trust and safety, and moderation | red-team gap | Proposed |
+| [0025](0025-editorial-operations-capacity.md) | Editorial operations and capacity | red-team gap | Accepted |
+| [0026](0026-open-source-boundary-licence.md) | Open-source boundary and licence | red-team gap | Accepted — LICENSE/SECURITY.md/CONTRIBUTING.md/CODE_OF_CONDUCT.md/TRADEMARKS.md landed (AT-0026-1); CI/infra ATs still open |
+| [0027](0027-user-media-uploads.md) | User media uploads | red-team gap | Proposed |
+| [0028](0028-client-ux-baseline.md) | Client UX baseline — i18n, accessibility, low bandwidth, offline | red-team gap | Proposed |
+| [0029](0029-cost-model-runway.md) | Cost model and runway | red-team gap | Accepted — STT line corrected to Chirp_2 post Round-A |
+| [0030](0030-creator-funnel-conflict-of-interest.md) | Creator funnel and conflict-of-interest firewall | red-team gap | Proposed — process doc at `docs/architecture/creator-funnel-firewall.md`; code/audit-table ATs still open |
+
+Each row's status is copied verbatim from that ADR's own `**Status:**`
+line (source of truth); "implemented"/"implementation notes" callouts
+mean the ADR's own "Implementation notes" section exists, not that every
+acceptance test in its table is green — check the ADR itself for the
+real AT-by-AT status before relying on this summary for a release
+decision.
 
 ## Hard blockers found
 
