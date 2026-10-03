@@ -17,6 +17,10 @@ export const mockDraftChecks: Check[] = [
     reviewedBy: null,
     createdAt: "2026-10-03T06:00:00.000Z",
     publishedAt: null,
+    calibratedConfidence: null,
+    whatWouldChangeThis: null,
+    evidence: [],
+    riskTier: null,
     claims: [
       {
         id: "e5a5f5a0-0000-4000-8000-000000000102",
@@ -50,6 +54,10 @@ export const mockDraftChecks: Check[] = [
     reviewedBy: null,
     createdAt: "2026-10-03T07:30:00.000Z",
     publishedAt: null,
+    calibratedConfidence: null,
+    whatWouldChangeThis: null,
+    evidence: [],
+    riskTier: null,
     claims: [
       {
         id: "e5a5f5a0-0000-4000-8000-000000000202",

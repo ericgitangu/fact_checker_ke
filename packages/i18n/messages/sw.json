@@ -46,6 +46,11 @@
       "heading": "Vyanzo"
     },
     "reviewedBy": "Imekaguliwa na mhariri kabla ya kuchapishwa",
+    "guidance": {
+      "confidenceLabel": "Uhakika",
+      "evidenceHeading": "Ushahidi uliotajwa",
+      "whatWouldChangeThisHeading": "Ni nini kingebadilisha hili"
+    },
     "notFound": {
       "title": "Hakiki haipatikani",
       "body": "Hatukuweza kupata hakiki yenye kitambulisho hicho."

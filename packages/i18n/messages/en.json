@@ -46,6 +46,11 @@
       "heading": "Sources"
     },
     "reviewedBy": "Reviewed by an editor before publishing",
+    "guidance": {
+      "confidenceLabel": "Confidence",
+      "evidenceHeading": "Cited evidence",
+      "whatWouldChangeThisHeading": "What would change this"
+    },
     "notFound": {
       "title": "Check not found",
       "body": "We couldn't find a check with that id."

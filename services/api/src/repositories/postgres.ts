@@ -113,12 +113,13 @@ export class PostgresCheckRepository implements CheckRepository {
       return { ok: false, error: { kind: "not_found", message: `Check ${id} not found` } };
     }
 
-    const [claimRows, sourceRows] = await Promise.all([
+    const [claimRows, sourceRows, evidenceRows] = await Promise.all([
       this.db.select().from(schema.claims).where(eq(schema.claims.checkId, id)),
       // Sources aren't linked to a check via a column in the current
       // schema (they're linked implicitly through retrieval, tracked as
       // a schema gap below) — returned empty until that join exists.
       Promise.resolve([] as (typeof schema.sources.$inferSelect)[]),
+      this.db.select().from(schema.checkEvidence).where(eq(schema.checkEvidence.checkId, id)),
     ]);
 
     return {
@@ -132,6 +133,10 @@ export class PostgresCheckRepository implements CheckRepository {
         reviewedBy: checkRow.reviewedBy,
         createdAt: toIsoString(checkRow.createdAt),
         publishedAt: checkRow.publishedAt ? toIsoString(checkRow.publishedAt) : null,
+        calibratedConfidence: checkRow.calibratedConfidence === null ? null : Number(checkRow.calibratedConfidence),
+        whatWouldChangeThis: checkRow.whatWouldChangeThis,
+        riskTier: checkRow.riskTier,
+        evidence: evidenceRows.map((e) => ({ sourceId: e.sourceId, quote: e.quote })),
         claims: claimRows.map((c) => ({
           id: c.id,
           checkId: c.checkId,

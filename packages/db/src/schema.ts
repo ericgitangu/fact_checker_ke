@@ -25,6 +25,7 @@ import {
   RatingSchema,
   ReviewActionTypeSchema,
   RightOfReplyStatusSchema,
+  RiskTierSchema,
   RoleSchema,
   SubmissionStatusSchema,
   WaitlistSourceSchema,
@@ -72,6 +73,18 @@ export const rightOfReplyStatusEnum = pgEnum(
   enumValues("right_of_reply_status", RightOfReplyStatusSchema.options),
 );
 export const commentStatusEnum = pgEnum("comment_status", enumValues("comment_status", CommentStatusSchema.options));
+export const riskTierEnum = pgEnum("risk_tier", enumValues("risk_tier", RiskTierSchema.options));
+
+/**
+ * ADR-0031: the source of a flywheel-captured labeled row — an editor's
+ * disposition on a draft (`editor_correction`), or a reader's post-publish
+ * signal (`user_agree` / `user_dispute`).
+ */
+export const trainingLabelSourceEnum = pgEnum("training_label_source", [
+  "editor_correction",
+  "user_agree",
+  "user_dispute",
+]);
 
 /**
  * `llm_calls.stage` is internal pipeline bookkeeping, not part of the
@@ -208,6 +221,17 @@ export const checks = pgTable(
     correctedFromCheckId: uuid("corrected_from_check_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
+    // ADR-0031: the measured-calibrated confidence weight (NOT the raw LLM
+    // confidence — see services/pipeline/app/eval/calibrate.py), the
+    // falsifiability note the pipeline already emits, and the risk tier
+    // that drove the publish-policy decision (app/stages/risk_tier.py /
+    // publish_policy.py). All three are nullable: a fresh draft has none
+    // of them; the application-level CheckSchema `superRefine` (packages/
+    // core/src/schemas/check.ts) is what actually enforces they're
+    // present before a Check is treated as published.
+    calibratedConfidence: numeric("calibrated_confidence", { precision: 5, scale: 4 }),
+    whatWouldChangeThis: text("what_would_change_this"),
+    riskTier: riskTierEnum("risk_tier"),
   },
   (table) => [
     index("checks_org_id_idx").on(table.orgId),
@@ -218,6 +242,29 @@ export const checks = pgTable(
       sql`${table.publishedAt} is null or ${table.rating} is not null`,
     ),
   ],
+);
+
+/**
+ * ADR-0031: cited evidence backing a Check's assessment. One row per
+ * (check, source, quoted span) — a check normally cites several sources,
+ * and a source can be quoted more than once for different spans, hence a
+ * separate table rather than a jsonb array on `checks` (keeps the FK to
+ * `sources` real and queryable, e.g. "which checks cite source X").
+ */
+export const checkEvidence = pgTable(
+  "check_evidence",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    checkId: uuid("check_id")
+      .notNull()
+      .references(() => checks.id, { onDelete: "cascade" }),
+    sourceId: uuid("source_id")
+      .notNull()
+      .references(() => sources.id),
+    quote: text("quote").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("check_evidence_check_id_idx").on(table.checkId)],
 );
 
 export const claims = pgTable(
@@ -632,4 +679,62 @@ export const dsarRequests = pgTable("dsar_requests", {
     .references(() => users.id),
   deviceTokenHash: text("device_token_hash").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * ADR-0031 "data flywheel" (ADR-0021 retention/audit tables is where these
+ * rows live, per the task's file-ownership note): every editor correction
+ * and every reader agree/dispute signal becomes a labeled training/eval
+ * row. Append-only — never updated/deleted, same discipline as
+ * `review_actions`/`audit_log` — so the flywheel's eval set is a growing,
+ * reproducible history rather than a mutable "current belief" table.
+ * `checkId`/`claimId` are both nullable because a user dispute signal may
+ * target a check with no single claim singled out.
+ */
+export const trainingEvalLabels = pgTable(
+  "training_eval_labels",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    checkId: uuid("check_id").references(() => checks.id, { onDelete: "cascade" }),
+    claimId: uuid("claim_id").references(() => claims.id, { onDelete: "cascade" }),
+    source: trainingLabelSourceEnum("source").notNull(),
+    // The actor who produced this label: a user_id for an editor
+    // correction, or a hashed device identity for a reader signal — kept
+    // as a free string (not an FK) because the two identity spaces
+    // (users.id vs device hash) differ, same pattern as
+    // comments.authorDeviceHash vs review_actions.actorId.
+    actorRef: text("actor_ref").notNull(),
+    // The structured label payload: e.g. { correctedRating, notes } for an
+    // editor correction, or { agreed: boolean, reason } for a reader
+    // signal. jsonb rather than fixed columns because the shape differs
+    // per `source` and the eval harness (services/pipeline/app/eval)
+    // consumes it as data, not as typed application state.
+    label: jsonb("label").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("training_eval_labels_check_id_idx").on(table.checkId),
+    index("training_eval_labels_source_idx").on(table.source),
+  ],
+);
+
+/**
+ * ADR-0031 hard constraint 2 / AT-0031-5: the live publish-policy flags
+ * (global auto-publish kill switch, per-tier thresholds, Tier-C relaxation
+ * state). A SINGLE current-value row per `key`, mutated only through
+ * services/api/src/lib/policy-audit.ts, which writes the new value here
+ * AND an audit_log row in the same transaction — never one without the
+ * other. `advocateSignoffRef` is required (enforced in application code,
+ * not a CHECK constraint, since it's only required for the specific
+ * `tier_c_relaxation_enabled` key, not every flag) whenever a write
+ * relaxes the Tier-C human gate.
+ */
+export const policyFlags = pgTable("policy_flags", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  advocateSignoffRef: text("advocate_signoff_ref"),
+  updatedBy: uuid("updated_by")
+    .notNull()
+    .references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

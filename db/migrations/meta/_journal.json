@@ -71,6 +71,13 @@
       "when": 1791062568000,
       "tag": "0009_totp_used_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791064953201,
+      "tag": "0010_adr_0031_confidence_weighted_guidance",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,10 @@ const baseCheck: Check = {
   reviewedBy: "jane@example.com",
   createdAt: "2026-10-01T00:00:00.000Z",
   publishedAt: "2026-10-02T00:00:00.000Z",
+  calibratedConfidence: 0.95,
+  whatWouldChangeThis: "A corrected 2025 subsidy ledger from the Treasury.",
+  evidence: [{ sourceId: "33333333-3333-3333-3333-333333333333", quote: "Treasury 2025 subsidy ledger." }],
+  riskTier: "A",
 };
 
 describe("buildClaimReviewJsonLd", () => {

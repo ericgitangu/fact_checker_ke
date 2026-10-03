@@ -13,3 +13,4 @@ export * from "./schemas/identity.js";
 export * from "./schemas/editorial.js";
 export * from "./schemas/moderation.js";
 export * from "./schemas/retention.js";
+export * from "./schemas/guidance.js";
