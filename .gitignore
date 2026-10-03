@@ -1,0 +1,42 @@
+# Node / pnpm / Turbo
+node_modules/
+.pnpm-store/
+.turbo/
+dist/
+.next/
+out/
+*.tsbuildinfo
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env files — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code local config — never commit
+.claude/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Docker
+*.pid
+
+# Serwist-generated service worker (apps/web next.config.ts swDest)
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+apps/web/public/swe-worker-*.js
