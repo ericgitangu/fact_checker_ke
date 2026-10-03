@@ -1,20 +1,35 @@
 import { describe, expect, it } from "vitest";
 import {
+  AttributionSchema,
   ClaimTypeSchema,
+  CommentStatusSchema,
   CredibilityTierSchema,
   DemonstrationStatusSchema,
   RatingSchema,
+  ReviewActionTypeSchema,
+  RightOfReplyStatusSchema,
+  RoleSchema,
   SubmissionStatusSchema,
   WaitlistSourceSchema,
 } from "@fact-checker-ke/core";
 import {
+  attributionEnum,
+  auditLog,
   claimTypeEnum,
   claims,
+  commentStatusEnum,
   credibilityTierEnum,
   demonstrationStatusEnum,
   organizations,
   ratingEnum,
+  retentionPolicy,
+  reviewActionTypeEnum,
+  rightOfReplyStatusEnum,
+  roleEnum,
+  sessions,
   submissionStatusEnum,
+  totpSecrets,
+  users,
   waitlistSignups,
   waitlistSourceEnum,
 } from "../schema.js";
@@ -33,6 +48,11 @@ describe("pgEnums are sourced from @fact-checker-ke/core zod enums", () => {
     [credibilityTierEnum, CredibilityTierSchema],
     [demonstrationStatusEnum, DemonstrationStatusSchema],
     [waitlistSourceEnum, WaitlistSourceSchema],
+    [roleEnum, RoleSchema],
+    [attributionEnum, AttributionSchema],
+    [reviewActionTypeEnum, ReviewActionTypeSchema],
+    [rightOfReplyStatusEnum, RightOfReplyStatusSchema],
+    [commentStatusEnum, CommentStatusSchema],
     // `as [pgEnum, zodEnum][]` would need a shared generic across six
     // distinct enum pairs; test-only helper data, not a boundary type.
   ] as [{ enumValues: string[] }, { options: readonly string[] }][])("%#", (pgEnumValue, zodSchema) => {
@@ -53,5 +73,27 @@ describe("table shape sanity", () => {
 
   it("waitlist_signups has a unique index target on email (schema-level)", () => {
     expect(waitlistSignups.email.name).toBe("email");
+  });
+
+  it("users table has role/mfaEnabled columns (ADR-0020 §4)", () => {
+    expect(Object.keys(users)).toEqual(expect.arrayContaining(["id", "email", "passwordHash", "role", "mfaEnabled"]));
+  });
+
+  it("totp_secrets is keyed 1:1 on userId", () => {
+    expect(totpSecrets.userId.primary).toBe(true);
+  });
+
+  it("sessions has a hashed token primary key, never the raw token", () => {
+    expect(sessions.tokenHash.primary).toBe(true);
+  });
+
+  it("audit_log has actor/action/target/metadata columns (ADR-0020 §5)", () => {
+    expect(Object.keys(auditLog)).toEqual(
+      expect.arrayContaining(["id", "actorId", "action", "targetType", "targetId", "metadata", "createdAt"]),
+    );
+  });
+
+  it("retention_policy is keyed on dataClass (ADR-0021)", () => {
+    expect(retentionPolicy.dataClass.primary).toBe(true);
   });
 });
