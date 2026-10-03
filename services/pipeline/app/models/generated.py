@@ -28,6 +28,14 @@ class PublishedAt(RootModel[AwareDatetime]):
     ]
 
 
+class CalibratedConfidence(RootModel[float]):
+    root: Annotated[float, Field(ge=0.0, le=1.0)]
+
+
+class WhatWouldChangeThis(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000, min_length=1)]
+
+
 class SpanStart(RootModel[int]):
     root: Annotated[int, Field(ge=0, le=9007199254740991)]
 
@@ -74,6 +82,20 @@ class DemonstrationStatus(StrEnum):
     cancelled = 'cancelled'
 
 
+class EvidenceItem(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    source_id: Annotated[
+        UUID,
+        Field(
+            alias='sourceId',
+            pattern='^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$',
+        ),
+    ]
+    quote: Annotated[str, Field(max_length=2000, min_length=1)]
+
+
 class Rating(StrEnum):
     true = 'True'
     mostly_true = 'MostlyTrue'
@@ -81,6 +103,12 @@ class Rating(StrEnum):
     false = 'False'
     unproven = 'Unproven'
     not_checkable = 'NotCheckable'
+
+
+class RiskTier(StrEnum):
+    a = 'A'
+    b = 'B'
+    c = 'C'
 
 
 class Source(BaseModel):
@@ -289,3 +317,11 @@ class Check(BaseModel):
         ),
     ]
     published_at: Annotated[PublishedAt | None, Field(alias='publishedAt')]
+    calibrated_confidence: Annotated[
+        CalibratedConfidence | None, Field(alias='calibratedConfidence')
+    ]
+    what_would_change_this: Annotated[
+        WhatWouldChangeThis | None, Field(alias='whatWouldChangeThis')
+    ]
+    evidence: list[EvidenceItem]
+    risk_tier: Annotated[RiskTier | None, Field(alias='riskTier')]

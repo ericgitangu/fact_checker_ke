@@ -4,6 +4,7 @@ import { schema, type Database } from "@fact-checker-ke/db";
 import type { EditorQueueItem } from "@fact-checker-ke/core";
 import { writeOutboxEvent } from "./outbox.js";
 import { writeAuditLog } from "./audit.js";
+import { captureEditorCorrection } from "./flywheel.js";
 
 export type EditorialResult<T> = { ok: true; value: T } | { ok: false; error: { kind: string; message: string } };
 
@@ -287,6 +288,16 @@ export async function correctCheck(
       targetType: "check",
       targetId: row.id,
       metadata: { previousCheckId: originalCheckId },
+    });
+    // ADR-0031 AT-0031-4: every editor correction is also a labeled
+    // flywheel row, in the SAME transaction (a rolled-back correction
+    // produces zero flywheel rows too).
+    await captureEditorCorrection(tx, {
+      originalCheckId,
+      newCheckId: row.id,
+      actorId,
+      correctedRating: args.rating,
+      notes: args.notes,
     });
     await writeOutboxEvent(tx, {
       aggregateType: "check",

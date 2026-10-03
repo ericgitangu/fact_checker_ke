@@ -69,6 +69,46 @@
               "type": "null"
             }
           ]
+        },
+        "calibratedConfidence": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "whatWouldChangeThis": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidenceItem"
+          }
+        },
+        "riskTier": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RiskTier"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -81,7 +121,11 @@
         "isDraft",
         "reviewedBy",
         "createdAt",
-        "publishedAt"
+        "publishedAt",
+        "calibratedConfidence",
+        "whatWouldChangeThis",
+        "evidence",
+        "riskTier"
       ],
       "additionalProperties": false
     },
@@ -262,6 +306,26 @@
         "cancelled"
       ]
     },
+    "EvidenceItem": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "quote": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "sourceId",
+        "quote"
+      ],
+      "additionalProperties": false
+    },
     "Rating": {
       "type": "string",
       "enum": [
@@ -271,6 +335,14 @@
         "False",
         "Unproven",
         "NotCheckable"
+      ]
+    },
+    "RiskTier": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C"
       ]
     },
     "Source": {

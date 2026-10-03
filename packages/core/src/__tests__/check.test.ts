@@ -12,6 +12,10 @@ const validCheck = {
   reviewedBy: null,
   createdAt: "2026-10-03T00:00:00.000Z",
   publishedAt: null,
+  calibratedConfidence: null,
+  whatWouldChangeThis: null,
+  evidence: [],
+  riskTier: null,
 };
 
 describe("CheckSchema", () => {

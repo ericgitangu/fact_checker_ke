@@ -182,7 +182,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register((instance) =>
     submissionRoutes(instance, { submissions: submissions!, submissionService, deviceQuotaGuard }),
   );
-  await app.register((instance) => checkRoutes(instance, { checks: checks! }));
+  await app.register((instance) => checkRoutes(instance, { checks: checks!, db }));
   await app.register((instance) => waitlistRoutes(instance, { waitlist: waitlist!, rateLimiter }));
   await app.register((instance) => deviceRoutes(instance, { deviceTokens: deviceTokens! }));
   await app.register((instance) =>

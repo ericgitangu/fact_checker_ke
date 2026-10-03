@@ -41,6 +41,7 @@ import { CheckSchema } from "../src/schemas/check.js";
 import { DemonstrationSchema, DemonstrationStatusSchema } from "../src/schemas/demonstration.js";
 import { ClaimTypeSchema, RatingSchema } from "../src/schemas/rating.js";
 import { CredibilityTierSchema, SourceSchema } from "../src/schemas/source.js";
+import { EvidenceItemSchema, RiskTierSchema } from "../src/schemas/guidance.js";
 import {
   SubmissionInputSchema,
   SubmissionSchema,
@@ -68,7 +69,9 @@ const CONTRACT_SCHEMAS = {
   CredibilityTier: CredibilityTierSchema,
   Demonstration: DemonstrationSchema,
   DemonstrationStatus: DemonstrationStatusSchema,
+  EvidenceItem: EvidenceItemSchema,
   Rating: RatingSchema,
+  RiskTier: RiskTierSchema,
   Source: SourceSchema,
   Submission: SubmissionSchema,
   SubmissionInput: SubmissionInputSchema,

@@ -47,6 +47,10 @@ const publishedCheck: Check = {
   publishedAt: "2026-10-03T07:00:00.000Z",
   claims: [baseClaim],
   sources: [baseSource],
+  calibratedConfidence: 0.91,
+  whatWouldChangeThis: "A revised EPRA pricing circular superseding the Sept 2026 guidance.",
+  evidence: [{ sourceId: baseSource.id, quote: "EPRA pricing guidance, Sept 2026" }],
+  riskTier: "A",
 };
 
 const draftCheck: Check = {

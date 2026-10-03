@@ -28,6 +28,10 @@ describe("GET /v1/checks/:id", () => {
       reviewedBy: null,
       createdAt: new Date().toISOString(),
       publishedAt: null,
+      calibratedConfidence: null,
+      whatWouldChangeThis: null,
+      evidence: [],
+      riskTier: null,
     });
 
     const app = await buildApp({ logger: false, checks });
@@ -51,6 +55,10 @@ describe("GET /v1/checks/:id", () => {
       reviewedBy: "editor-1",
       createdAt: new Date().toISOString(),
       publishedAt: new Date().toISOString(),
+      calibratedConfidence: 0.9,
+      whatWouldChangeThis: "A material correction to the underlying published figures.",
+      evidence: [{ sourceId: randomUUID(), quote: "Published figures excerpt." }],
+      riskTier: "A",
     });
 
     const app = await buildApp({ logger: false, checks });
