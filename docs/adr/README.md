@@ -160,3 +160,43 @@ The amendments above close the sharpest edge cases but do not substitute for ful
 - **0028** Client UX baseline (i18n, a11y, low-bandwidth, offline)
 - **0029** Cost model & runway
 - **0030** Creator funnel & conflict of interest
+
+## Implementation status ledger (2026-10-04)
+
+Evidence-based state of every ADR after the weekend build merged to `main`. "Implemented" = code exists on `main` and was verified (moon ci + tests + integration). "Partial" = core landed, some acceptance tests still RED. "Proposed" = decision recorded, not yet built (reason given). No status is claimed without evidence.
+
+| ADR | State | Evidence / what remains |
+|---|---|---|
+| 0001 scope & phasing | Accepted | Phasing drives the build; Phase-0 PWA + site shipped |
+| 0002 content ingestion | Implemented | User-submitted links + quote/timestamp flow live (blocker-1/2 fixed) |
+| 0003 outbound bots | Proposed | Blocked: platform API access + X automation approval |
+| 0004 verification pipeline | Implemented | Human review gate live (AT-0004-A/B green); RAG/citation guards in pipeline |
+| 0005 speech & language | Partial | ASR Round A done (Chirp_2 7.8%); Round B needs human Sheng clips; STT not wired to live |
+| 0006 synthetic media | Implemented | Triage (C2PA + detector-as-triage), never "deepfake" on score alone |
+| 0007 maandamano | Partial | Tracker UI + night band live; kill-switch *mechanism* (flag+ISR purge) RED |
+| 0008 legal compliance | Proposed | Blocked: Kenyan advocate sign-off; 7 questions logged |
+| 0009 runtime topology | Accepted/Implemented | Two-runtime + polyglot roadmap; moon graph live |
+| 0010 client strategy | Partial | PWA + Expo decision; mobile app not started (D-U-N-S gated) |
+| 0011 AI cost controls | Accepted | Pricing verified; routing defined; telemetry table exists |
+| 0012 monetization | Proposed | Deferred (billable-last); Vercel Pro gate documented |
+| 0013 git workflow | Implemented | lefthook + ruleset + conventional/no-attribution enforced (5 AT green) |
+| 0014 moonrepo | Implemented | moon v2 migration complete (AT green) |
+| 0015 deployment topology | Implemented | Vercel web+site LIVE; Cloud Run defined, enable_services=false |
+| 0016 deploy rail + IaC | Implemented | Terraform applied (free-tier), plan-guard, release rail (AT green) |
+| 0017 event-driven core | Implemented | Outbox + 3-layer idempotency + state machine (AT green, 33/33 integ) |
+| 0018 SSE + caching | Implemented | SSE live-verified, caching, device tokens (AT green) |
+| 0019 test strategy | Implemented | AT suites + RED/GREEN + red-team gates in use |
+| 0020 identity/auth/roles | Implemented | Self-hosted auth + MFA + audit log (hardening PR in review) |
+| 0021 data protection | Partial | Retention sweep + DSAR stub; cross-border basis needs advocate |
+| 0022 observability | Partial | Infra alerts + 4 runbooks; app-emitted DLQ/quota metrics RED |
+| 0023 adversarial AI | Implemented | Delimited untrusted blocks, citation integrity, injection fixtures |
+| 0024 trust & safety | Implemented | Comments moderation (comment-on-draft gate in hardening PR) |
+| 0025 editorial ops | Implemented | Review queue/approve/correct/right-of-reply (AT green) |
+| 0026 OSS boundary/licence | Implemented | Apache-2.0 LICENSE + SECURITY/CONTRIBUTING/COC; GitHub push-protection on |
+| 0027 user media uploads | Partial | Processing (EXIF strip/hash/scan) done; signed GCS upload RED |
+| 0028 client UX baseline | Partial | EN/SW i18n live; a11y audit + offline SW tests RED |
+| 0029 cost model | Accepted | Doc complete; advocate retainer amount a GAP |
+| 0030 creator funnel | Accepted | Firewall process doc; audit-table schema RED |
+| 0031 confidence-weighted | Proposed | Owner-accepted direction; risk-tier + calibration + publish-policy NOT built |
+
+**Billable/live surfaces deliberately deferred** (owner: "billable last"): the Cloud Run backend deploy (`enable_services=true`), real LLM/STT API keys, platform-posting bots, payments/ads, and app-store submission. The pipeline runs on fakes until a key lands.
