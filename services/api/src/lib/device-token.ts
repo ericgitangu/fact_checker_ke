@@ -70,6 +70,13 @@ export async function verifyCapabilityToken(
     if (err instanceof joseErrors.JWTExpired) {
       return { ok: false, reason: "expired" };
     }
-    return { ok: false, reason: "invalid_signature" };
+    if (err instanceof joseErrors.JOSEError) {
+      return { ok: false, reason: "invalid_signature" };
+    }
+    // A non-jose error here is a programming fault (e.g. a stale/partial
+    // @fact-checker-ke/core build left a schema undefined — observed
+    // 2026-10-03). Mislabelling it as invalid_signature hides the bug;
+    // rethrow so it fails loudly.
+    throw err;
   }
 }
