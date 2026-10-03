@@ -1,10 +1,8 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
-
 jobs:
   node:
     name: Node (lint, typecheck, test, build)
@@ -23,46 +21,33 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U fact_checker_ke"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          --health-cmd "pg_isready -U fact_checker_ke" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_URL_TEST: postgres://fact_checker_ke:fact_checker_ke@localhost:5432/fact_checker_ke
       DATABASE_URL_DIRECT: postgres://fact_checker_ke:fact_checker_ke@localhost:5432/fact_checker_ke
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 9
-
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Lint
         run: pnpm turbo run lint
-
       - name: Typecheck
         run: pnpm turbo run typecheck
-
       - name: Build
         run: pnpm turbo run build
-
       - name: Run migrations against the service-container Postgres
         run: pnpm --filter @fact-checker-ke/db db:migrate
-
       - name: Test (unit, in-memory doubles)
         run: pnpm turbo run test
-
       - name: Test (integration, real Postgres)
         run: pnpm --filter @fact-checker-ke/api test:integration
-
   pipeline:
     name: Python pipeline (uv, pytest)
     runs-on: ubuntu-latest
@@ -71,26 +56,22 @@ jobs:
         working-directory: services/pipeline
     steps:
       - uses: actions/checkout@v4
-
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
-
       - name: Sync dependencies
         run: uv sync
-
+      - name: Typecheck generated/hand-written models
+        run: uv run mypy app/models
       - name: Run tests
         run: uv run pytest
-
   docker-images:
     name: Build & scan container images (no push)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: docker/setup-buildx-action@v3
-
       # Base images are Docker Hardened Images (dhi.io). The Community tier
       # is free, but the registry still gates pulls behind `docker login
       # dhi.io` — use the same Docker Hub account/PAT as any other Docker
@@ -101,7 +82,6 @@ jobs:
           registry: dhi.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Build API image (linux/amd64, no push)
         uses: docker/build-push-action@v6
         with:
@@ -111,7 +91,6 @@ jobs:
           push: false
           load: true
           tags: fact-checker-ke/api:ci
-
       - name: Build pipeline image (linux/amd64, no push)
         uses: docker/build-push-action@v6
         with:
@@ -121,14 +100,12 @@ jobs:
           push: false
           load: true
           tags: fact-checker-ke/pipeline:ci
-
       - name: Trivy scan — API image (fail on CRITICAL)
         uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: fact-checker-ke/api:ci
           severity: CRITICAL
           exit-code: "1"
-
       - name: Trivy scan — API image (report HIGH, non-blocking)
         if: always()
         uses: aquasecurity/trivy-action@0.28.0
@@ -136,14 +113,12 @@ jobs:
           image-ref: fact-checker-ke/api:ci
           severity: HIGH
           exit-code: "0"
-
       - name: Trivy scan — pipeline image (fail on CRITICAL)
         uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: fact-checker-ke/pipeline:ci
           severity: CRITICAL
           exit-code: "1"
-
       - name: Trivy scan — pipeline image (report HIGH, non-blocking)
         if: always()
         uses: aquasecurity/trivy-action@0.28.0
@@ -151,3 +126,25 @@ jobs:
           image-ref: fact-checker-ke/pipeline:ci
           severity: HIGH
           exit-code: "0"
+  contracts-drift:
+    name: Contracts drift gate (gen:contracts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Regenerate packages/core/generated/contracts.schema.json and services/pipeline/app/models/generated.py
+        run: pnpm gen:contracts
+      - name: Fail if regenerating produced a diff (contracts drifted from their source zod schemas)
+        run: git diff --exit-code -- packages/core/generated services/pipeline/app/models/generated.py
