@@ -54,16 +54,50 @@
   "submit": {
     "heading": "fact_checker_ke",
     "lede": "Submit a link or paste text. We transcribe, extract claims, run retrieval against known sources, and draft a verdict — always reviewed by a human before it is published.",
-    "field": {
-      "url": "Link to a claim, video or article",
-      "quote": "Exact quote from the video (optional)",
-      "quoteHelp": "For video links, we check the text you quote here rather than downloading the video's audio. Leave blank for articles or text posts.",
-      "timestamp": "Timestamp, in seconds (optional)"
+    "smartInput": {
+      "placeholder": "Paste a link, or type what they said…",
+      "label": "Paste a link or type a claim"
     },
+    "detected": {
+      "youtube": "YouTube video detected",
+      "tiktok": "TikTok video detected",
+      "x": "Post from X detected",
+      "threads": "Threads post detected",
+      "news": "Article link detected",
+      "unknown": "Link detected",
+      "text": "Free text — we'll check this claim directly"
+    },
+    "moment": {
+      "heading": "Mark the moment + the claim",
+      "help": "Drag to the moment they said it, then type or paste exactly what they said — we check that quoted text, we never download or clip the video itself.",
+      "claimPlaceholder": "e.g. \"unemployment fell to 2% last year\"",
+      "noEmbed": "We don't have a live preview for this platform yet — the link itself is still submitted and checked."
+    },
+    "upload": {
+      "heading": "Or share your own photo or video",
+      "help": "Drag a file here, click to browse, or paste from your clipboard.",
+      "trust": "Uploads are scanned and stripped of location/device data on our server before any human reviews them (ADR-0027).",
+      "rights": "I own this media or have the right to share it, it is not of a minor, and I consent to its use for fact-checking.",
+      "uploading": "Uploading…",
+      "uploaded": "Uploaded",
+      "remove": "Remove"
+    },
+    "languages": {
+      "heading": "Detected language"
+    },
+    "nextSteps": {
+      "heading": "What happens next",
+      "received": "We receive your submission",
+      "analyzing": "AI drafts an analysis",
+      "verifying": "A human editor reviews it",
+      "ready": "The verdict is published"
+    },
+    "awaitingReview": "Awaiting review — not a verdict yet",
     "success": "Submitted. Watch it move through the pipeline.",
     "error": {
       "network": "Network error — please try again.",
-      "offline": "You're offline — submitting a new claim needs a connection."
+      "offline": "You're offline — submitting a new claim needs a connection.",
+      "empty": "Paste a link or type a claim before submitting."
     }
   },
   "status": {
