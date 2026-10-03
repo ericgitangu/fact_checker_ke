@@ -112,5 +112,9 @@ Implementation notes section apply here too (in-memory CheckStore/cache,
 regex-based dedup signals, TEMPORARY hop request models, env-gated real
 embedder).
 
+## Implementation notes (security-hardening wave, 2026-10-04)
+
+- **SEC-4 cross-reference.** The security + code review's "empty-analysis gap" finding (a video-URL submission with no quote reaching the LLM with an empty `<untrusted_submission>`) is this ADR's §1 prompt-injection-containment umbrella in spirit (an LLM call on attacker-or-submitter-controlled input with no real content), but the fix itself — a pre-LLM short-circuit in `run_analyze_hop` returning a typed `needs_quote` outcome — is recorded in full under **ADR-0004's** Implementation notes (security-hardening wave), since it lives in `app/stages/analyze.py` and is really a pipeline-input-validity gate, not a containment/citation-integrity control. No change to this ADR's own decisions, options, or acceptance tests was needed.
+
 ---
 **See ADR-0031:** admission/confidence thresholds here are calibration-derived and per-risk-tier; no confidence gates auto-publish until measured-calibrated on held-out data.
