@@ -139,6 +139,8 @@ export class PostgresCheckRepository implements CheckRepository {
           claimType: c.claimType,
           spanStart: c.spanStart,
           spanEnd: c.spanEnd,
+          namedPerson: c.namedPerson,
+          attribution: c.attribution,
           createdAt: toIsoString(c.createdAt),
         })),
         sources: sourceRows.map((s) => ({
