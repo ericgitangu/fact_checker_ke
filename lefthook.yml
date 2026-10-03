@@ -1,0 +1,36 @@
+# ADR-0013: local git workflow gates. Installed via the root `prepare`
+# script (`lefthook install`), so `pnpm install` wires these up for every
+# contributor -- see package.json.
+#
+# https://lefthook.dev/configuration/
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: gitleaks (staged secrets scan)
+      run: gitleaks protect --staged --redact --verbose
+
+    - name: lint (staged files only)
+      glob: '*.{js,jsx,ts,tsx}'
+      run: moon run :lint --affected --status=staged
+
+    - name: contracts drift (only when packages/core/src changed)
+      glob: 'packages/core/src/**'
+      run: moon run core:gen-contracts && git diff --exit-code -- packages/core/generated services/pipeline/app/models/generated.py
+
+commit-msg:
+  jobs:
+    - name: no AI attribution (owner rule, ADR-0013)
+      run: |
+        if grep -qiE '(co-authored-by|generated with)' "{1}"; then
+          echo "commit-msg rejected: AI attribution lines are not allowed in commit messages (ADR-0013 owner rule)." >&2
+          exit 1
+        fi
+
+    - name: commitlint (Conventional Commits)
+      run: pnpm exec commitlint --edit "{1}"
+
+pre-push:
+  jobs:
+    - name: moon ci (affected projects only)
+      run: moon ci
