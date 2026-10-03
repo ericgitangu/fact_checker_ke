@@ -64,6 +64,21 @@ describe.skipIf(!connectionString)("Comment moderation (ADR-0024, integration)",
     return check!.id;
   }
 
+  async function createDraftCheck() {
+    const [submission] = await db.insert(schema.submissions).values({ url: null, text: `draft-comment-test-${randomUUID()}` }).returning();
+    const [check] = await db
+      .insert(schema.checks)
+      .values({
+        submissionId: submission!.id,
+        summary: "Draft check, not yet published.",
+        rating: null,
+        isDraft: true,
+        publishedAt: null,
+      })
+      .returning();
+    return check!.id;
+  }
+
   it("AT-0024-1: a flagged comment is held pending, not publicly visible", async () => {
     const checkId = await createPublishedCheck(null);
     const post = await app.inject({
@@ -77,6 +92,40 @@ describe.skipIf(!connectionString)("Comment moderation (ADR-0024, integration)",
 
     const list = await app.inject({ method: "GET", url: `/v1/checks/${checkId}/comments` });
     expect(list.json().items).toHaveLength(0);
+  });
+
+  /**
+   * SEC-2 (security-hardening finding #2, 2026-10-04): ADR-0024 §1 scopes
+   * comments to "published checks only", but `postComment` previously
+   * only checked that the check row existed at all -- a still-draft
+   * check (isDraft: true, publishedAt: null; AT-0004-A/B's "rating:
+   * null, evidence-only" surface shown to the submitter) could receive
+   * public comments before an editor ever approved it.
+   */
+  it("SEC-2: a comment on a still-draft (unpublished) check is rejected", async () => {
+    const checkId = await createDraftCheck();
+    const post = await app.inject({
+      method: "POST",
+      url: `/v1/checks/${checkId}/comments`,
+      headers: { "x-device-token": "draft-commenter" },
+      payload: { body: "this should never be allowed" },
+    });
+    expect(post.statusCode).toBe(403);
+    expect(post.json().error).toBe("check_not_published");
+
+    const rows = await db.select().from(schema.comments).where(eq(schema.comments.checkId, checkId));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("SEC-2 (positive): a comment on a published check is still allowed", async () => {
+    const checkId = await createPublishedCheck(null);
+    const post = await app.inject({
+      method: "POST",
+      url: `/v1/checks/${checkId}/comments`,
+      headers: { "x-device-token": "published-commenter" },
+      payload: { body: "a perfectly normal comment" },
+    });
+    expect(post.statusCode).toBe(201);
   });
 
   it("AT-0024-3: an ongoing protest event rejects new comments; a concluded one allows them", async () => {

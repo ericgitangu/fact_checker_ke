@@ -30,6 +30,15 @@ export async function postComment(
   const [check] = await db.select().from(schema.checks).where(eq(schema.checks.id, args.checkId)).limit(1);
   if (!check) return { ok: false, error: { kind: "not_found", message: "No such check." } };
 
+  // SEC-2 (security-hardening finding #2, 2026-10-04): ADR-0024 §1 scopes
+  // comments to "published checks only" -- a still-draft check (shown to
+  // its submitter as evidence/sources-only, `rating: null`, per
+  // AT-0004-A/B) must never accept a public comment, regardless of its
+  // demonstration/ongoing-event state below.
+  if (check.isDraft || !check.publishedAt) {
+    return { ok: false, error: { kind: "check_not_published", message: "Comments are only allowed on published checks." } };
+  }
+
   if (check.demonstrationId) {
     const [demonstration] = await db
       .select({ status: schema.demonstrations.status })
