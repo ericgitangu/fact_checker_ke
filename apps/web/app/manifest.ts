@@ -7,8 +7,10 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Kenyan fact-checking: submit a link or text, get an AI-assisted draft analysis, human-approved before publish.",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#0f172a",
+    // Matches the "On the record" design system (apps/web/app/globals.css):
+    // --paper and --ink, not a generic slate.
+    background_color: "#fafaf7",
+    theme_color: "#15181b",
     icons: [
       {
         src: "/icon-192x192.png",

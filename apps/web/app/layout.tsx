@@ -1,46 +1,62 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
+import { Archivo, Newsreader } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 import { SerwistProvider } from "@serwist/turbopack/react";
+import { AppFooter, AppHeader } from "../components/site-chrome";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Archivo (grotesque, the adjudicator's voice) and Newsreader (serif,
+// reserved for the human claim under examination) — same pairing as
+// apps/site. Google Fonts does not publish "Archivo Expanded" as its own
+// family for next/font/google's catalog (only the variable "Archivo"
+// family, which carries a width axis Google's static API doesn't expose
+// per-instance here); globals.css's `--sans-x` therefore falls back to
+// `--sans` at the same weight rather than silently rendering nothing. If a
+// future next/font/google catalog update adds "Archivo Expanded" as its
+// own importable export, swap this in directly.
+const archivo = Archivo({
+  variable: "--font-archivo",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
   subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
   title: "fact_checker_ke",
-  description: "Kenyan fact-checking: submit a link or text, get an AI-assisted draft analysis, human-approved before publish.",
+  description:
+    "Kenyan fact-checking: submit a link or text, get an AI-assisted draft analysis, human-approved before publish.",
   manifest: "/manifest.webmanifest",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
     <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      lang={locale}
+      className={`${archivo.variable} ${newsreader.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <SerwistProvider swUrl="/serwist/sw.js">
-          <header className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-            <nav className="mx-auto flex max-w-3xl items-center justify-between">
-              <Link href="/" className="font-semibold">
-                fact_checker_ke
-              </Link>
-              <div className="flex items-center gap-4 text-sm text-zinc-600 dark:text-zinc-400">
-                <Link href="/methodology">Methodology</Link>
-                <Link href="/maandamano">Maandamano advisories</Link>
-              </div>
-            </nav>
-          </header>
-          {children}
-        </SerwistProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <a className="skip-link" href="#main-content">
+            Skip to content
+          </a>
+          <SerwistProvider swUrl="/serwist/sw.js">
+            <AppHeader />
+            <main id="main-content" className="app-main">
+              {children}
+            </main>
+            <AppFooter />
+          </SerwistProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );
