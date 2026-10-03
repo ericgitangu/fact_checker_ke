@@ -39,7 +39,7 @@ describe.skipIf(!connectionString)("ADR-0017: transactional outbox + idempotency
     const outcome = await service.createWithIdempotency({
       idempotencyKey,
       requestHash: "hash-1",
-      submission: { url: null, text: "AT-0017: outbox+idempotency probe " + randomUUID(), submittedBy: null },
+      submission: { url: null, text: "AT-0017: outbox+idempotency probe " + randomUUID(), submittedBy: null, quote: null, timestampSec: null },
     });
 
     expect(outcome.kind).toBe("created");
@@ -73,7 +73,7 @@ describe.skipIf(!connectionString)("ADR-0017: transactional outbox + idempotency
     const publisher = new FakePublisher();
     const service = new PostgresSubmissionService(db, new NoopIdempotencyPreCheck(), publisher, "http://localhost:8000/internal/analyze", "test-capability-secret");
     const idempotencyKey = randomUUID();
-    const submission = { url: null, text: "AT-0017: replay probe " + randomUUID(), submittedBy: null };
+    const submission = { url: null, text: "AT-0017: replay probe " + randomUUID(), submittedBy: null, quote: null, timestampSec: null };
 
     const first = await service.createWithIdempotency({ idempotencyKey, requestHash: "h", submission });
     const second = await service.createWithIdempotency({ idempotencyKey, requestHash: "h", submission });
@@ -99,12 +99,12 @@ describe.skipIf(!connectionString)("ADR-0017: transactional outbox + idempotency
     const first = await service.createWithIdempotency({
       idempotencyKey,
       requestHash: "h1",
-      submission: { url: null, text: `AT-0017: conflict probe A ${marker}`, submittedBy: null },
+      submission: { url: null, text: `AT-0017: conflict probe A ${marker}`, submittedBy: null, quote: null, timestampSec: null },
     });
     const second = await service.createWithIdempotency({
       idempotencyKey,
       requestHash: "h2",
-      submission: { url: null, text: `AT-0017: conflict probe B ${marker}`, submittedBy: null },
+      submission: { url: null, text: `AT-0017: conflict probe B ${marker}`, submittedBy: null, quote: null, timestampSec: null },
     });
 
     expect(first.kind).toBe("created");

@@ -14,7 +14,13 @@ import { signCapabilityToken } from "./device-token.js";
 export type SubmissionCreateInput = {
   idempotencyKey: string;
   requestHash: string;
-  submission: { url: string | null; text: string | null; submittedBy: string | null };
+  submission: {
+    url: string | null;
+    text: string | null;
+    submittedBy: string | null;
+    quote: string | null;
+    timestampSec: number | null;
+  };
 };
 
 /**
@@ -75,6 +81,8 @@ export class PostgresSubmissionService implements SubmissionService {
             url: input.submission.url,
             text: input.submission.text,
             submittedBy: input.submission.submittedBy,
+            quote: input.submission.quote,
+            timestampSec: input.submission.timestampSec,
           })
           .returning();
         if (!submissionRow) throw new Error("Insert into submissions returned no row");
@@ -110,6 +118,8 @@ export class PostgresSubmissionService implements SubmissionService {
             url: submissionRow.url,
             text: submissionRow.text,
             submitted_by: submissionRow.submittedBy,
+            quote: submissionRow.quote,
+            timestamp_sec: submissionRow.timestampSec,
           },
         });
 
@@ -232,6 +242,8 @@ export class InMemorySubmissionService implements SubmissionService {
         url: input.submission.url,
         text: input.submission.text,
         submitted_by: input.submission.submittedBy,
+        quote: input.submission.quote,
+        timestamp_sec: input.submission.timestampSec,
       },
     });
     const outboxId = randomUUID();
