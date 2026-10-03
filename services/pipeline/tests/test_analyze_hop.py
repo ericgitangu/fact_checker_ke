@@ -54,6 +54,22 @@ async def test_swahili_text_detected_as_sw() -> None:
     assert result.language == "sw"
 
 
+async def test_video_url_submission_with_no_quote_short_circuits_to_needs_quote() -> None:
+    """SEC-4 (security-hardening finding #4, 2026-10-04): a video-URL
+    submission with no quote at all must never reach the LLM with an
+    empty <untrusted_submission> -- it must short-circuit to an explicit
+    needs-quote outcome instead of silently "analyzing" an empty string.
+    """
+    req = _request(url="https://tiktok.com/@someone/video/999")
+    llm = FakeLlmClient()
+    result = await run_analyze_hop(req, llm=llm, store=InMemoryIdempotencyStore())
+    assert result.needs_quote is True
+    assert result.claims == []
+    assert result.attribution == "unverified"
+    # No LLM call was made at all for the empty-quote short-circuit.
+    assert llm.call_count == 0
+
+
 async def test_dropped_items_sampled_for_editor_review_at_0004_e() -> None:
     # A single dropped (non-checkable) item: >=10% sampling means it must
     # itself be the sampled one (ceil(1 * 0.10) == 1).

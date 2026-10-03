@@ -57,6 +57,14 @@ class AnalyzeResult(BaseModel):
     # through untouched with this set to "unverified"; otherwise None.
     attribution: str | None = None
     usage: UsageRecord
+    # SEC-4 (security-hardening finding #4, 2026-10-04): true when this
+    # result is the explicit "no checkable text" short-circuit for a
+    # video-URL submission with no quote -- `claims` is always empty and
+    # no LLM call was made. Callers (and the API's status-rendering
+    # layer) must treat this as a distinct, user-facing outcome ("a quote
+    # is required for video links"), not as "zero claims detected" by an
+    # LLM that ran on empty input.
+    needs_quote: bool = False
 
 
 class Citation(BaseModel):

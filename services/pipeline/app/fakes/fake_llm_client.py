@@ -75,7 +75,14 @@ class FakeLlmClient(LlmClient):
       original stage-stub fixtures).
     """
 
+    def __init__(self) -> None:
+        # SEC-4 test support only: lets a test assert the LLM was never
+        # invoked at all (e.g. the analyze-hop empty-quote short-circuit),
+        # without needing a mocking framework.
+        self.call_count = 0
+
     async def complete(self, prompt: str, *, max_tokens: int = 1024) -> str:
+        self.call_count += 1
         if "TRIGGER_FAILURE" in prompt:
             raise LlmCompletionError("Fake LLM client was asked to simulate a failure.")
         if '"claim_type"' in prompt:
