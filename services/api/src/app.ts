@@ -8,6 +8,10 @@ import { waitlistRoutes } from "./routes/waitlist.js";
 import { deviceRoutes } from "./routes/device.js";
 import { internalRoutes } from "./routes/internal.js";
 import { sseRoutes } from "./routes/sse.js";
+import { authRoutes } from "./routes/auth.js";
+import { editorRoutes } from "./routes/editor.js";
+import { commentRoutes } from "./routes/comments.js";
+import { AuthService } from "./lib/auth/service.js";
 import {
   InMemoryCheckRepository,
   InMemoryDeviceTokenRepository,
@@ -202,6 +206,22 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       maxDurationMs: options.sseMaxDurationMs,
     }),
   );
+
+  // ADR-0020/0024/0025: editor/admin/moderator identity, editorial
+  // review gate, and comment moderation all require a real Postgres
+  // connection (users/audit_log/review_actions/comments tables) --
+  // they're a no-op (routes not registered, 404 rather than a 500) when
+  // running fully in-memory (local dev with no DATABASE_URL, or a unit
+  // test that doesn't need them), same convention as the repositories
+  // above falling back to in-memory doubles.
+  if (db) {
+    const authService = new AuthService(db);
+    await app.register((instance) => authRoutes(instance, { auth: authService }));
+    await app.register((instance) => editorRoutes(instance, { db, auth: authService }));
+    await app.register((instance) => commentRoutes(instance, { db, auth: authService }));
+  } else {
+    warn("DATABASE_URL unset — auth/editor/comment routes not registered (require Postgres).");
+  }
 
   return app;
 }

@@ -9,6 +9,7 @@ import type { PubSub } from "../lib/pubsub.js";
 import type { SignatureVerifier } from "../lib/internal-auth.js";
 import { drainOutbox, cleanupExpiredIdempotencyKeys, publishOutboxRowInline } from "../lib/outbox.js";
 import { advanceWithInbox } from "../lib/advance.js";
+import { runRetentionSweep } from "../lib/retention.js";
 
 const SubmissionAdvancedBodySchema = z.object({
   messageId: z.string().min(1),
@@ -59,11 +60,16 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
 
     const drainResult = await drainOutbox(deps.db, deps.publisher, deps.analyzeHopUrl);
     const idempotencyKeysCleaned = await cleanupExpiredIdempotencyKeys(deps.db);
+    // ADR-0021: the retention sweep piggybacks on the EXISTING sweeper
+    // endpoint rather than a new cron (task brief's explicit
+    // instruction) -- see services/api/src/lib/retention.ts.
+    const retention = await runRetentionSweep(deps.db);
 
     return reply.status(200).send({
       drained: drainResult.drained,
       failed: drainResult.failed,
       idempotencyKeysCleaned,
+      retention,
     });
   });
 
