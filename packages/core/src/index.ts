@@ -9,3 +9,7 @@ export * from "./client/api-client.js";
 export * from "./schemas/waitlist.js";
 export * from "./schemas/events.js";
 export * from "./schemas/device-token.js";
+export * from "./schemas/identity.js";
+export * from "./schemas/editorial.js";
+export * from "./schemas/moderation.js";
+export * from "./schemas/retention.js";

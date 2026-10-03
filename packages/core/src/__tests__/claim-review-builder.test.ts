@@ -15,6 +15,8 @@ const baseCheck: Check = {
       claimType: "checkable",
       spanStart: 0,
       spanEnd: 40,
+      namedPerson: false,
+      attribution: "not_applicable",
       createdAt: "2026-10-01T00:00:00.000Z",
     },
   ],
