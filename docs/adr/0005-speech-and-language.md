@@ -85,3 +85,18 @@ Default: **inline** — the claim-detection call (Haiku 4.5, ADR-0011) emits the
 `~/Development/wave` (Senior ML Engineer application, Rust+PyO3/Python/Next.js/CDK) contributes two verified lessons:
 1. **Language-ID is an in-process stage, never a service.** wave replaced its always-on SageMaker XLM-RoBERTa endpoint (~$86/mo) with an in-process `langdetect` library call inside the existing Lambda ($0) — `backend/python/sagemaker_handler.py` documents the swap inline. **Decision for us:** language identification runs in-process in the `analyze` hop. Default: the claim-detection call (Haiku 4.5) emits `language` in the same structured output it already returns (consistent with the inline-translation decision above); a library fallback (lingua/fasttext-class) only if eval shows the LLM misrouting. Caveat carried over: library detectors are weak on short, code-switched and Sheng text — wave's own Rust heuristic (`backend/src/voice.rs`) is *deliberately conservative*, flagging Swahili only on unambiguous keywords; our claim-language router inherits that bias (uncertain → treat as code-switched, keep the original text primary).
 2. **No WER harness exists in wave** — checked; the multilingual work there is language-ID and intent, not ASR. The 30-clip eval set remains the first WER instrument we'll own.
+
+### Provider lock-in (owner, 2026-10-03) + cost model [V-PRIMARY pricing]
+**LOCKED (provisional): Gemini Flash via Vertex AI, paid tier** — no-training Cloud terms, rides existing gcloud auth. Conditional: stays locked only while it (a) wins or ties Round A WER on our harness and (b) clears the ≤25% noisy-subset gate in Round B; failing either unlocks the decision and the next-best qualifier takes over. Round A is in flight; this section gets its results appended.
+
+Cost math (ai.google.dev/gemini-api/docs/pricing, fetched 2026-10-03 — Vertex list prices to be confirmed at implementation, usually identical [GAP-minor]):
+| Item | Figure |
+|---|---|
+| Gemini 2.5 Flash audio input | **$1.00 / MTok**; text in $0.30; output $2.50 |
+| Audio token rate | ~25 tokens/sec → 1,500 tokens/min |
+| **Transcription cost** | input $0.0015/min + output (~300 tok/min transcript) $0.00075/min ≈ **$0.00225/min ≈ $0.14/hour** |
+| Chirp (GCP STT v2) comparator | ~$0.016/min ≈ $0.96/hour [V2-SECONDARY] → **Gemini ≈ 7× cheaper** |
+| Worst-case daily exposure | 60 min/day audio cap → <$0.14/day before dedup; the ADR-0017 result cache amortises viral duplicates to one payment |
+| Newer option noted | Gemini 3.8 Flash exists ($0.75/MTok promo input through 2026-12-31, $1.50 after; audio price not separately listed) — the eval harness tests whichever Flash generation Vertex serves; a model-generation bump re-runs Round A, it does not reopen the provider decision |
+
+ADR-0029's variable-cost line for STT is corrected by this table: ~$0.00225/min (Gemini) not $0.016/min (Chirp assumption) — an ~86% reduction in the modelled STT unit cost.
