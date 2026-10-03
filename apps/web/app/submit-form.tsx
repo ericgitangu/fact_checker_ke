@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { getDeviceToken } from "../lib/device-token";
 
 type SubmitState =
   | { status: "idle" }
@@ -8,25 +11,58 @@ type SubmitState =
   | { status: "success"; id: string }
   | { status: "error"; message: string };
 
+function randomIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  // Fallback for environments without crypto.randomUUID (older Safari);
+  // not cryptographically strong, but this key only needs to be unique
+  // per attempt, not unguessable.
+  return `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function SubmitForm(): React.JSX.Element {
+  const t = useTranslations("submit");
+  const tCommon = useTranslations("common");
+  const router = useRouter();
   const [url, setUrl] = useState("");
   const [quote, setQuote] = useState("");
   const [timestampSec, setTimestampSec] = useState("");
   const [state, setState] = useState<SubmitState>({ status: "idle" });
+  const [isOffline, setIsOffline] = useState(
+    typeof navigator !== "undefined" ? !navigator.onLine : false,
+  );
+
+  // ADR-0028: no offline submission queueing in Phase 0-1 — disable
+  // submit with a clear message instead of silently queueing a claim
+  // that might go stale by the time it actually sends.
+  useEffect(() => {
+    const goOnline = () => setIsOffline(false);
+    const goOffline = () => setIsOffline(true);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setState({ status: "submitting" });
     try {
-      // `quote`/`timestampSec` only apply to URL submissions (ADR-0002: we
-      // check a user-supplied quote for third-party video, never download
-      // audio). The API (SubmissionInputSchema) re-validates this; omitting
-      // empty values here just avoids sending stray blank fields.
       const trimmedQuote = quote.trim();
       const parsedTimestamp = timestampSec.trim() === "" ? undefined : Number(timestampSec);
+      const deviceToken = await getDeviceToken();
+      const idempotencyKey = randomIdempotencyKey();
+
       const res = await fetch("/api/submissions", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": idempotencyKey,
+          ...(deviceToken ? { "x-device-token": deviceToken } : {}),
+        },
         body: JSON.stringify({
           url,
           ...(trimmedQuote ? { quote: trimmedQuote } : {}),
@@ -46,78 +82,80 @@ export function SubmitForm(): React.JSX.Element {
       }
       const body = (await res.json()) as { id: string };
       setState({ status: "success", id: body.id });
+      router.push(`/submissions/${body.id}`);
     } catch {
-      setState({ status: "error", message: "Network error — please try again." });
+      setState({ status: "error", message: t("error.network") });
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-3">
-      <label htmlFor="url" className="text-sm font-medium">
-        Link to a claim, video or article
-      </label>
-      <input
-        id="url"
-        name="url"
-        type="url"
-        required
-        placeholder="https://..."
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-      />
+    <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-4" aria-describedby={isOffline ? "offline-note" : undefined}>
+      {isOffline && (
+        <p id="offline-note" className="form-note form-note-muted" role="status">
+          {t("error.offline")}
+        </p>
+      )}
 
-      <label htmlFor="quote" className="text-sm font-medium">
-        Exact quote from the video (optional)
-      </label>
-      <p className="text-xs text-zinc-500">
-        For video links, we check the text you quote here rather than downloading the
-        video&rsquo;s audio. Leave blank for articles or text posts.
-      </p>
-      <textarea
-        id="quote"
-        name="quote"
-        rows={2}
-        placeholder="“...”"
-        value={quote}
-        onChange={(e) => setQuote(e.target.value)}
-        className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-      />
+      <div className="field">
+        <label htmlFor="url" className="field-label">
+          {t("field.url")}
+        </label>
+        <input
+          id="url"
+          name="url"
+          type="url"
+          required
+          placeholder="https://..."
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+        />
+      </div>
 
-      <label htmlFor="timestampSec" className="text-sm font-medium">
-        Timestamp, in seconds (optional)
-      </label>
-      <input
-        id="timestampSec"
-        name="timestampSec"
-        type="number"
-        min={0}
-        max={86_400}
-        step={1}
-        placeholder="e.g. 95"
-        value={timestampSec}
-        onChange={(e) => setTimestampSec(e.target.value)}
-        className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
-      />
+      <div className="field">
+        <label htmlFor="quote" className="field-label">
+          {t("field.quote")}
+        </label>
+        <p className="field-help">{t("field.quoteHelp")}</p>
+        <textarea
+          id="quote"
+          name="quote"
+          rows={2}
+          placeholder="&ldquo;...&rdquo;"
+          value={quote}
+          onChange={(e) => setQuote(e.target.value)}
+        />
+      </div>
 
-      <button
-        type="submit"
-        disabled={state.status === "submitting"}
-        className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50"
-      >
-        {state.status === "submitting" ? "Submitting..." : "Check this"}
+      <div className="field">
+        <label htmlFor="timestampSec" className="field-label">
+          {t("field.timestamp")}
+        </label>
+        <input
+          id="timestampSec"
+          name="timestampSec"
+          type="number"
+          min={0}
+          max={86_400}
+          step={1}
+          placeholder="e.g. 95"
+          value={timestampSec}
+          onChange={(e) => setTimestampSec(e.target.value)}
+        />
+      </div>
+
+      <button type="submit" className="btn btn-primary" disabled={state.status === "submitting" || isOffline}>
+        {state.status === "submitting" ? tCommon("action.submitting") : tCommon("action.submit")}
       </button>
+
       {state.status === "success" && (
-        <p className="text-sm text-green-700 dark:text-green-400">
-          Submitted. Track progress at{" "}
-          <a className="underline" href={`/checks/${state.id}`}>
-            /checks/{state.id}
-          </a>
-          .
+        <p className="form-note form-note-success" role="status">
+          {t("success")}
         </p>
       )}
       {state.status === "error" && (
-        <p className="text-sm text-red-700 dark:text-red-400">{state.message}</p>
+        <p className="form-note form-note-error" role="alert">
+          {state.message}
+        </p>
       )}
     </form>
   );
