@@ -1,14 +1,27 @@
 """Eval harness scaffold (ADR-0004/0023/0005).
 
-`uv run python -m app.eval` runs the starter JSONL fixture set (20 claims:
-8 en / 7 sw / 5 sheng-codeswitched, labelled checkable/opinion) through the
-real claim-detection prompt path (FakeLlmClient backend by default, a real
-Anthropic client if ANTHROPIC_API_KEY is set) and prints precision/recall/F1
-per class.
+`uv run python -m app.eval` runs the JSONL fixture set (45 claims: 8 en /
+7 sw / **30 sheng-codeswitched**, labelled checkable/opinion/prediction/
+rhetoric) through the real claim-detection prompt path (FakeLlmClient
+backend by default, a real Anthropic client if ANTHROPIC_API_KEY is set)
+and prints precision/recall/F1 per class.
 
-This is a scaffold, not the full gate: ADR-0004 AT-0004-E and ADR-0023 §5
-call for a 100-claim set with >=30 Sheng items and an agreed F1 threshold
-before launch — that full set stays an explicit open AT (not faked here).
+The Sheng item count (30) satisfies ADR-0023 §5's "at least 30 Sheng-
+language items" floor as of 2026-10-03 (verified: see the Counter check
+run against app/eval/fixtures/claims.jsonl — 30 of 45 rows have
+`lang: "sheng"`), split across all four claim_type classes (checkable/
+opinion/prediction/rhetoric; "rhetoric" is this taxonomy's home for
+satire, per ADR-0023 §5's "claims, opinions, and satire" split).
+
+This is still a scaffold, not the full launch gate: ADR-0004 AT-0004-E and
+ADR-0023 §6/AT-0023-6 call for a **100-claim** set (this is 45) and an
+**agreed F1 threshold** measured from week-1 production data before the
+classifier is allowed to silently drop items — neither the 100-claim count
+nor a threshold number is fabricated here; both stay an explicit open AT.
+The harness below prints per-class P/R/F1 so that threshold-setting work
+has real numbers to start from, but it does not itself gate CI (see
+moon.yml: `eval` has no `pass`/`fail` semantics, by design, until that
+threshold is agreed).
 """
 
 from __future__ import annotations
@@ -88,11 +101,13 @@ async def main() -> int:
         precision, recall, f1 = _prf1(c["tp"], c["fp"], c["fn"])
         print(f"{label:<12}{precision:>10.2f}{recall:>10.2f}{f1:>10.2f}")
     print(f"\nOverall accuracy: {correct}/{len(rows)} = {correct / len(rows):.2%}")
+    sheng_count = lang_counts.get("sheng", 0)
     print(
-        "\nNOTE: this is a 20-claim starter scaffold. ADR-0004 AT-0004-E / "
-        "ADR-0023 §5 require a 100-claim set with >=30 Sheng items and an "
-        "agreed F1 threshold before launch — that remains an open AT, not "
-        "faked here."
+        f"\nNOTE: this is a {len(rows)}-claim scaffold ({sheng_count} Sheng items, "
+        f"{'meets' if sheng_count >= 30 else 'BELOW'} the ADR-0023 §5 >=30 floor). "
+        "ADR-0004 AT-0004-E / ADR-0023 §6 (AT-0023-6) still require a "
+        "100-claim set and an agreed launch F1 threshold — that full gate "
+        "remains an explicit open AT, not faked here."
     )
     return 0
 

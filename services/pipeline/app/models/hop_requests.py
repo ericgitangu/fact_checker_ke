@@ -19,7 +19,7 @@ integration time — expect this file to be deleted or rewritten then.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import Base64Bytes, BaseModel, ConfigDict, Field, model_validator
 
 
 class HopContent(BaseModel):
@@ -73,3 +73,41 @@ class VerifyHopRequest(BaseModel):
     claim_text: str = Field(min_length=1, max_length=2000)
     language: str = Field(default="en", min_length=2, max_length=16)
     named_person_involved: bool = False
+
+
+class MediaProcessHopRequest(BaseModel):
+    """POST /hops/media-process request body (ADR-0027).
+
+    `media_base64` carries already-uploaded media bytes for processing in
+    this call only (ADR-0027's post-upload stage this service owns) — the
+    signed-GCS-upload mechanics that got the bytes here are a
+    services/api + apps/web concern, out of scope. # TEMPORARY, see module
+    docstring (same TEMPORARY-pending-wave-2-reconciliation status as the
+    analyze/verify hop requests above).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    submission_id: str = Field(min_length=1)
+    org_id: str = Field(min_length=1)
+    media_base64: Base64Bytes
+    mime_type: str = Field(min_length=1, max_length=100)
+
+
+class SyntheticMediaTriageHopRequest(BaseModel):
+    """POST /hops/synthetic-media-triage request body (ADR-0006).
+
+    Scope note (ADR-0006 red-team amendment): detector-based triage only
+    runs on media the caller has already resolved as upload-only or
+    owner-authorized (ADR-0002 forbids fetching third-party video/audio
+    bytes) — this request model takes raw bytes precisely because that
+    scoping decision has already been made by the caller.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    submission_id: str = Field(min_length=1)
+    org_id: str = Field(min_length=1)
+    media_base64: Base64Bytes
+    mime_type: str = Field(min_length=1, max_length=100)
+    media_hash: str = Field(min_length=1)
