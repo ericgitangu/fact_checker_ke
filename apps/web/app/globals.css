@@ -970,6 +970,21 @@ a:hover {
   background: var(--true-tint);
 }
 
+/*
+ * ADR-0028 WCAG 2.4.7 (focus visible): the real focusable control is the
+ * visually-hidden `.sr-only` <input type="file"> inside this <label>, so
+ * the global `:focus-visible` outline would draw on a 1px-clipped element
+ * and be invisible. Mirror the design's focus treatment onto the visible
+ * box via :focus-within so a keyboard user sees focus land on the
+ * dropzone. (axe can't detect missing visible focus, so this is enforced
+ * by review, not the a11y test.)
+ */
+.media-dropzone:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-color: var(--brand);
+}
+
 .media-dropzone-icon {
   width: 32px;
   height: 32px;
