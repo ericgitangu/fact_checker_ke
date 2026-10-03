@@ -60,9 +60,10 @@ fi
 
 note "AT-0023-5 (Turnstile gates QStash/LLM calls) is owned by services/api"
 note "(the submission endpoint), out of scope for services/pipeline. Left RED."
-note "AT-0023-6's full gate (>=30 Sheng items + recorded F1 threshold) is"
-note "scaffolded (app/eval, 5 Sheng items in the 20-claim starter set) but the"
-note "100-claim/30-Sheng threshold decision remains an explicit open AT, not faked."
+note "AT-0023-6: the >=30-Sheng-item floor is now MET (app/eval/fixtures/"
+note "claims.jsonl has 30 of 45 rows labelled lang=sheng, verified via"
+note "'uv run python -m app.eval'). The 100-claim total and an agreed launch"
+note "F1 threshold remain an explicit open AT, not faked."
 
 echo ""
 if [ "$FAIL" -eq 0 ]; then

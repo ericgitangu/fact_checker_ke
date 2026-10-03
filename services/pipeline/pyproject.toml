@@ -10,6 +10,7 @@ dependencies = [
   "httpx>=0.28.1",
   "anthropic>=0.69.0",
   "fastembed>=0.5.1",
+  "c2pa-python>=0.38.0",
 ]
 
 [dependency-groups]
@@ -19,6 +20,7 @@ dev = [
   "ruff>=0.8.4",
   "mypy>=1.14.0",
   "datamodel-code-generator>=0.83.0",
+  "piexif>=1.1.3",
 ]
 
 [build-system]
@@ -43,3 +45,18 @@ line-length = 100
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+# c2pa-python (ADR-0006 provenance check) ships no py.typed marker / stubs
+# as of 0.38.0 -- verified via `uv run mypy app` failing with
+# import-untyped before this override. Third-party gap, not ours to fix;
+# narrowly scoped to this one module rather than a blanket
+# ignore_missing_imports.
+module = "c2pa"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# piexif (test-only, dev dependency group): used solely to craft synthetic
+# EXIF/GPS fixtures in tests/test_media_processing.py; ships no stubs.
+module = "piexif"
+ignore_missing_imports = true
