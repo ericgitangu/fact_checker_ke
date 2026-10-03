@@ -1,6 +1,6 @@
 # ADR-0020: Identity, auth and roles
 
-**Status:** Proposed · **Date:** 2026-10-03 · Gates ADR-0009/0011 per-user quotas and ADR-0018 SSE capability tokens
+**Status:** Accepted (Better Auth self-hosted; device tokens, owner, 2026-10-03) · **Date:** 2026-10-03 · Gates ADR-0009/0011 per-user quotas and ADR-0018 SSE capability tokens
 
 ## Problem
 ADR-0015 says "later auth", ADR-0018 says "capability token, later auth", but ADR-0009 and ADR-0011 already enforce *per-user* quotas and ADR-0007/0008 need editor and admin roles with accountability. "Later" has no definition, and per-IP is the only fallback today, which breaks under Safaricom CGNAT (red-team C-9: many subscribers share one egress IP). This ADR defines the identity model for three populations: anonymous submitters/readers, optional registered accounts (later), and editor/admin staff (now).

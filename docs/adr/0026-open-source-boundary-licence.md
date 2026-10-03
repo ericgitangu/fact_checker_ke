@@ -1,6 +1,6 @@
 # ADR-0026: Open-source boundary and licence
 
-**Status:** Proposed · **Date:** 2026-10-03
+**Status:** Accepted (Apache-2.0; registry/thresholds/prompts private, owner, 2026-10-03) · **Date:** 2026-10-03
 
 ## Problem
 The owner wants `github.com/ericgitangu/fact_checker_ke` public for stars and portfolio signal, while running a Kenyan fact-checking product that is a defamation and abuse target (ADR-0008, ADR-0019). A public repo with no licence boundary, no fork-PR isolation and no disclosure channel turns the codebase itself into an attack surface (red-team C-12, E7) the day it goes public, and an unclear licence either scares off the stars the owner wants or lets a competitor white-label the product with no attribution.

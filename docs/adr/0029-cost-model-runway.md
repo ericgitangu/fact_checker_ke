@@ -1,6 +1,6 @@
 # ADR-0029: Cost model and runway
 
-**Status:** Proposed · **Date:** 2026-10-03
+**Status:** Accepted (cost floor acknowledged; advocate retainer still [GAP], owner, 2026-10-03) · **Date:** 2026-10-03
 
 ## Problem
 Red-team U8/E10: there is no cost or runway model anywhere in the ADR set. Known costs are scattered (Vercel Pro in ADR-0015, STT in ADR-0005, X posting in ADR-0003, ODPC in ADR-0008), free tiers are scattered (ADR-0009), and revenue is at least 3 months out (ADR-0012 Phase 2) while some costs start at launch. A solo founder needs to know, in one place, what binds first and what a "sustainable" subscriber/sponsor count looks like.

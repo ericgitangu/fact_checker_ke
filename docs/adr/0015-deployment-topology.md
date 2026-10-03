@@ -1,6 +1,6 @@
 # ADR-0015: Deployment topology — Cloud Run backend, Vercel frontends and BFF
 
-**Status:** Proposed · **Date:** 2026-10-03 · Refines ADR-0009 (hosting was left open)
+**Status:** Accepted (topology set, owner, 2026-10-03) · **Date:** 2026-10-03 · Refines ADR-0009 (hosting was left open)
 
 ## Decision summary
 | Surface | Host | Why |
