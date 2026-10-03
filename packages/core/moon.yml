@@ -1,0 +1,33 @@
+$schema: 'https://moonrepo.dev/schemas/project.yml'
+
+# lint/typecheck/test/build are inherited from .moon/tasks/node.yml and
+# proxy to this project's own package.json scripts. Only overrides below.
+
+tasks:
+  build:
+    outputs:
+      - 'dist/**'
+
+  gen-schema:
+    command: 'pnpm run gen:schema'
+    inputs:
+      - 'src/schemas/**/*'
+      - 'scripts/export-json-schema.ts'
+    outputs:
+      - 'generated/**'
+
+  # ADR-0014: the codegen chain is a real graph edge. This is the single
+  # source of truth for both derived contract artifacts -- the JSON Schema
+  # under packages/core/generated, AND the Pydantic models in
+  # services/pipeline (cross-project output, workspace-relative path).
+  # services/pipeline's typecheck/test tasks `deps: [core:gen-contracts]`.
+  # Drift gate: `moon run core:gen-contracts && git diff --exit-code`.
+  gen-contracts:
+    command: 'bash scripts/gen-contracts.sh'
+    options:
+      runFromWorkspaceRoot: true
+    inputs:
+      - 'src/schemas/**/*'
+    outputs:
+      - 'generated/**'
+      - '/services/pipeline/app/models/generated.py'

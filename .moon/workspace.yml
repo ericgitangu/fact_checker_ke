@@ -1,0 +1,22 @@
+$schema: 'https://moonrepo.dev/schemas/workspace.yml'
+
+# ADR-0014: moonrepo replaces Turborepo. projects are discovered by glob so
+# that adding a new workspace package never requires editing this file (or
+# any Dockerfile) -- see AT-0014-3.
+projects:
+  - 'apps/*'
+  - 'packages/*'
+  - 'services/*'
+
+vcs:
+  defaultBranch: 'main'
+  provider: 'github'
+
+docker:
+  scaffold:
+    # Extra workspace-relative files the `moon docker scaffold` "workspace"
+    # phase copies in addition to each scaffolded project's manifest/lockfile
+    # -- needed so `pnpm install` inside the Dockerfile sees the full
+    # workspace shape.
+    configsPhaseGlobs:
+      - 'pnpm-workspace.yaml'

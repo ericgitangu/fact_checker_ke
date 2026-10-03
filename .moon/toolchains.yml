@@ -1,0 +1,15 @@
+$schema: 'https://moonrepo.dev/schemas/toolchains.yml'
+
+# ADR-0014: Node + pnpm are managed toolchains, pinned. No Python toolchain
+# -- `unstable_uv`/`unstable_python` are experimental (moonrepo/moon#2691,
+# polyglot Python-can't-find-Node bug), so services/pipeline's tasks are
+# plain `command: uv run ...` tasks instead (see services/pipeline/moon.yml).
+# moon caches those by declared inputs/outputs without managing the
+# interpreter -- the interpreter itself stays pinned by uv via
+# services/pipeline/pyproject.toml (requires-python = ">=3.12") and uv.lock.
+node:
+  version: '24.14.0'
+  syncVersionManagerConfig: 'nvm'
+
+pnpm:
+  version: '9.15.0'

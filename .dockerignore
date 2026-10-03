@@ -11,14 +11,18 @@
 .idea
 **/.DS_Store
 
-# Node / pnpm / Turbo build artifacts (rebuilt inside the image)
+# Node / pnpm build artifacts (rebuilt inside the image)
 **/node_modules
 **/.pnpm-store
-**/.turbo
 **/dist
 **/.next
 **/out
 **/*.tsbuildinfo
+
+# ADR-0014: moon's cache is machine-local and not portable across
+# environments (see moonrepo.dev/docs/guides/docker) -- must never be
+# COPY'd into a build context.
+.moon/cache
 
 # Python artifacts — irrelevant to the API image, excluded for size
 **/.venv
@@ -36,10 +40,13 @@
 # Logs
 **/*.log
 
-# Workspace members not needed to build @fact-checker-ke/api.
-# (services/api's Dockerfile only COPYs packages/core, services/api,
-# pnpm-workspace.yaml and the root manifests/lockfile.)
-apps
-services/pipeline
-docs
-db
+# ADR-0014 (2026-10-03): the old hand-maintained exclusion list for
+# "workspace members not needed to build @fact-checker-ke/api" (apps,
+# services/pipeline, docs, db) was removed here. That list is exactly the
+# hard-coded dependency graph ADR-0014 exists to eliminate -- it broke once
+# already when packages/db landed and services/api started depending on it.
+# services/api/Dockerfile's "skeleton" stage now needs the full workspace
+# in its build context so `moon docker scaffold api` can derive the real
+# dependency graph; `pnpm deploy --prod` (also in that Dockerfile -- see
+# its DEVIATION 3 comment) is what keeps the final runtime image small,
+# not this file.
