@@ -87,7 +87,7 @@ Default: **inline** — the claim-detection call (Haiku 4.5, ADR-0011) emits the
 2. **No WER harness exists in wave** — checked; the multilingual work there is language-ID and intent, not ASR. The 30-clip eval set remains the first WER instrument we'll own.
 
 ### Provider lock-in (owner, 2026-10-03) + cost model [V-PRIMARY pricing]
-**LOCKED (provisional): Gemini Flash via Vertex AI, paid tier** — no-training Cloud terms, rides existing gcloud auth. Conditional: stays locked only while it (a) wins or ties Round A WER on our harness and (b) clears the ≤25% noisy-subset gate in Round B; failing either unlocks the decision and the next-best qualifier takes over. Round A is in flight; this section gets its results appended.
+~~**LOCKED (provisional): Gemini Flash via Vertex AI, paid tier**~~ _(SUPERSEDED by Round A below — do not act on this line. Gemini lost: 18.4% WER vs Chirp_2's 7.8%, AND silently returned an empty transcript on a sensitive Bunge/FBI political clip, which is disqualifying for a political fact-checker where claims vanishing without an operator signal is a safety failure. **New provisional winner: GCP STT v2 Chirp_2**, pending Round B noisy/Sheng clips. Gemini remains a cheap secondary/fallback.)_ The original conditional lock-in text is kept below for the record — no-training Cloud terms, rides existing gcloud auth; it stayed locked only while it won or tied Round A WER (it did not) and cleared the ≤25% Round B gate; failing either unlocks it and the next-best qualifier takes over.
 
 Cost math (ai.google.dev/gemini-api/docs/pricing, fetched 2026-10-03 — Vertex list prices to be confirmed at implementation, usually identical [GAP-minor]):
 | Item | Figure |
