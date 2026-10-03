@@ -196,23 +196,26 @@ a:hover {
   gap: 20px;
 }
 
+/* <Wordmark> (src/components/wordmark.tsx) owns its own internal layout,
+   mark sizing and variant colours — it's intentionally independent of this
+   app's tokens so it can be lifted into a shared package. `.wordmark` (the
+   nav link) and `.footer-mark` below are apps/site-only integration
+   styles layered on top: link affordance, the display typeface, and
+   footer alignment. */
 .wordmark {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
   text-decoration: none;
-  color: var(--ink);
 }
 
-.wordmark svg {
-  flex: none;
-  border-radius: 7px;
-}
-
-.wordmark-text {
+.wordmark .fck-wordmark-text,
+.footer-mark {
   font-family: var(--display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+}
+
+.footer-mark {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: 8px;
+  transform: translateY(-1px);
 }
 
 .nav-links {
