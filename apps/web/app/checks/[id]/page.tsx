@@ -5,6 +5,9 @@ import {
   buildClaimReviewJsonLd,
   ClaimReviewValidationError,
 } from "@fact-checker-ke/core";
+import { getTranslations } from "next-intl/server";
+import { CheckCard } from "../../../components/check-card";
+import { AiAssistedNote } from "../../../components/verdict";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +36,8 @@ export default async function CheckPage({
     notFound();
   }
 
+  const t = await getTranslations("check");
+
   let claimReviewJsonLd: object | null = null;
   if (!check.isDraft) {
     try {
@@ -50,7 +55,7 @@ export default async function CheckPage({
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-16">
+    <div className="shell-narrow flex flex-col gap-6">
       {claimReviewJsonLd && (
         <script
           type="application/ld+json"
@@ -59,44 +64,13 @@ export default async function CheckPage({
       )}
 
       {check.isDraft && (
-        <div className="rounded border border-amber-400 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          AI-assisted analysis — not a verdict. Pending human review.
+        <div>
+          <AiAssistedNote />
+          <p style={{ marginTop: 8, fontSize: "0.85rem", color: "var(--ink-3)" }}>{t("draft.pending")}</p>
         </div>
       )}
 
-      <h1 className="text-2xl font-semibold">{check.summary}</h1>
-
-      {check.rating && (
-        <p className="text-lg">
-          Rating: <span className="font-medium">{check.rating}</span>
-        </p>
-      )}
-
-      <section>
-        <h2 className="mb-2 text-lg font-medium">Claims</h2>
-        <ul className="flex flex-col gap-2">
-          {check.claims.map((claim) => (
-            <li key={claim.id} className="rounded border border-zinc-200 p-3 dark:border-zinc-800">
-              <p>{claim.text}</p>
-              <p className="text-xs text-zinc-500">{claim.claimType}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <h2 className="mb-2 text-lg font-medium">Sources</h2>
-        <ul className="flex flex-col gap-2">
-          {check.sources.map((source) => (
-            <li key={source.id}>
-              <a href={source.url} className="underline">
-                {source.title}
-              </a>{" "}
-              <span className="text-xs text-zinc-500">({source.credibilityTier})</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </main>
+      <CheckCard check={check} />
+    </div>
   );
 }
