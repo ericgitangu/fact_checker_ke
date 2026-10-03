@@ -21,3 +21,18 @@ describe("SubmissionInputSchema", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("SubmissionInputSchema quote fields (ADR-0002)", () => {
+  it("accepts a url with a quote and timestamp", () => {
+    const r = SubmissionInputSchema.safeParse({
+      url: "https://www.youtube.com/watch?v=abc",
+      quote: "Unemployment fell to 2% last year",
+      timestampSec: 754,
+    });
+    expect(r.success).toBe(true);
+  });
+  it("rejects a quote on a text submission", () => {
+    const r = SubmissionInputSchema.safeParse({ text: "hello", quote: "x" });
+    expect(r.success).toBe(false);
+  });
+});
