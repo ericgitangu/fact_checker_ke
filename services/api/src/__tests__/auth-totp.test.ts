@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateTotpSecret, hotp, totpUri, verifyTotpCode } from "../lib/auth/totp.js";
+import { generateTotpSecret, hotp, matchTotpCounter, totpUri, verifyTotpCode } from "../lib/auth/totp.js";
 
 describe("TOTP/HOTP (RFC 6238 / RFC 4226, node:crypto only)", () => {
   it("matches RFC 4226 Appendix D HOTP test vectors for secret '12345678901234567890'", () => {
@@ -29,6 +29,18 @@ describe("TOTP/HOTP (RFC 6238 / RFC 4226, node:crypto only)", () => {
 
   it("verifyTotpCode rejects a non-6-digit string without throwing", () => {
     expect(verifyTotpCode(generateTotpSecret(), "abc")).toBe(false);
+  });
+
+  /** SEC-3 (security-hardening finding #3): the replay-aware callers in AuthService need the exact matched counter, not just a yes/no. */
+  it("matchTotpCounter returns the exact step counter a code matched, or null for no match", () => {
+    const secret = generateTotpSecret();
+    const now = Date.now();
+    const step = Math.floor(now / 1000 / 30);
+    const key = base32DecodeForTest(secret);
+    const code = hotp(key, step);
+    expect(matchTotpCounter(secret, code, now)).toBe(step);
+    expect(matchTotpCounter(secret, "000000", now)).not.toBe(step);
+    expect(matchTotpCounter(secret, "abc", now)).toBeNull();
   });
 
   it("totpUri embeds the account email and issuer for an authenticator app to scan", () => {
