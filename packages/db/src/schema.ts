@@ -128,6 +128,10 @@ export const submissions = pgTable(
     url: text("url"),
     text: text("text"),
     submittedBy: text("submitted_by"),
+    // ADR-0002/0004 amendment #6: user-supplied quote + timestamp for
+    // third-party video URLs (we never download the audio).
+    quote: text("quote"),
+    timestampSec: integer("timestamp_sec"),
     status: submissionStatusEnum("status").notNull().default("received"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     // ADR-0018: the polling ETag is derived from (status, updated_at).

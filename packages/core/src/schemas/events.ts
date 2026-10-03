@@ -35,6 +35,12 @@ export const SubmissionReceivedEventSchema = EventEnvelopeSchema.extend({
     url: z.string().url().nullable(),
     text: z.string().nullable(),
     submitted_by: z.string().nullable(),
+    // ADR-0002/0004 amendment #6: for a third-party video URL we never
+    // download audio — the submitter's quote + timestamp ARE the input the
+    // pipeline checks. These must travel on the event or the pipeline
+    // verifies an empty quote (code-review blocker #2).
+    quote: z.string().nullable(),
+    timestamp_sec: z.number().int().nonnegative().nullable(),
   }),
 });
 export type SubmissionReceivedEvent = z.infer<typeof SubmissionReceivedEventSchema>;
