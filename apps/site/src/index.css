@@ -4,23 +4,33 @@
  * evidence. The page shows a real verdict instead of describing the product.
  *
  * - Colour is earned from the rating system: saturated hues appear ONLY on
- *   verdicts. Everything else is ink on paper.
- * - Archivo (grotesque) is the adjudicator's voice; Newsreader (serif) is
- *   reserved for the human claim under examination.
- * - Light = the public record; one dark band = the live street (maandamano).
+ *   verdicts, plus the brand mark's gradient (verdict-green -> azure) and
+ *   its purposeful accents (focus rings, the typing caret, the review
+ *   check). It never becomes a page-wide wash. Everything else is ink on
+ *   paper (or, at night, paper on ink — see [data-theme="dark"] below).
+ * - Bricolage Grotesque — a 2024-vintage, slightly hand-tooled grotesque —
+ *   carries the headline voice: distinctive enough to brand an "evidence,
+ *   not opinion" product without tipping into novelty. Archivo stays the
+ *   quieter UI/body voice; Newsreader is reserved for the human claim under
+ *   examination, nowhere else.
+ * - Light = the public record; dark = the same record read at night — not
+ *   a different product, so the verdict system, the checkcard and the
+ *   street band all get deliberate dark-mode values rather than a filter.
  */
 
 :root {
-  /* surfaces */
+  /* surfaces (light, default) */
   --paper: #fafaf7;
   --paper-2: #f2f1ea;
+  --surface: #ffffff;
   --ink: #15181b;
   --ink-2: #585f66;
   --ink-3: #8a9198;
   --rule: #e4e3dc;
   --rule-strong: #d2d0c6;
 
-  /* verdict system — the only saturated colour on the page */
+  /* verdict system — the only saturated colour on the page besides the
+     brand gradient */
   --true: #0e8a4f;
   --true-tint: #e7f2ec;
   --mostly: #6f9a16;
@@ -30,7 +40,8 @@
   --unproven: #6b7280;
   --notcheckable: #7d64a8;
 
-  /* night band */
+  /* night band (the maandamano section keeps this look in BOTH themes —
+     it is a deliberate dark panel on the light page, not theme-dependent) */
   --night: #0e1613;
   --night-2: #17241e;
   --night-rule: #2a3a31;
@@ -38,9 +49,30 @@
   --night-ink-2: #9db0a6;
 
   --brand: var(--true);
+  /* brand mark gradient — verdict-green into a complementary azure. Used
+     ONLY on the mark itself and small accents (caret, focus glow on the
+     theme toggle), never as a background wash. */
+  --brand-grad-a: #17a862;
+  --brand-grad-b: #2458d6;
+  --mark-tile-bg: var(--ink);
+
+  /* Stamp ink colours — deliberately darker than the matching --true /
+     --misleading / etc. swatch tokens above. Those tokens double as pale
+     tint backgrounds for the stamp (12% over the card surface); printing
+     the *same* hue as both the ink and the wash it sits on fails WCAG AA
+     (measured 2.9-4.2:1 here). The ink gets its own darker value per
+     verdict so the stamp stays legible without touching the swatch colour
+     used elsewhere (scale dots, --brand, checkcard-review). */
+  --stamp-true: #0c7946;
+  --stamp-mostly: #547511;
+  --stamp-misleading: #9a5d00;
+  --stamp-false: #c8102e;
+  --stamp-unproven: #656b78;
+  --stamp-notcheckable: #765e9e;
 
   --sans: "Archivo", system-ui, sans-serif;
   --sans-x: "Archivo Expanded", "Archivo", system-ui, sans-serif;
+  --display: "Bricolage Grotesque", "Archivo Expanded", var(--sans);
   --serif: "Newsreader", Georgia, serif;
 
   --shell: 1120px;
@@ -49,6 +81,48 @@
   color-scheme: light;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* ---------- dark theme ----------
+ * Applied via `<html data-theme="dark">`, set by an inline script in
+ * index.html before first paint (reads localStorage, falls back to
+ * `prefers-color-scheme`) and kept in sync by `useTheme` afterwards. Every
+ * token below is re-tuned for WCAG AA against `--paper`/`--surface`, not a
+ * blanket filter over the light values — the verdict hues in particular
+ * need more luminance to stay AA on a near-black ground.
+ */
+:root[data-theme="dark"] {
+  --paper: #0c100e;
+  --paper-2: #151b18;
+  --surface: #141a17;
+  --ink: #f1f3ef;
+  --ink-2: #b7c0ba;
+  --ink-3: #828f88;
+  --rule: #263029;
+  --rule-strong: #35433b;
+
+  --true: #30cf84;
+  --true-tint: rgba(48, 207, 132, 0.14);
+  --mostly: #a9d53f;
+  --misleading: #f0a93f;
+  --misleading-tint: rgba(240, 169, 63, 0.14);
+  --false: #ff6b7f;
+  --unproven: #9aa6ae;
+  --notcheckable: #c4a9f5;
+
+  --mark-tile-bg: #0a0d0b;
+
+  /* The brightened dark-theme swatches already clear 4.5:1 for stamp ink
+     against their own 14%-tint wash (measured 5.3-7.6:1), so the ink can
+     just alias the swatch token here instead of needing its own value. */
+  --stamp-true: var(--true);
+  --stamp-mostly: var(--mostly);
+  --stamp-misleading: var(--misleading);
+  --stamp-false: var(--false);
+  --stamp-unproven: var(--unproven);
+  --stamp-notcheckable: var(--notcheckable);
+
+  color-scheme: dark;
 }
 
 * {
@@ -64,6 +138,9 @@ body {
   background: var(--paper);
   color: var(--ink-2);
   font: 400 1.0625rem/1.6 var(--sans);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 h1,
@@ -74,6 +151,7 @@ h3 {
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.05;
+  font-family: var(--display);
 }
 
 p {
@@ -126,19 +204,13 @@ a:hover {
   color: var(--ink);
 }
 
-.wordmark-mark {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  background: var(--ink);
-  color: var(--paper);
+.wordmark svg {
+  flex: none;
   border-radius: 7px;
-  font: 700 0.9rem/1 var(--sans-x);
-  letter-spacing: -0.03em;
 }
 
 .wordmark-text {
+  font-family: var(--display);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -151,12 +223,24 @@ a:hover {
 }
 
 .nav-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   text-decoration: none;
   color: var(--ink-2);
 }
 
 .nav-links a:hover {
   color: var(--ink);
+}
+
+.link-icon {
+  color: var(--ink-3);
+  transform: translateY(-1px);
+}
+
+.nav-links a:hover .link-icon {
+  color: var(--brand-grad-b);
 }
 
 .nav-join {
@@ -170,6 +254,29 @@ a:hover {
   border-color: var(--ink);
 }
 
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  margin-left: 2px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--brand-grad-b);
+  color: var(--ink);
+}
+
 /* ---------- hero ---------- */
 .hero {
   display: grid;
@@ -180,7 +287,7 @@ a:hover {
 }
 
 .hero h1 {
-  font-family: var(--sans-x);
+  font-family: var(--display);
   font-weight: 800;
   font-size: clamp(2.5rem, 5.6vw, 4.6rem);
   line-height: 0.98;
@@ -220,12 +327,24 @@ a:hover {
 
 .btn-primary {
   background: var(--brand);
+  /* Light theme: --true (#0e8a4f) is dark enough for white text at AA.
+     Dark theme: --true brightens to #30cf84 for AA against the near-black
+     page, which would fail AA *for* white text — so the button itself
+     flips to dark ink-on-bright-green there (see override below). */
   color: #fff;
 }
 
 .btn-primary:hover {
   background: #0b7343;
   transform: translateY(-1px);
+}
+
+:root[data-theme="dark"] .btn-primary {
+  color: #06130c;
+}
+
+:root[data-theme="dark"] .btn-primary:hover {
+  background: #28b874;
 }
 
 .btn-ghost {
@@ -240,7 +359,7 @@ a:hover {
 /* ---------- the fact-check card (the one bold object) ---------- */
 .checkcard {
   margin: 0;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 14px;
   padding: 28px 28px 24px;
@@ -265,6 +384,20 @@ a:hover {
   font-weight: 500;
   color: var(--ink);
   letter-spacing: -0.005em;
+  /* Reserves two lines up front so the typing reveal (see TypedClaim) never
+     shifts the stamp/rationale below it — a growing text node with no
+     reserved box is a textbook CLS source. */
+  min-height: 2.56em;
+}
+
+.type-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  background: var(--brand-grad-b);
+  vertical-align: text-bottom;
+  animation: caret-blink 0.9s steps(1) infinite;
 }
 
 .checkcard-source-claim {
@@ -279,20 +412,80 @@ a:hover {
   margin: 22px 0 18px;
 }
 
-.verdict-stamp {
-  display: inline-block;
-  padding: 7px 16px;
-  border-radius: 8px;
-  font-weight: 700;
-  font-size: 1.05rem;
-  letter-spacing: -0.01em;
-  transform: rotate(-1.5deg);
+/* A verdict reads as something stamped onto the public record, not a UI
+   pill: an ink-stamp frame (a heavy outer rule plus a thin inset ring,
+   the gap between them cut from the card surface like a real rubber
+   stamp), tracked caps, a fixed off-true angle, and a faint dot-grain
+   texture standing in for uneven ink coverage. Colour still comes only
+   from the verdict system — each `.verdict-<rating>` sets the two custom
+   properties the frame, text and texture all read from. */
+.verdict-true {
+  --stamp-color: var(--stamp-true);
+  --stamp-tint: var(--true-tint);
+}
+.verdict-mostly {
+  --stamp-color: var(--stamp-mostly);
+  --stamp-tint: color-mix(in srgb, var(--mostly) 12%, transparent);
+}
+.verdict-misleading {
+  --stamp-color: var(--stamp-misleading);
+  --stamp-tint: var(--misleading-tint);
+}
+.verdict-false {
+  --stamp-color: var(--stamp-false);
+  --stamp-tint: color-mix(in srgb, var(--false) 12%, transparent);
+}
+.verdict-unproven {
+  --stamp-color: var(--stamp-unproven);
+  --stamp-tint: color-mix(in srgb, var(--unproven) 12%, transparent);
+}
+.verdict-notcheckable {
+  --stamp-color: var(--stamp-notcheckable);
+  --stamp-tint: color-mix(in srgb, var(--notcheckable) 12%, transparent);
 }
 
-.verdict-misleading .verdict-stamp {
-  color: var(--misleading);
-  background: var(--misleading-tint);
-  border: 1.5px solid color-mix(in srgb, var(--misleading) 45%, transparent);
+.verdict-stamp {
+  position: relative;
+  isolation: isolate;
+  display: inline-block;
+  padding: 8px 20px;
+  border-radius: 3px;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+  color: var(--stamp-color);
+  background: var(--stamp-tint);
+  border: 2px solid var(--stamp-color);
+  /* The second, thinner ring: an inset shadow cut from the card surface
+     first (the "gap"), then the ring colour — a real stamp's double
+     line, drawn without extra markup. */
+  box-shadow:
+    inset 0 0 0 3px var(--surface),
+    inset 0 0 0 4.5px var(--stamp-color);
+  /* Starts invisible; .stamp-ready (added once TypedClaim finishes, or
+     immediately under reduced motion) triggers the one-shot stamp-in
+     animation below. */
+  opacity: 0;
+}
+
+.verdict-stamp::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: radial-gradient(var(--stamp-color) 0.6px, transparent 0.6px);
+  background-size: 3px 3px;
+  opacity: 0.16;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: -1;
+}
+
+:root[data-theme="dark"] .verdict-stamp::before {
+  mix-blend-mode: screen;
+  opacity: 0.12;
 }
 
 .checkcard-rationale {
@@ -345,14 +538,8 @@ a:hover {
   gap: 7px;
 }
 
-.checkcard-review::before {
-  content: "";
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: var(--true);
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.5 11L3 7.5l1.2-1.2 2.3 2.3 5-5L12.7 4.8z' fill='black'/%3E%3C/svg%3E")
-    center / contain no-repeat;
+.checkcard-review svg {
+  flex: none;
 }
 
 /* ---------- verdict scale ---------- */
@@ -475,7 +662,7 @@ a:hover {
 
 .step-no {
   display: block;
-  font-family: var(--sans-x);
+  font-family: var(--display);
   font-weight: 800;
   font-size: 1.1rem;
   color: var(--ink-3);
@@ -609,7 +796,7 @@ a:hover {
   border-radius: 10px;
   font: inherit;
   font-size: 1rem;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -637,6 +824,14 @@ a:hover {
 
 .waitlist button:hover:not(:disabled) {
   background: #0b7343;
+}
+
+:root[data-theme="dark"] .waitlist button {
+  color: #06130c;
+}
+
+:root[data-theme="dark"] .waitlist button:hover:not(:disabled) {
+  background: #28b874;
 }
 
 .waitlist button:disabled {
@@ -705,20 +900,31 @@ a:hover {
 @keyframes stamp-in {
   0% {
     opacity: 0;
-    transform: rotate(-1.5deg) scale(1.25);
+    transform: rotate(-2deg) scale(1.3);
   }
-  60% {
+  55% {
     opacity: 1;
-    transform: rotate(-1.5deg) scale(0.96);
+    transform: rotate(-2deg) scale(0.94);
   }
   100% {
     opacity: 1;
-    transform: rotate(-1.5deg) scale(1);
+    transform: rotate(-2deg) scale(1);
   }
 }
 
-.verdict-stamp {
-  animation: stamp-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s both;
+.verdict-stamp.stamp-ready {
+  animation: stamp-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 /* ---------- responsive ---------- */
@@ -755,9 +961,16 @@ a:hover {
   }
   .verdict-stamp {
     animation: none;
+    opacity: 1;
+  }
+  .type-caret {
+    animation: none;
+    display: none;
   }
   .btn,
-  .waitlist button {
+  .waitlist button,
+  .theme-toggle,
+  body {
     transition: none;
   }
 }
