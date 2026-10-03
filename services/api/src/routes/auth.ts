@@ -75,20 +75,28 @@ export async function authRoutes(app: FastifyInstance, deps: { auth: AuthService
   });
 
   // Role grants: either a real admin's authenticated request, or the
-  // one-time bootstrap path (see AuthService.grantRole's docblock) --
-  // bootstrap is identified by the ABSENCE of a bearer token, never by
-  // a flag a caller could forge.
+  // one-time bootstrap self-grant (see AuthService.grantRole's docblock).
+  // SEC-1 (2026-10-04 security-hardening fix): a bearer session is now
+  // REQUIRED in every case, including bootstrap -- the caller must always
+  // present their own session token, and `grantRole` itself enforces that
+  // a zero-admin bootstrap grant may only target that SAME caller's own
+  // account. Previously, the absence of a bearer token was treated as
+  // "unauthenticated bootstrap" and let the request name ANY userId as
+  // the target; that side channel is removed entirely.
   app.post("/v1/auth/roles/grant", async (request, reply) => {
     const parsed = GrantRoleBodySchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: "validation_error", issues: parsed.error.issues });
 
     const header = request.headers.authorization;
-    let actor: { id: string; role: import("@fact-checker-ke/core").Role | null } | null = null;
-    if (header?.startsWith("Bearer ")) {
-      const session = await auth.verifySession(header.slice("Bearer ".length).trim());
-      if (!session.ok) return reply.status(401).send({ error: "unauthorized" });
-      actor = { id: session.value.id, role: session.value.role };
+    if (!header?.startsWith("Bearer ")) {
+      return reply.status(401).send({ error: "unauthorized", message: "Missing bearer session token." });
     }
+    const session = await auth.verifySession(header.slice("Bearer ".length).trim());
+    if (!session.ok) return reply.status(401).send({ error: "unauthorized" });
+    const actor: { id: string; role: import("@fact-checker-ke/core").Role | null } = {
+      id: session.value.id,
+      role: session.value.role,
+    };
 
     const result = await auth.grantRole(actor, parsed.data.userId, parsed.data.role);
     if (!result.ok) {

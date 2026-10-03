@@ -34,6 +34,7 @@ export const AuditActionSchema = z.enum([
   "totp_verified",
   "role_granted",
   "role_grant_rejected_no_mfa",
+  "role_grant_rejected_bootstrap_scope",
   "check.approved",
   "check.corrected",
   "check.rejected",
