@@ -1,0 +1,131 @@
+{
+  "common": {
+    "appName": "fact_checker_ke",
+    "nav": {
+      "home": "Nyumbani",
+      "methodology": "Mbinu",
+      "tracker": "Maandamano",
+      "editor": "Mhariri",
+      "language": "Lugha"
+    },
+    "footer": {
+      "tagline": "Mradi huru, wa chanzo-wazi wa kuhakiki habari nchini Kenya.",
+      "languages": "Kiingereza, Kiswahili na Sheng",
+      "builtIn": "Imetengenezwa Nairobi"
+    },
+    "action": {
+      "submit": "Hakiki hili",
+      "submitting": "Inatuma…",
+      "retry": "Jaribu tena",
+      "cancel": "Ghairi"
+    },
+    "offline": {
+      "title": "Huna mtandao",
+      "body": "fact_checker_ke haikuweza kufikia mtandao. Muundo wa programu umehifadhiwa, hivyo kurasa ulizotembelea tayari zinaweza kufanya kazi — unganisha tena ili kutuma dai jipya au kupakia hakiki mpya."
+    }
+  },
+  "check": {
+    "aiAssisted": "Uchambuzi wa AI — si uamuzi wa mwisho",
+    "draft": {
+      "pending": "Inasubiri ukaguzi wa binadamu",
+      "awaitingEditor": "Inasubiri ukaguzi wa mhariri. Ushahidi na vyanzo vimeonyeshwa hapa chini, lakini hakuna uamuzi utakaochapishwa hadi mhariri athibitishe."
+    },
+    "rating": {
+      "label": "Uamuzi",
+      "True": "Kweli",
+      "MostlyTrue": "Kwa kiasi kikubwa kweli",
+      "Misleading": "Inapotosha",
+      "False": "Uongo",
+      "Unproven": "Haijathibitishwa",
+      "NotCheckable": "Haiwezi kuhakikiwa"
+    },
+    "claims": {
+      "heading": "Madai"
+    },
+    "sources": {
+      "heading": "Vyanzo"
+    },
+    "reviewedBy": "Imekaguliwa na mhariri kabla ya kuchapishwa",
+    "notFound": {
+      "title": "Hakiki haipatikani",
+      "body": "Hatukuweza kupata hakiki yenye kitambulisho hicho."
+    }
+  },
+  "submit": {
+    "heading": "fact_checker_ke",
+    "lede": "Tuma kiungo au bandika maandishi. Tunanakili, tunatoa madai, tunalinganisha na vyanzo vinavyojulikana, na kuandaa uamuzi — daima hukaguliwa na binadamu kabla ya kuchapishwa.",
+    "field": {
+      "url": "Kiungo cha dai, video, au makala",
+      "quote": "Nukuu kamili kutoka kwa video (si lazima)",
+      "quoteHelp": "Kwa viungo vya video, tunahakiki maandishi uliyonukuu hapa badala ya kupakua sauti ya video. Acha wazi kwa makala au machapisho ya maandishi.",
+      "timestamp": "Muda, kwa sekunde (si lazima)"
+    },
+    "success": "Imetumwa. Fuatilia inavyopitia mchakato.",
+    "error": {
+      "network": "Hitilafu ya mtandao — tafadhali jaribu tena.",
+      "offline": "Huna mtandao — kutuma dai jipya kunahitaji muunganisho."
+    }
+  },
+  "status": {
+    "heading": "Kufuatilia dai lako",
+    "state": {
+      "received": "Imepokelewa",
+      "analyzing": "Inachambuliwa",
+      "analyzed": "Imechambuliwa",
+      "verifying": "Inahakikiwa",
+      "ready": "Tayari",
+      "failed": "Imeshindwa"
+    },
+    "desc": {
+      "received": "Dai lako liko kwenye foleni ya uchambuzi.",
+      "analyzing": "Tunatoa madai na kutafsiri, tukihifadhi maneno asili.",
+      "analyzed": "Madai yametolewa. Yanalinganishwa na vyanzo vinavyoaminika.",
+      "verifying": "Mhariri wa binadamu anakagua ushahidi na uamuzi wa awali.",
+      "ready": "Imechapishwa. Angalia hakiki hapa chini.",
+      "failed": "Hitilafu imetokea wakati wa kuchakata dai hili."
+    },
+    "viewCheck": "Angalia hakiki iliyochapishwa",
+    "reconnecting": "Inaunganisha tena…",
+    "polling": "Masasisho ya moja kwa moja hayapatikani — tunakagua mara kwa mara badala yake."
+  },
+  "tracker": {
+    "heading": "Taarifa za maandamano",
+    "intro": "Taarifa za kusoma tu kwa kata na kaunti ndogo. Hakuna maeneo mahususi yanayochapishwa.",
+    "streetHeading": "Mitaa inaposonga, uvumi husonga haraka zaidi.",
+    "streetBody": "Wakati wa maandamano, fact_checker_ke hufuatilia taarifa zilizothibitishwa katika kiwango cha kata — kufungwa kwa barabara, tahadhari za usalama, na madai yanayosambaa kuyahusu. Tunaonyesha kinachoendelea na wapi, si nani yuko wapi.",
+    "streetNote": "Usalama wa waandamanaji unatangulia ushiriki. Maeneo yanabaki ya jumla, na chochote kinachoweza kuhatarisha watu kinazuiwa au kuondolewa.",
+    "status": {
+      "rumoured": "Uvumi",
+      "announced": "Imetangazwa",
+      "confirmed": "Imethibitishwa",
+      "ongoing": "Inaendelea",
+      "ended": "Imekwisha",
+      "cancelled": "Imeghairiwa"
+    },
+    "sourcedFrom": "Chanzo",
+    "updatedAt": "Ilisasishwa mara ya mwisho",
+    "frozen": {
+      "title": "Taarifa za maandamano zimesitishwa kwa muda",
+      "body": "Taarifa zimesitishwa huku tukithibitisha hali ya sasa. Hili ni hatua ya makusudi ya usalama, si hitilafu — angalia tena baadaye kidogo."
+    },
+    "offline": {
+      "title": "Haiwezekani kuthibitisha hali ya sasa",
+      "body": "Hatuonyeshi kamwe taarifa iliyohifadhiwa kama ya sasa. Unganisha tena ili kuona hali ya hivi karibuni."
+    },
+    "staleWarning": "Haijathibitishwa tena kwa zaidi ya saa 2 — hali inaweza kuwa si ya hivi karibuni."
+  },
+  "editorial": {
+    "heading": "Ukaguzi wa mhariri",
+    "devBanner": "Toleo la majaribio pekee: uthibitisho halisi wa kikao utakuja na ADR-0020 (Better Auth). Unaona hii ukijifanya mhariri aliyeingia.",
+    "drafts": {
+      "empty": "Hakuna rasimu zinazosubiri ukaguzi.",
+      "heading": "Rasimu zinazosubiri"
+    },
+    "action": {
+      "approve": "Idhinisha na uchapishe",
+      "correct": "Sahihisha na uchapishe",
+      "publishing": "Inachapisha…"
+    },
+    "noRatingToSubmitter": "Uamuzi umefichwa kwa mtumaji hadi uchapishwe (AT-0004-B)."
+  }
+}
