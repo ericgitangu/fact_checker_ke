@@ -146,5 +146,37 @@ AT-0016-6's own grep check (run manually before trusting the script) caught this
 - **`google_cloud_run_v2_service_iam_member.public_invoker`** in `modules/cloud_run_service` grants `roles/run.invoker` to `allUsers` when `allow_unauthenticated=true` (the default) — correct per ADR-0015 for a public API, but worth a second look once auth (ADR-0020) exists, so a future reviewer doesn't assume it was an oversight.
 - **Upstash database import path is now a dead end** given the provider's state-leak behaviour — if lifecycle tracking (not just `prevent_destroy`) of the Upstash resource is ever required, it needs either an upstream provider fix or a wrapper (e.g. a null_resource driving the Upstash CLI) that keeps the credential out of state; not attempted here as it was out of scope.
 
+### Observability-as-code additions (2026-10-03, ADR-0022 follow-up)
+
+Added to `infra/terraform/envs/prod/monitoring.tf`, applying the ADR-0022 Decision list's items that are expressible without application-layer changes:
+
+- `google_logging_metric.dlq_non_empty` (`fact_checker_ke_dlq_depth`) and `google_logging_metric.outbox_lag` (`fact_checker_ke_outbox_lag_seconds`) — log-based metrics extracting a numeric field from structured JSON log lines the app is expected to emit (`jsonPayload.signal="dlq_depth_check"` / `"outbox_sweep"`; exact field contract is documented in the Terraform file's doc comment, for whoever implements the `services/pipeline` sweeper). **Not gated behind `enable_services`** — log-based metrics are free, passive filters over logs already ingested, and cannot poll or wake Neon.
+- `google_monitoring_alert_policy.dlq_non_empty` and `.outbox_lag` — alert on those metrics (DLQ depth > 0 sustained one full sweep interval; outbox lag > 900s), per ADR-0022 Decision #3. Both report zero data until the app emits the log lines above — this is the explicit, documented placeholder the task asked for (ADR-0022's AT-0022-2/AT-0022-3 stay RED; what's GREEN is that the signal pipeline and alert wiring exist and `terraform plan` is clean).
+- `google_monitoring_dashboard.services` — a single dashboard with 6 tiles: api/pipeline request-count-by-response-class, api/pipeline p95 latency, and the two log-based signals above. Not gated behind `enable_services` either (a dashboard is a free, static definition; empty widgets until real Cloud Run revisions and app logs exist is expected, not a bug).
+- `policy/plan-guard.sh` got a documentation-only addition confirming `google_logging_metric`/`google_monitoring_alert_policy`/`google_monitoring_dashboard`/`google_monitoring_notification_channel` are correctly absent from `BANNED_TYPES` — verified by running plan-guard against the real `envs/prod` plan containing all five new resources (PASS) and against the unmodified `fixtures/violating-plan.json` (still FAILs with 5 violations) and `fixtures/clean-plan.json` (still PASSes).
+
+`terraform plan` with `enable_services=false` (GCS backend, `GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)`) reports **5 to add, 0 to change, 0 to destroy** — exactly the two metrics, two alert policies, and one dashboard; nothing else in the existing state drifts. Nothing was applied (all five are free-tier/non-billable by construction, but this change's scope was prepare-only).
+
+### `scripts/release/release.sh` dry-run hardening (2026-10-03)
+
+`--dry-run` previously only showed the real sequence for steps that were already reachable given the current (unconfigured) environment — e.g. step B (build+push) printed a `SKIP` instead of the commands it would run, because the old gating conflated "is this dry-run" with "is `ENABLE_SERVICES` set". Fixed: a `billable_gate` helper now separates the two concerns — in `--dry-run` every step always prints its full command sequence (using a placeholder Artifact Registry path/digest when a real one can't be resolved without actually pushing), regardless of `ENABLE_SERVICES`; in a real run, the exact same billable steps (image push, migrate job, candidate deploy, traffic shift, Vercel promote) are skipped unless `ENABLE_SERVICES=true` is set by the owner. `bash scripts/release/release.sh --dry-run` now prints the complete ordered plan — moon ci → build+push by digest → terraform plan/plan-guard → migration lint → migrate job → deploy `--no-traffic` tag=candidate → smoke → update-traffic → vercel build/deploy/promote — end to end, with every billable command clearly labelled `[BILLABLE: ...]` in its step header, and makes zero real changes (verified: re-running `terraform plan` afterward is unaffected, `plan.out`/`plan.json` stay gitignored scratch files). A latent bug was also fixed in the same pass: the old script ran `terraform show -json plan.out > plan.json` unconditionally (outside the dry-run-aware `run()` wrapper), which in `--dry-run` would silently read a **stale** `plan.out` from a previous real run if one happened to exist on disk; it's now explicitly gated to only run when `DRY_RUN=0`.
+
+### First real deploy — exact command sequence (documented now, NOT executed)
+
+When the owner is ready to ship the first real images and cut over traffic for the first time, the sequence is:
+
+1. **Secrets the services need, added once (no-echo, from stdin per the established runbook):**
+   ```
+   printf '%s' "$ANTHROPIC_API_KEY" | gcloud secrets versions add fact-checker-ke-<name> --data-file=- --project=master-crossing-435409-r1
+   ```
+   (exact secret name TBD by whoever wires the Anthropic/Claude call and the Chirp_2 ASR key per ADR-0005 — both go into existing or new `module.secret_*` containers; no secret value is ever committed or placed in a `.tfvars` file.)
+2. **Push images by digest and flip the Terraform gate:**
+   ```
+   ENABLE_SERVICES=true bash scripts/release/release.sh
+   ```
+   This is the single flag flip (`ENABLE_SERVICES=true`, this script's own env var — distinct from, but mirrored by, `envs/prod`'s Terraform `enable_services` variable, which the owner sets via `-var enable_services=true` on the `terraform apply` that defines the Cloud Run services/job for the first time, run once ahead of the first `release.sh` invocation). The script then runs for real: builds+pushes `api`/`pipeline` images by digest, runs `terraform plan`/plan-guard (now showing the Cloud Run services/job as real creates), runs the migrate job, deploys `--no-traffic` tag=candidate, smokes `healthz` (must not touch the DB — ADR-0016 amendment, enforced by application code, not by this script), shifts 100% traffic, then builds/deploys/promotes `apps/web` on Vercel.
+3. **Vercel env flip:** once the Cloud Run `api` service has a stable URL (`terraform output` or `gcloud run services describe fact-checker-ke-api --format='value(status.url)'`), set it as `apps/web`'s backend URL env var in Vercel (`vercel env add <VAR_NAME> production`, value = the Cloud Run URL) before the `vercel promote` step in `release.sh` runs, so the promoted production build points at the live API rather than a placeholder/local URL. This is a one-time [MANUAL] step the first time; subsequent releases reuse the same env var.
+4. **Confirm scale-to-zero held:** after the first real traffic, `gcloud run services describe fact-checker-ke-api --region=africa-south1 --format='value(status.traffic)'` plus a 24h idle soak showing Neon suspended (AT-0016-7, still RED/deferred — application-layer `healthz` behaviour, not infra).
+
 ### Commits
 See the commit log for this change (conventional commits, no AI attribution per repo convention).
