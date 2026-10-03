@@ -19,16 +19,19 @@ WORKDIR /repo
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 FROM base AS deps
+# Dependency-graph agnostic: `pnpm fetch` needs only the lockfile, so this
+# layer is cached until dependencies change and never lists workspace
+# packages by hand (adding a package must not require editing this file).
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY packages/core/package.json packages/core/package.json
-COPY services/api/package.json services/api/package.json
-RUN pnpm install --frozen-lockfile --filter @fact-checker-ke/api...
+RUN pnpm fetch --frozen-lockfile
 
 FROM deps AS build
-COPY packages/core packages/core
+COPY packages packages
 COPY services/api services/api
-RUN pnpm --filter @fact-checker-ke/core build \
- && pnpm --filter @fact-checker-ke/api build
+# `api...` = the API plus every workspace package it depends on, in
+# topological order, resolved from package.json — not from this file.
+RUN pnpm install --offline --frozen-lockfile --filter "@fact-checker-ke/api..." \
+ && pnpm --filter "@fact-checker-ke/api..." build
 # Self-contained, hard-linked, prod-only node_modules + dist for the
 # runtime stage — no devDependencies, no workspace symlinks to resolve
 # at runtime, nothing else from the monorepo.
