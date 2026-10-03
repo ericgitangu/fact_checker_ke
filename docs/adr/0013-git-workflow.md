@@ -44,3 +44,9 @@ GitHub Actions on the account is **locked by a billing issue**, so remote checks
 
 ## Review trigger
 Revisit when a second human contributor joins, or once Actions is restored.
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #15 (README/hygiene wave, medium severity).
+
+- **Turn on GitHub push protection before the repo goes public.** The repo is heading toward an OSS release (ADR-0001 Phase 0, D-U-N-S/entity clocks already started) with remote CI gates currently off and required approvals at 0 (section 5 above). Once Actions billing is restored and the repo is public, a fork PR on `pull_request_target` or a loosely-scoped WIF condition could mint deploy credentials (red-team C-12; see ADR-0016 amendments for the WIF-condition fix). Push protection (secret-scanning on push) must be enabled ahead of going public, independent of the Actions billing blocker.
