@@ -1,4 +1,5 @@
 import { BrandMark } from "./brand-mark";
+import { WavingFlag } from "./waving-flag";
 import "./wordmark.css";
 
 export type WordmarkSize = "sm" | "md" | "lg";
@@ -58,18 +59,8 @@ export function Wordmark({
         tone={variant === "mono" ? "mono" : "gradient"}
         className="fck-wordmark-mark"
       />
-      {showText && (
-        <span className="fck-wordmark-textwrap">
-          <span className="fck-wordmark-text">fact_checker_ke</span>
-          {variant !== "mono" && (
-            <span className="fck-wordmark-tricolour" aria-hidden="true">
-              <span className="fck-band-black" />
-              <span className="fck-band-red" />
-              <span className="fck-band-green" />
-            </span>
-          )}
-        </span>
-      )}
+      {showText && <span className="fck-wordmark-text">fact_checker_ke</span>}
+      {showText && variant !== "mono" && <WavingFlag className="fck-wordmark-flag" />}
     </span>
   );
 }
