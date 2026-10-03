@@ -16,7 +16,7 @@ from app.fakes.fake_abuse_scan import FakeAbuseScan
 from app.fakes.fake_reverse_image import FakeReverseImageSearch
 from app.fakes.fake_synthetic_media import FakeSyntheticMediaDetector
 from app.models.hop_requests import (
-    AnalyzeHopRequest,
+    AnalyzeHopEnvelope,
     MediaProcessHopRequest,
     SyntheticMediaTriageHopRequest,
     VerifyHopRequest,
@@ -82,9 +82,11 @@ async def healthz() -> dict[str, str]:
 
 
 @app.post("/hops/analyze")
-async def hop_analyze(payload: AnalyzeHopRequest) -> AnalyzeResult:
+async def hop_analyze(event: AnalyzeHopEnvelope) -> AnalyzeResult:
     try:
-        return await run_analyze_hop(payload, llm=_haiku_llm, store=_hop_idempotency_store)
+        return await run_analyze_hop(
+            event.to_hop_request(), llm=_haiku_llm, store=_hop_idempotency_store
+        )
     except AnalyzeHopError as exc:
         logger.warning("analyze hop failed: %s", exc)
         raise HTTPException(status_code=422, detail=str(exc)) from exc

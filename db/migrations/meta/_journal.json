@@ -57,6 +57,13 @@
       "when": 1791054396770,
       "tag": "0007_users_role_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791059978333,
+      "tag": "0008_submission_quote_timestamp",
+      "breakpoints": true
     }
   ]
 }
