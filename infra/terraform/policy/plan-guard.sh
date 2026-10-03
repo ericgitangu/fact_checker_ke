@@ -116,6 +116,16 @@ for t in "${BANNED_TYPES[@]}"; do
   fi
 done
 
+# Note (ADR-0022 observability-as-code, 2026-10-03): google_logging_metric,
+# google_monitoring_alert_policy, google_monitoring_dashboard and
+# google_monitoring_notification_channel are intentionally NOT in
+# BANNED_TYPES above. They are free, non-polling, non-billable
+# definitions (log-based metrics are passive filters over logs already
+# being ingested; dashboards are static JSON; alert policies only
+# evaluate existing metric/log data) and none of them can wake Neon or
+# incur idle cost, so they correctly never trip this guard. Verified by
+# running plan-guard against a real plan containing all of them
+# (envs/prod, enable_services=false) — see AT-0016-1 verification run.
 echo "=== plan-guard: $PLAN_JSON ==="
 if [[ "$FAIL" -eq 1 ]]; then
   echo "FAIL — ${#VIOLATIONS[@]} violation(s):"
