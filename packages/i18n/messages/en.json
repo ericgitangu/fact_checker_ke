@@ -1,0 +1,131 @@
+{
+  "common": {
+    "appName": "fact_checker_ke",
+    "nav": {
+      "home": "Home",
+      "methodology": "Methodology",
+      "tracker": "Maandamano",
+      "editor": "Editor",
+      "language": "Language"
+    },
+    "footer": {
+      "tagline": "An independent, open-source fact-checking project for Kenya.",
+      "languages": "English, Swahili & Sheng",
+      "builtIn": "Built in Nairobi"
+    },
+    "action": {
+      "submit": "Check this",
+      "submitting": "Submitting…",
+      "retry": "Try again",
+      "cancel": "Cancel"
+    },
+    "offline": {
+      "title": "You're offline",
+      "body": "fact_checker_ke couldn't reach the network. The app shell is cached, so pages you've already visited may still work — reconnect to submit a new claim or load fresh checks."
+    }
+  },
+  "check": {
+    "aiAssisted": "AI-assisted analysis — not a verdict",
+    "draft": {
+      "pending": "Pending human review",
+      "awaitingEditor": "Awaiting editor review. Evidence and sources are shown below, but no rating is published until an editor signs off."
+    },
+    "rating": {
+      "label": "Rating",
+      "True": "True",
+      "MostlyTrue": "Mostly true",
+      "Misleading": "Misleading",
+      "False": "False",
+      "Unproven": "Unproven",
+      "NotCheckable": "Not checkable"
+    },
+    "claims": {
+      "heading": "Claims"
+    },
+    "sources": {
+      "heading": "Sources"
+    },
+    "reviewedBy": "Reviewed by an editor before publishing",
+    "notFound": {
+      "title": "Check not found",
+      "body": "We couldn't find a check with that id."
+    }
+  },
+  "submit": {
+    "heading": "fact_checker_ke",
+    "lede": "Submit a link or paste text. We transcribe, extract claims, run retrieval against known sources, and draft a verdict — always reviewed by a human before it is published.",
+    "field": {
+      "url": "Link to a claim, video or article",
+      "quote": "Exact quote from the video (optional)",
+      "quoteHelp": "For video links, we check the text you quote here rather than downloading the video's audio. Leave blank for articles or text posts.",
+      "timestamp": "Timestamp, in seconds (optional)"
+    },
+    "success": "Submitted. Watch it move through the pipeline.",
+    "error": {
+      "network": "Network error — please try again.",
+      "offline": "You're offline — submitting a new claim needs a connection."
+    }
+  },
+  "status": {
+    "heading": "Tracking your submission",
+    "state": {
+      "received": "Received",
+      "analyzing": "Analyzing",
+      "analyzed": "Analyzed",
+      "verifying": "Verifying",
+      "ready": "Ready",
+      "failed": "Failed"
+    },
+    "desc": {
+      "received": "Your submission is queued for analysis.",
+      "analyzing": "Extracting claims and translating, keeping the original words.",
+      "analyzed": "Claims extracted. Matching each one against credible sources.",
+      "verifying": "A human editor is reviewing the evidence and draft verdict.",
+      "ready": "Published. View the check below.",
+      "failed": "Something went wrong processing this submission."
+    },
+    "viewCheck": "View the published check",
+    "reconnecting": "Reconnecting…",
+    "polling": "Live updates unavailable — checking periodically instead."
+  },
+  "tracker": {
+    "heading": "Maandamano advisories",
+    "intro": "Read-only advisories by ward and sub-county. No precise locations are published.",
+    "streetHeading": "When the streets move, the rumours move faster.",
+    "streetBody": "During maandamano, fact_checker_ke tracks confirmed advisories at the ward level — road closures, safety notices, and the claims going viral about them. We show what's happening and where, never who is where.",
+    "streetNote": "Protester safety comes before engagement. Locations stay coarse, and anything that could put people at risk is held or dropped.",
+    "status": {
+      "rumoured": "Rumoured",
+      "announced": "Announced",
+      "confirmed": "Confirmed",
+      "ongoing": "Ongoing",
+      "ended": "Ended",
+      "cancelled": "Cancelled"
+    },
+    "sourcedFrom": "Source",
+    "updatedAt": "Last updated",
+    "frozen": {
+      "title": "Tracker temporarily frozen",
+      "body": "Advisories are paused while we confirm current conditions. This is a deliberate safety measure, not an outage — check back shortly."
+    },
+    "offline": {
+      "title": "Can't confirm current status",
+      "body": "We never show a cached advisory as current. Reconnect to see the latest status."
+    },
+    "staleWarning": "Not re-verified in over 2 hours — status may be out of date."
+  },
+  "editorial": {
+    "heading": "Editor review",
+    "devBanner": "Dev-only stub: real session auth lands with ADR-0020 (Better Auth). You are viewing this as a pretend-logged-in editor.",
+    "drafts": {
+      "empty": "No drafts awaiting review.",
+      "heading": "Pending drafts"
+    },
+    "action": {
+      "approve": "Approve & publish",
+      "correct": "Correct & publish",
+      "publishing": "Publishing…"
+    },
+    "noRatingToSubmitter": "Rating withheld from the submitter until published (AT-0004-B)."
+  }
+}

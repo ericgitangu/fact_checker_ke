@@ -8,6 +8,7 @@ $schema: 'https://moonrepo.dev/schemas/project.yml'
 # finding behind this.
 dependsOn:
   - 'core'
+  - 'i18n'
 
 tasks:
   build:
