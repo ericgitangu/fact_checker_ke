@@ -1,0 +1,23 @@
+$schema: 'https://moonrepo.dev/schemas/project.yml'
+
+# lint/typecheck/test/build inherited from .moon/tasks/node.yml.
+#
+# dependsOn declared explicitly -- package.json's "workspace:*" dependency
+# on @fact-checker-ke/core feeds affected-detection but not the `^:build`
+# task dependency ordering; see packages/db/moon.yml for the empirical
+# finding behind this.
+dependsOn:
+  - 'core'
+
+tasks:
+  build:
+    # ADR-0014 AT-0014-4: VITE_API_URL/VITE_WEB_URL are baked into the
+    # static bundle at build time (vite.config.ts fails the production
+    # build if VITE_API_URL is unset/invalid). Declaring them as env inputs
+    # means changing either value invalidates the cached build -- turbo had
+    # no equivalent for this.
+    inputs:
+      - '$VITE_API_URL'
+      - '$VITE_WEB_URL'
+    outputs:
+      - 'dist/**'

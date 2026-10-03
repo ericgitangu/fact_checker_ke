@@ -1,0 +1,21 @@
+$schema: 'https://moonrepo.dev/schemas/project.yml'
+
+# lint/typecheck/test/build inherited from .moon/tasks/node.yml.
+#
+# dependsOn declared explicitly (verified empirically, 2026-10-03): a
+# "workspace:*" dependency in package.json is enough for moon's affected-
+# detection to cascade (touching core correctly affects db), but NOT
+# enough for the `^:build` task dependency (.moon/tasks/node.yml) to
+# actually order db:build after core:build -- without this field,
+# `moon run db:build` in isolation (or inside a Docker build) races
+# core:build and fails with "Cannot find module '@fact-checker-ke/core'"
+# depending on scheduling luck. This is the real root cause behind the
+# "a zod v4 type change broke Drizzle pgEnum's" / build-order incidents
+# ADR-0013's Problem section names.
+dependsOn:
+  - 'core'
+
+tasks:
+  build:
+    outputs:
+      - 'dist/**'

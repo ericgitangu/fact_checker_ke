@@ -1,0 +1,59 @@
+$schema: 'https://moonrepo.dev/schemas/project.yml'
+
+# ADR-0014: no Python toolchain (unstable_uv/unstable_python are
+# experimental -- moonrepo/moon#2691). Every task below is a plain system
+# command that shells out to `uv`, which already pins the interpreter via
+# pyproject.toml (requires-python) and uv.lock. moon caches these by their
+# declared inputs/outputs same as any other task, it just doesn't manage
+# the Python toolchain itself.
+#
+# This project is discovered via the `services/*` glob in
+# .moon/workspace.yml (folder name -> project id `pipeline`), and does NOT
+# match .moon/tasks/node.yml's `inheritedBy: { toolchains: ['node'] }`
+# condition (no package.json here), so none of the shared Node tasks leak
+# in -- every task is defined explicitly below.
+
+fileGroups:
+  sources:
+    - 'app/**/*.py'
+    - 'pyproject.toml'
+    - 'uv.lock'
+  tests:
+    - 'tests/**/*.py'
+
+tasks:
+  lint:
+    command: 'uv run ruff check .'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+
+  typecheck:
+    command: 'uv run mypy app/models'
+    # ADR-0014: the codegen graph edge. app/models/generated.py is derived
+    # from packages/core's zod schemas -- regenerate before typechecking so
+    # a stale generated.py never passes typecheck against drifted models.
+    deps:
+      - 'core:gen-contracts'
+    inputs:
+      - '@group(sources)'
+
+  test:
+    command: 'uv run pytest'
+    deps:
+      - 'core:gen-contracts'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+
+  build:
+    # No deployable artifact other than the Docker image (built separately,
+    # see services/pipeline/Dockerfile). `uv build` still exercises the
+    # packaging metadata (hatchling, pyproject.toml) as a real build step
+    # moon can cache, matching AT-0014-1's "build for every project".
+    command: 'uv build'
+    inputs:
+      - '@group(sources)'
+      - 'pyproject.toml'
+    outputs:
+      - 'dist/**'

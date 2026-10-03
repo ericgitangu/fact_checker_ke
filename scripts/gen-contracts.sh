@@ -22,7 +22,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo "==> [1/2] packages/core: exporting zod schemas to JSON Schema"
-pnpm turbo run gen:schema --filter=@fact-checker-ke/core --force
+# Called directly (not via `moon run core:gen-schema`) because this script
+# is itself invoked BY the `core:gen-contracts` moon task -- a nested moon
+# invocation from inside a moon-run action is unsupported/reentrant.
+pnpm --filter @fact-checker-ke/core run gen:schema
 
 echo "==> [2/2] services/pipeline: generating Pydantic v2 models"
 (

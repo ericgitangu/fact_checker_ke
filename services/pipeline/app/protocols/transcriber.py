@@ -12,7 +12,7 @@ from typing import Protocol
 
 
 class TranscriptionResult:
-    __slots__ = ("text", "language", "duration_seconds")
+    __slots__ = ("duration_seconds", "language", "text")
 
     def __init__(self, text: str, language: str, duration_seconds: float) -> None:
         self.text = text
