@@ -1,21 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { WaitlistForm } from "./waitlist-form";
 
 const GITHUB_URL = "https://github.com/ericgitangu";
 
 function App(): React.JSX.Element {
-  const [email, setEmail] = useState("");
-  const [joined, setJoined] = useState(false);
-
-  /**
-   * Client-side stub only — no data submission backend exists yet for the
-   * marketing site waitlist (see docs/adr). This intentionally does not
-   * call any API; it's a UX placeholder until a real capture mechanism
-   * (e.g. a hosted form or a dedicated endpoint) is chosen.
-   */
-  function handleWaitlistSubmit(event: FormEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    setJoined(true);
-  }
+  const methodologyUrl = `${import.meta.env.VITE_WEB_URL}/methodology`;
 
   return (
     <>
@@ -53,25 +41,13 @@ function App(): React.JSX.Element {
           <p>A human reviewer approves (or corrects) the verdict before it is published.</p>
         </div>
         <p>
-          Read the full <a href="/methodology">methodology</a>.
+          Read the full <a href={methodologyUrl}>methodology</a>.
         </p>
       </section>
 
       <section className="waitlist-section container">
         <h2>Join the waitlist</h2>
-        <form className="waitlist" onSubmit={handleWaitlistSubmit}>
-          <input
-            type="email"
-            required
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={joined}
-          />
-          <button type="submit" disabled={joined}>
-            {joined ? "You're on the list" : "Join"}
-          </button>
-        </form>
+        <WaitlistForm />
       </section>
 
       <footer className="container">
