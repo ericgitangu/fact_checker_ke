@@ -36,6 +36,17 @@ Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 
 | [0017](0017-event-driven-core.md) | Event-driven core: outbox, idempotency, ACID | yes |
 | [0018](0018-realtime-and-caching.md) | Near-real-time status (SSE) and caching | no (poll fallback) |
 | [0019](0019-test-strategy-redteam.md) | Test strategy: ADR-derived TDD and red-team gates | process |
+| [0020](0020-identity-auth-roles.md) | Identity, auth and roles | red-team gap |
+| [0021](0021-data-protection-lifecycle.md) | Data protection lifecycle | red-team gap |
+| [0022](0022-observability-incident-response.md) | Observability and incident response | red-team gap |
+| [0023](0023-adversarial-ai-abuse.md) | Adversarial AI and abuse | red-team gap |
+| [0024](0024-trust-safety-moderation.md) | Trust and safety, and moderation | red-team gap |
+| [0025](0025-editorial-operations-capacity.md) | Editorial operations and capacity | red-team gap |
+| [0026](0026-open-source-boundary-licence.md) | Open-source boundary and licence | red-team gap |
+| [0027](0027-user-media-uploads.md) | User media uploads | red-team gap |
+| [0028](0028-client-ux-baseline.md) | Client UX baseline — i18n, accessibility, low bandwidth, offline | red-team gap |
+| [0029](0029-cost-model-runway.md) | Cost model and runway | red-team gap |
+| [0030](0030-creator-funnel-conflict-of-interest.md) | Creator funnel and conflict-of-interest firewall | red-team gap |
 
 ## Hard blockers found
 
