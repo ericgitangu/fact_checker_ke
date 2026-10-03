@@ -189,8 +189,12 @@ describe.skipIf(!connectionString)("GET /v1/submissions/:id/events (ADR-0018 SSE
       logger: false,
       config: baseConfig(),
       pubsub: new InMemoryPubSub(),
-      sseHeartbeatMs: 30,
-      sseMaxDurationMs: 150,
+      // Window sized with headroom so the heartbeat assertion is robust to
+      // the initial current-state Postgres read latency (negligible on a
+      // local CI DB, ~100ms against a remote Neon branch) — the cap must
+      // measure the STREAMING window, not the one-time startup read.
+      sseHeartbeatMs: 40,
+      sseMaxDurationMs: 500,
     });
 
     const token = await signCapabilityToken(CAPABILITY_SECRET, submission!.id, 90);
@@ -200,8 +204,13 @@ describe.skipIf(!connectionString)("GET /v1/submissions/:id/events (ADR-0018 SSE
 
     expect(res.statusCode).toBe(200);
     const heartbeatCount = (res.body.match(/: heartbeat/g) ?? []).length;
-    expect(heartbeatCount).toBeGreaterThanOrEqual(2); // ~150ms / 30ms interval
-    expect(elapsedMs).toBeLessThan(2_000); // closed at the cap, not left hanging
+    expect(heartbeatCount).toBeGreaterThanOrEqual(2); // >=~6 expected in a 500ms cap at 40ms
+    // Proves the stream CLOSED (didn't hang) rather than asserting an exact
+    // cap time: total elapsed = one-time current-state read + the 500ms cap,
+    // and that read is ~5ms on a local CI DB but ~1.9s against a cold remote
+    // Neon pooler. A genuinely hung stream would run to the 90s production
+    // default and blow the vitest timeout instead.
+    expect(elapsedMs).toBeLessThan(6_000);
     await app.close();
   });
 
