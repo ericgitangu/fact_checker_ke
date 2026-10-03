@@ -456,6 +456,33 @@ export const totpSecrets = pgTable("totp_secrets", {
 });
 
 /**
+ * SEC-3 (security-hardening finding #3, 2026-10-04): single-use tracking
+ * for TOTP codes. `verifyTotpCode` (app/lib/auth/totp.ts) accepts a code
+ * for its whole +/-1 step (90s) drift window with no state of its own --
+ * without this table, the SAME code could be replayed any number of
+ * times within that window, across both the enrollment-verification and
+ * login call sites. One row per (user, counter) actually consumed; a
+ * duplicate insert for an already-used counter is the replay rejection
+ * (`ON CONFLICT DO NOTHING`, checked by rows-returned, same pattern as
+ * `comment_reports`'s dedup). Rows are small and effectively
+ * append-only; a scheduled prune of rows older than the drift window
+ * (a few minutes) is tech debt -- not implemented here, since an unused
+ * extra row has no behavioural effect, only a few bytes of storage.
+ */
+export const totpUsedCodes = pgTable(
+  "totp_used_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    counter: integer("counter").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("totp_used_codes_user_counter_idx").on(table.userId, table.counter)],
+);
+
+/**
  * Opaque, hashed (sha256) session tokens — same pattern as
  * `device_tokens`, applied to authenticated editor/admin/moderator
  * sessions instead of anonymous devices.
