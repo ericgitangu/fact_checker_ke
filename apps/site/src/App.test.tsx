@@ -26,14 +26,22 @@ describe("App (marketing site)", () => {
     vi.unstubAllEnvs();
   });
 
-  it("renders the hero, GitHub CTA, and a methodology link built from VITE_WEB_URL", () => {
+  it("renders the wordmark, a GitHub link, and methodology links built from VITE_WEB_URL", () => {
     render(<App />);
     expect(screen.getByText("fact_checker_ke")).toBeInTheDocument();
-    const cta = screen.getByRole("link", { name: /view the code on github/i });
-    expect(cta).toHaveAttribute("href", "https://github.com/ericgitangu");
 
-    const methodologyLink = screen.getByRole("link", { name: /methodology/i });
-    expect(methodologyLink).toHaveAttribute("href", "http://localhost:3000/methodology");
+    // GitHub is linked (nav + footer both point at the owner's profile).
+    const githubLinks = screen
+      .getAllByRole("link", { name: /github/i })
+      .filter((a) => a.getAttribute("href") === "https://github.com/ericgitangu");
+    expect(githubLinks.length).toBeGreaterThan(0);
+
+    // Every methodology link resolves to VITE_WEB_URL/methodology.
+    const methodologyLinks = screen.getAllByRole("link", { name: /methodology/i });
+    expect(methodologyLinks.length).toBeGreaterThan(0);
+    for (const link of methodologyLinks) {
+      expect(link).toHaveAttribute("href", "http://localhost:3000/methodology");
+    }
   });
 
   it("idle: shows the form with no status message", () => {
