@@ -1,5 +1,7 @@
 import { useId, useState, type FormEvent } from "react";
-import { WaitlistSignupInputSchema, WaitlistSignupResultSchema } from "@fact-checker-ke/core";
+import { WaitlistSignupInputSchema } from "@fact-checker-ke/core";
+import { resolveApiUrl } from "./config";
+import { classifyWaitlistResponse } from "./waitlist-outcome";
 
 type WaitlistState =
   | { status: "idle" }
@@ -7,7 +9,10 @@ type WaitlistState =
   | { status: "joined" }
   | { status: "already_joined" }
   | { status: "invalid"; message: string }
-  | { status: "rate_limited" }
+  | { status: "rate_limited"; retryAfterSec: number | null }
+  | { status: "server_error" }
+  | { status: "unexpected" }
+  | { status: "misconfigured" }
   | { status: "network_error" };
 
 const BUSY_STATES: ReadonlySet<WaitlistState["status"]> = new Set(["submitting"]);
@@ -39,44 +44,40 @@ export function WaitlistForm(): React.JSX.Element {
       return;
     }
 
+    const config = resolveApiUrl(import.meta.env.VITE_API_URL);
+    if (!config.ok) {
+      // Deployment error, not a user or network problem — never send a
+      // request to a relative/garbage URL.
+      setState({ status: "misconfigured" });
+      return;
+    }
+
     setState({ status: "submitting" });
 
-    const apiUrl = import.meta.env.VITE_API_URL;
-
+    let res: Response;
     try {
-      const res = await fetch(`${apiUrl}/v1/waitlist`, {
+      res = await fetch(`${config.apiUrl}/v1/waitlist`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(parsedInput.data),
       });
+    } catch {
+      // Only a rejected fetch (offline, DNS, CORS) is a network error. Never
+      // log the email or the raw error — it can carry the typed address.
+      setState({ status: "network_error" });
+      return;
+    }
 
-      if (res.status === 400) {
+    const outcome = await classifyWaitlistResponse(res);
+    switch (outcome.kind) {
+      case "invalid":
         setState({ status: "invalid", message: "Enter a valid email address." });
         return;
-      }
-      if (res.status === 429) {
-        setState({ status: "rate_limited" });
+      case "rate_limited":
+        setState({ status: "rate_limited", retryAfterSec: outcome.retryAfterSec });
         return;
-      }
-      if (res.status !== 200 && res.status !== 201) {
-        setState({ status: "network_error" });
-        return;
-      }
-
-      const body: unknown = await res.json().catch(() => null);
-      const parsedResult = WaitlistSignupResultSchema.safeParse(body);
-      if (!parsedResult.success) {
-        setState({ status: "network_error" });
-        return;
-      }
-
-      setState({
-        status: parsedResult.data.status === "joined" ? "joined" : "already_joined",
-      });
-    } catch {
-      // Network failure, CORS rejection, etc. Never log the email or the
-      // raw error here — it can carry the address the person just typed.
-      setState({ status: "network_error" });
+      default:
+        setState({ status: outcome.kind });
     }
   }
 
@@ -106,8 +107,18 @@ export function WaitlistForm(): React.JSX.Element {
         {state.status === "joined" && "You're on the waitlist — thanks!"}
         {state.status === "already_joined" && "You're already on the waitlist."}
         {state.status === "invalid" && state.message}
-        {state.status === "rate_limited" && "Too many attempts — please try again in a moment."}
-        {state.status === "network_error" && "Something went wrong — please try again."}
+        {state.status === "rate_limited" &&
+          (state.retryAfterSec
+            ? `Too many attempts — please try again in ${state.retryAfterSec} seconds.`
+            : "Too many attempts — please try again in a moment.")}
+        {state.status === "server_error" &&
+          "The waitlist is temporarily unavailable — please try again shortly."}
+        {state.status === "unexpected" &&
+          "Something unexpected happened on our side — we couldn't add you. Please try again later."}
+        {state.status === "misconfigured" &&
+          "The waitlist isn't available right now. Please check back soon."}
+        {state.status === "network_error" &&
+          "We couldn't reach the server — check your connection and try again."}
       </p>
     </form>
   );
