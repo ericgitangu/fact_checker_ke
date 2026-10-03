@@ -1,12 +1,14 @@
 """LLM client Protocol: structural typing boundary for claim extraction and
-drafting. Only a fake implementation exists in this skeleton — no real API
-calls, no keys read or required. A real implementation (Anthropic, etc.)
-is a follow-up, gated behind ANTHROPIC_API_KEY being present and valid.
+drafting. A real implementation (AnthropicClient, app/clients/llm_anthropic.py)
+now exists alongside the deterministic FakeLlmClient; selection is by env
+(see app/clients/llm_anthropic.py:make_llm_client).
 """
 
 from __future__ import annotations
 
 from typing import Protocol
+
+from app.models.pipeline_io import UsageRecord
 
 
 class LlmCompletionError(Exception):
@@ -20,5 +22,15 @@ class LlmClient(Protocol):
 
         Must raise LlmCompletionError (not a bare exception) on an expected
         failure mode.
+        """
+        ...
+
+    async def complete_with_usage(
+        self, prompt: str, *, stage: str, max_tokens: int = 1024
+    ) -> tuple[str, UsageRecord]:
+        """Like `complete`, but also returns per-call cost telemetry
+        (ADR-0011 §7): `{stage, model, input_tokens, cached_tokens,
+        output_tokens, usd}`. `stage` is the caller-supplied pipeline stage
+        name (e.g. "analyze", "verify") for the telemetry record.
         """
         ...
