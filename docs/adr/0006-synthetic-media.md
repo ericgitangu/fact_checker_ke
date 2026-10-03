@@ -40,3 +40,10 @@ Revisit if an independent benchmark shows a detector above 0.95 AUC in the wild 
   - Instagram reads them but strips them on processing.
   - YouTube video credentials are not fully shipped.
 - SynthID Detector is a waitlist portal (reported 1-2 week review). There is no public API **[V2-SECONDARY]**. Apply now as a journalist or researcher.
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #14 (medium severity).
+
+- **Detection applies only to user uploads or owner-authorized media.** Signal #4 (detector score) needs media bytes, and ADR-0002's accepted decision forbids fetching audio/video from third-party YouTube/TikTok (red-team contradiction: signal #4 vs ADR-0002). In practice, detector-based triage only runs on content the user uploaded or that an owner authorized — this scopes U4 (deepfakes) to "upload-only until a licensed media path exists."
+- **Uploads are deleted within 24h after analysis**, are scanned for NCII/CSAM before processing, and are never re-hosted. This is a stopgap pending a dedicated media-uploads ADR (see README pointer list, "User media uploads"); it does not replace that future ADR's full intake/consent/retention design.
