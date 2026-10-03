@@ -29,6 +29,13 @@ Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 
 | [0010](0010-client-strategy.md) | Client strategy: PWA first, Expo monorepo for stores | yes |
 | [0011](0011-ai-cost-controls.md) | LLM routing and cost controls | yes |
 | [0012](0012-monetization.md) | Monetization sequencing | no (deferred) |
+| [0013](0013-git-workflow.md) | Git workflow and branch hygiene | process |
+| [0014](0014-monorepo-tooling-moon.md) | Monorepo tooling: moonrepo replaces Turborepo | tooling |
+| [0015](0015-deployment-topology.md) | Deployment topology: Cloud Run backend, Vercel frontends and BFF | yes |
+| [0016](0016-deploy-rail-iac.md) | Atomic deploy rail and IaC (Terraform), scale-to-zero only | yes |
+| [0017](0017-event-driven-core.md) | Event-driven core: outbox, idempotency, ACID | yes |
+| [0018](0018-realtime-and-caching.md) | Near-real-time status (SSE) and caching | no (poll fallback) |
+| [0019](0019-test-strategy-redteam.md) | Test strategy: ADR-derived TDD and red-team gates | process |
 
 ## Hard blockers found
 
