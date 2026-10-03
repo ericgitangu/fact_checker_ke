@@ -1,0 +1,39 @@
+{
+  "format_version": "1.2",
+  "resource_changes": [
+    {
+      "address": "google_cloud_run_v2_service.bad_api",
+      "type": "google_cloud_run_v2_service",
+      "change": {
+        "actions": ["create"],
+        "after": {
+          "template": [
+            {
+              "scaling": [{ "min_instance_count": 1, "max_instance_count": 2 }],
+              "containers": [
+                {
+                  "resources": [{ "cpu_idle": false, "limits": { "cpu": "1", "memory": "512Mi" } }]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "address": "google_compute_router_nat.bad_nat",
+      "type": "google_compute_router_nat",
+      "change": { "actions": ["create"], "after": {} }
+    },
+    {
+      "address": "google_compute_global_forwarding_rule.bad_lb",
+      "type": "google_compute_global_forwarding_rule",
+      "change": { "actions": ["create"], "after": {} }
+    },
+    {
+      "address": "google_sql_database_instance.bad_sql",
+      "type": "google_sql_database_instance",
+      "change": { "actions": ["create"], "after": {} }
+    }
+  ]
+}
