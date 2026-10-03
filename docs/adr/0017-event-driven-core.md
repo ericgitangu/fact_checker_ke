@@ -21,7 +21,7 @@ COMMIT;
 ```
 A **relay** publishes unpublished outbox rows to QStash and marks them `published_at`. The relay selects with `FOR UPDATE SKIP LOCKED LIMIT n` so concurrent relays never double-publish the same row.
 - The relay runs **inline after commit** (best effort, low latency).
-- It is also a **sweeper** on a schedule: the QStash schedule hits `POST /internal/outbox/drain`, which catches anything the inline path missed. No always-on worker (cost policy).
+- It is also a **sweeper** on a schedule: the QStash schedule hits `POST /internal/outbox/drain`, which catches anything the inline path missed. No always-on worker (cost policy). ~~(schedule interval unspecified here)~~ _(superseded — see "Red-team amendments": the sweeper runs at most hourly, both for the QStash quota ledger (ADR-0009) and to avoid keeping Neon awake, see ADR-0016 amendments)_
 - The outbox row id becomes the QStash **deduplication id**, so a relay crash between publish and mark cannot fan out twice.
 
 ### 2. Idempotency, three layers
@@ -59,3 +59,17 @@ These affect implementation, not the pattern:
 
 ## Review trigger
 Revisit if more than about 300 submissions a day hits the QStash quota (ADR-0009), or if a second consumer type appears (then consider Pub/Sub).
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #2, #3 (blocker severity, persistence wave).
+
+- **Amendment #2 [blocker]:** The sweeper interval is at most hourly, not every 5 minutes. A 5-minute sweeper both overstates the QStash daily-message budget (ADR-0009's ledger: `2×subs + retries + sweeps + callbacks`) and risks keeping Neon awake past its 5-minute idle-suspend window (red-team C-3, C-4; see ADR-0016 amendments for the Neon wake budget).
+- **Amendment #3 [blocker]:** The inline relay publishes to QStash **before** the HTTP response is returned to the caller, never fire-and-forget after the response. Under Cloud Run's request-based CPU model (`cpu_idle=true`, enforced by the ADR-0016 plan-guard), work scheduled after the response is sent can be starved, which would make every event wait for the sweeper and make SSE (ADR-0018) look dead (red-team C-5).
+
+## Acceptance tests
+
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0017-A | A quota-ledger test asserts that projected daily QStash messages = 2×subs + retries + sweeps + callbacks ≤ 800. | RED |
+| AT-0017-B | The relay publishes to QStash before the 202 response is returned. The e2e test sees status `analyzing` within 5s with no sweeper running. | RED |
