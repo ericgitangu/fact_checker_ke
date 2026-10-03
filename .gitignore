@@ -48,3 +48,19 @@ pnpm-debug.log*
 
 # SBOM outputs (syft)
 .sbom-out/
+
+# Terraform (ADR-0016) — state and plan files can contain resource
+# metadata (bootstrap/'s local state) or, worse, secret values baked in
+# by a provider's own schema (see infra/terraform/modules/upstash's
+# known-limitation doc comment) — never commit any of these, remote
+# state in GCS is the source of truth.
+infra/terraform/**/.terraform/
+infra/terraform/**/*.tfstate
+infra/terraform/**/*.tfstate.backup
+infra/terraform/**/*.tfvars
+!infra/terraform/**/*.tfvars.example
+infra/terraform/**/plan.out
+infra/terraform/**/plan.json
+infra/terraform/**/*.tfplan
+infra/terraform/**/.token
+infra/terraform/**/.envrc
