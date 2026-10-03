@@ -1,0 +1,16 @@
+$schema: 'https://moonrepo.dev/schemas/project.yml'
+
+# lint/typecheck/test/build inherited from .moon/tasks/node.yml.
+#
+# dependsOn declared explicitly -- package.json's "workspace:*" dependency
+# on @fact-checker-ke/core feeds affected-detection but not the `^:build`
+# task dependency ordering; see packages/db/moon.yml for the empirical
+# finding behind this.
+dependsOn:
+  - 'core'
+
+tasks:
+  build:
+    outputs:
+      - '.next/**'
+      - '!.next/cache/**'

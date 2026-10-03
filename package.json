@@ -8,15 +8,20 @@
   },
   "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
-    "build": "turbo run build",
-    "dev": "turbo run dev --parallel",
-    "gen:contracts": "bash scripts/gen-contracts.sh"
+    "lint": "moon run :lint",
+    "typecheck": "moon run :typecheck",
+    "test": "moon run :test",
+    "build": "moon run :build",
+    "dev": "moon run :dev",
+    "ci": "moon ci",
+    "gen:contracts": "bash scripts/gen-contracts.sh",
+    "prepare": "lefthook install || true"
   },
   "devDependencies": {
-    "turbo": "^2.3.3",
+    "@moonrepo/cli": "^2.3.5",
+    "lefthook": "^1.9.0",
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
     "typescript": "^5.7.2"
   }
 }

@@ -1,0 +1,34 @@
+$schema: 'https://moonrepo.dev/schemas/project.yml'
+
+# lint/typecheck/test/build inherited from .moon/tasks/node.yml.
+#
+# dependsOn is declared explicitly (not left to package.json auto-detection)
+# because `moon docker scaffold` only copies SOURCE files for the project
+# IDs you pass it -- it does not itself walk "workspace:*" package.json
+# deps to find transitive source dependencies the way affected-detection
+# does. Declaring it here is what lets services/api/Dockerfile call
+# `moon docker scaffold api` with no package list and still get
+# packages/core + packages/db's sources copied -- verified empirically
+# (without this field, scaffolding just "api" omitted core/db source and
+# `moon run api:build` failed with "Cannot find module '@fact-checker-ke/
+# core'"). Still satisfies AT-0014-3: adding a new workspace package means
+# adding one id here, never editing the Dockerfile.
+dependsOn:
+  - 'core'
+  - 'db'
+
+tasks:
+  build:
+    outputs:
+      - 'dist/**'
+
+  test-integration:
+    command: 'pnpm run test:integration'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+    options:
+      # Needs a real Postgres (DATABASE_URL_TEST); never cache or silently
+      # skip (ADR-0013 #7 / ADR-0019 #5 -- integration tests never skip
+      # silently when CI=true and the DB URL is absent).
+      cache: false

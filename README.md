@@ -22,7 +22,8 @@ docs/adr           Architecture decision records — see docs/adr/README.md
 ```bash
 # Node toolchain (apps/web, apps/site, packages/core, services/api)
 pnpm install
-pnpm turbo run lint typecheck test build
+moon ci              # affected-only: lint, typecheck, test, build
+moon run :lint :typecheck :test :build   # or: everything, unconditionally
 
 # Python pipeline
 cd services/pipeline

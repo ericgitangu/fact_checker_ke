@@ -1,0 +1,64 @@
+$schema: 'https://moonrepo.dev/schemas/tasks.yml'
+
+# ADR-0014: shared task inheritance for every Node/pnpm project (apps/*,
+# packages/*, services/api). Only inherited by projects whose toolchain is
+# `node` (i.e. have a package.json) -- services/pipeline (Python/uv) does
+# not match, and defines its own plain command tasks in its own moon.yml.
+#
+# Each task is a thin proxy to the project's own package.json script, so a
+# project only needs to override inputs/outputs/deps here -- not the
+# command -- when it differs (DRY, per ADR-0014).
+inheritedBy:
+  toolchains: ['node']
+
+tasks:
+  lint:
+    command: 'pnpm run lint'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '/package.json'
+
+  typecheck:
+    command: 'pnpm run typecheck'
+    # Dependency packages (@fact-checker-ke/core, @fact-checker-ke/db) are
+    # consumed via their built `dist/` (package.json main/types), not
+    # `src/`, so a consumer's typecheck/test/build must wait for its
+    # upstream deps' `build` first -- same requirement turbo.json encoded
+    # as `dependsOn: ["^build", "build"]`. `^:build` = every project this
+    # one depends on (moon's javascript toolchain auto-detects
+    # "workspace:*" deps from package.json for the `^` scope).
+    deps:
+      - '^:build'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '/package.json'
+      - '/pnpm-workspace.yaml'
+
+  test:
+    command: 'pnpm run test'
+    deps:
+      - '^:build'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - '/package.json'
+
+  build:
+    command: 'pnpm run build'
+    deps:
+      - '^:build'
+    inputs:
+      - '@group(sources)'
+      - '/package.json'
+
+fileGroups:
+  sources:
+    - 'src/**/*'
+    - 'app/**/*'
+    - '*.config.{js,cjs,mjs,ts}'
+    - 'tsconfig*.json'
+  tests:
+    - 'tests/**/*'
+    - '**/*.{test,spec}.{js,ts,tsx}'

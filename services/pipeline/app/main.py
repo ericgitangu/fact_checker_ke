@@ -46,7 +46,7 @@ async def stage_normalize(payload: NormalizeRequest) -> dict[str, str]:
 async def stage_transcribe(payload: TranscribeRequest) -> dict[str, str | float]:
     try:
         return await run_transcribe(payload.audio_url)
-    except Exception as exc:  # noqa: BLE001 - translate to typed HTTP error at boundary
+    except Exception as exc:
         logger.warning("transcribe stage failed: %s", exc)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
