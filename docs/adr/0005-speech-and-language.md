@@ -154,3 +154,6 @@ Clip `fleurs_sw_ke_01671` (reference: *"...FBI lazima itoe makachero kumi kwa po
 - **AT-0005-1 stays RED.** `eval/asr/results/manifest.json`'s `coverage_gap` field explicitly records the Round A/B gap (0 Sheng/code-switched, 0 noisy clips) every run; `scripts/at/at-0005.sh` asserts this field is present rather than silently passing.
 - **AT-0005-2 is NOT flipped to GREEN here.** A winner at 7.8% WER (<=25% gate) exists, but AT-0005-2 as written requires the noisy-subset number specifically, which Round A cannot produce (no noisy clips exist in FLEURS). This section records the clean-set numbers per the task; the row stays RED until Round B supplies a noisy-subset WER for the same provider.
 - AT-0005-3 and AT-0005-4 are unaffected by this round and remain as before.
+
+---
+**See ADR-0031:** the custom-model roadmap (Sheng/Swahili STT fine-tune, claim/credibility classifiers) is the output of the data flywheel (checks + editor corrections + user signals → eval → fine-tune).

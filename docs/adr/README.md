@@ -47,6 +47,7 @@ Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 
 | [0028](0028-client-ux-baseline.md) | Client UX baseline — i18n, accessibility, low bandwidth, offline | red-team gap | Proposed |
 | [0029](0029-cost-model-runway.md) | Cost model and runway | red-team gap | Accepted — STT line corrected to Chirp_2 post Round-A |
 | [0030](0030-creator-funnel-conflict-of-interest.md) | Creator funnel and conflict-of-interest firewall | red-team gap | Proposed — process doc at `docs/architecture/creator-funnel-firewall.md`; code/audit-table ATs still open |
+| [0031](0031-confidence-weighted-guidance.md) | Confidence-weighted guidance & data-flywheel threshold evolution | model direction |
 
 Each row's status is copied verbatim from that ADR's own `**Status:**`
 line (source of truth); "implemented"/"implementation notes" callouts
