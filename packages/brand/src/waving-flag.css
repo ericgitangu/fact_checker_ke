@@ -1,0 +1,60 @@
+/*
+ * Self-contained styles for <WavingFlag>'s wind motion. Two layers,
+ * combined:
+ *
+ * 1. The SVG turbulence+displacement filter (in waving-flag.tsx) ripples
+ *    the cloth's surface texture.
+ * 2. This transform-based sway (GPU-friendly: transform only, no layout
+ *    properties) rocks the whole cloth group from the pole/hoist edge, so
+ *    the free (right) edge visibly flaps — this is what actually reads as
+ *    "flailing in the wind" rather than a subtle shimmer.
+ *
+ * `transform-box: fill-box` + `transform-origin: 0% 50%` anchors the
+ * rotation/skew at the left-centre of the cloth group's own bounding box
+ * — which starts right at the hoist edge (x=3 in the 54x34 viewBox, just
+ * past the pole) — so the pole-side edge stays put while the free edge
+ * sweeps through the widest arc, like real cloth pinned at one edge.
+ */
+.fck-flag-cloth {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+}
+
+.fck-flag-cloth-sway {
+  animation: fck-flag-sway 3s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* prefers-reduced-motion: reduce renders a still, gently-furled flag (a
+   fixed small rotate+skew, not a flat/dead rect) rather than animating.
+   Belt-and-braces: waving-flag.tsx also skips applying the -sway class
+   (and the filter's <animate>) in JS when the media query matches, but a
+   plain CSS fallback here covers the brief pre-hydration window too. */
+@media (prefers-reduced-motion: reduce) {
+  .fck-flag-cloth-sway {
+    animation: none;
+    transform: rotate(-1.4deg) skewX(-1.8deg);
+  }
+}
+
+.fck-flag-cloth-still {
+  transform: rotate(-1.4deg) skewX(-1.8deg);
+}
+
+@keyframes fck-flag-sway {
+  0% {
+    transform: rotate(-2.6deg) skewX(-3.4deg);
+  }
+  22% {
+    transform: rotate(1.8deg) skewX(2.6deg);
+  }
+  48% {
+    transform: rotate(-1.6deg) skewX(-2.2deg);
+  }
+  74% {
+    transform: rotate(2.4deg) skewX(3.2deg);
+  }
+  100% {
+    transform: rotate(-2.6deg) skewX(-3.4deg);
+  }
+}
