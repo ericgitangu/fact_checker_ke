@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { WaitlistForm } from "./waitlist-form";
-import { BrandMark } from "./components/brand-mark";
+import { Wordmark } from "./components/wordmark";
 import { TypedClaim } from "./components/typed-claim";
 import { ExternalLinkIcon, MoonIcon, ShieldCheckIcon, SunIcon } from "./components/icons";
 import { useTheme } from "./use-theme";
@@ -23,8 +23,7 @@ function App(): React.JSX.Element {
     <>
       <header className="nav">
         <a className="wordmark" href="#top" aria-label="fact_checker_ke home">
-          <BrandMark size={32} />
-          <span className="wordmark-text">fact_checker_ke</span>
+          <Wordmark size="md" variant={theme} />
         </a>
         <nav className="nav-links" aria-label="Primary">
           <a href={methodologyUrl}>
@@ -230,6 +229,7 @@ function App(): React.JSX.Element {
 
       <footer className="site-footer">
         <p className="footer-lead">
+          <Wordmark size="sm" variant={theme} showText={false} decorative className="footer-mark" />
           fact_checker_ke &mdash; an independent, open-source fact-checking project for Kenya.
         </p>
         <div className="footer-meta">
