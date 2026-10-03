@@ -130,6 +130,17 @@
             }
           ]
         },
+        "namedPerson": {
+          "type": "boolean"
+        },
+        "attribution": {
+          "type": "string",
+          "enum": [
+            "unverified",
+            "confirmed",
+            "not_applicable"
+          ]
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",
@@ -143,6 +154,8 @@
         "claimType",
         "spanStart",
         "spanEnd",
+        "namedPerson",
+        "attribution",
         "createdAt"
       ],
       "additionalProperties": false
