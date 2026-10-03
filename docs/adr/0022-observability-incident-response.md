@@ -51,3 +51,33 @@ Revisit if Sentry's 5k errors/month is routinely exceeded (tighten sampling or p
 | AT-0022-3 | A non-empty DLQ for longer than one sweep interval fires an alert distinct from the generic error-rate alert | RED |
 | AT-0022-4 | The runbooks directory contains a page for each of: quota exhaustion, legal takedown, NC4/kill switch, credential leak — a CI check fails the build if any is missing or empty | RED |
 | AT-0022-5 | A day with zero traffic shows the Neon project transitioning to suspended state at least once, confirmed via the Neon API/console the next morning | RED |
+
+## Implementation notes (2026-10-03)
+
+The four required runbooks (decision §4) now exist under
+`docs/runbooks/`: [`quota-exhaustion.md`](../runbooks/quota-exhaustion.md),
+[`legal-takedown.md`](../runbooks/legal-takedown.md),
+[`nc4-kill-switch.md`](../runbooks/nc4-kill-switch.md), and
+[`credential-leak.md`](../runbooks/credential-leak.md) — each a
+step-by-step operational page, not prose buried in this ADR, per the
+original decision's own instruction. The credential-leak runbook
+documents the real, already-occurred Upstash Redis credential exposure
+recorded in ADR-0016 (line ~127) and gives it the procedure that ADR
+flagged as missing at the time.
+
+**AT-0022-4: GREEN** for the "runbooks directory contains a page for each
+of: quota exhaustion, legal takedown, NC4/kill switch, credential leak"
+behaviour — verified by `test -f` against all four paths above (none are
+empty). The CI-enforcement half of AT-0022-4 ("a CI check fails the build
+if any is missing or empty") is **not** added here — that's a workflow/CI
+change out of scope for a docs-only pass.
+
+**AT-0022-1/2/3/5** remain **RED** — they require the actual alerting
+code/config (Cloud Monitoring policies, a synthetic QStash-usage test, an
+outbox-stall simulation in CI) which is a code change, not documentation,
+and is explicitly out of scope here (`apps/**`, `services/**`, `infra/**`
+are owned by concurrent agents). Not claimed as done.
+
+This ADR's own status is left as `Proposed` — the runbooks close one
+specific acceptance test (AT-0022-4), not the ADR's broader alerting
+decision, which still needs code to land.

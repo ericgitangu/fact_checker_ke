@@ -41,3 +41,13 @@ Slower PRs. That's the price of evidence-based "done" on a product whose credibi
 
 ## Review trigger
 Revisit if PR cycle time exceeds about a day for small changes. Then trim the red-team checklist to risk-tiered subsets.
+
+## Implementation notes (2026-10-03)
+
+A consolidated reference doc for this ADR's RED→GREEN→REFACTOR discipline
+and the standing red-team checklist now exists at
+[`docs/architecture/testing-strategy.md`](../architecture/testing-strategy.md)
+— a practical "how to run this" companion to this ADR's decision record,
+linked from `CONTRIBUTING.md` and
+[`docs/architecture/security-and-compliance.md`](../architecture/security-and-compliance.md).
+Documentation only; no change to the test suites, hooks, or CI themselves.
