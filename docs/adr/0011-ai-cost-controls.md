@@ -49,3 +49,8 @@ Source: fact_checker_ke ADR set red-team report, Section D #12 (high severity).
 | ID | Behaviour | Status |
 |---|---|---|
 | AT-0011-A | At 80% of the QStash quota, new unique submissions queue in Postgres while dedup hits still return normally. | RED |
+
+---
+## Pricing re-check resolved (2026-10-03)
+
+The round-2 table's "needs re-check" row is settled: claude.com/pricing (fetched directly today) lists **Sonnet 5.5 — $2 / $10 per MTok** as a current model, alongside Opus 5.5 ($4/$20), Haiku 4.5 ($1/$5) and Fable 5.1 ($10/$50); Sonnet 5 is now in the legacy list. The 50% batch discount is confirmed on the same page. The tiered-routing plan stands: Haiku 4.5 for claim detection/classification, Sonnet 5.5 as the default draft-verdict model, Opus-class reserved for contested named-person drafts if the eval set justifies it **[V-PRIMARY]**.
