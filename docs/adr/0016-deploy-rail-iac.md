@@ -1,6 +1,6 @@
 # ADR-0016: Atomic deploy rail and IaC (Terraform), scale-to-zero only
 
-**Status:** Proposed · **Date:** 2026-10-03
+**Status:** Accepted (rail set, owner, 2026-10-03) · **Date:** 2026-10-03
 
 ## Problem
 We need a single, repeatable release path with atomic cut-over and instant rollback across Cloud Run and Vercel. It must enforce, mechanically, the owner's hard rule: **never provision always-on resources**.

@@ -1,6 +1,6 @@
 # ADR-0013: Git workflow and branch hygiene
 
-**Status:** Proposed · **Date:** 2026-10-03
+**Status:** Accepted (process set, owner, 2026-10-03) · **Date:** 2026-10-03
 
 ## Problem
 Work happens in parallel: several agents in worktrees plus the founder. Integrating wave 1 surfaced three classes of defect that only appear at merge time:

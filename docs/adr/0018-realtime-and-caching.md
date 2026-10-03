@@ -1,6 +1,6 @@
 # ADR-0018: Near-real-time status (SSE) and caching
 
-**Status:** Proposed · **Date:** 2026-10-03 · Depends on ADR-0017 (events) and ADR-0015 (topology)
+**Status:** Accepted (design set, owner, 2026-10-03) · **Date:** 2026-10-03 · Depends on ADR-0017 (events) and ADR-0015 (topology)
 
 ## Problem
 A user who submits a claim should watch it move through `received → analyzing → verifying → ready` in near real time. Published checks should be served fast and cheaply to many readers. All of this has to run on scale-to-zero compute and free tiers.

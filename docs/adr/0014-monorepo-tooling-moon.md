@@ -1,6 +1,6 @@
 # ADR-0014: Monorepo tooling — moonrepo replaces Turborepo
 
-**Status:** Proposed · **Date:** 2026-10-03 · Supersedes the Turborepo choice in ADR-0010's layout
+**Status:** Accepted (option 2, owner, 2026-10-03) · **Date:** 2026-10-03 · Supersedes the Turborepo choice in ADR-0010's layout
 
 ## Problem
 The repo is polyglot (TypeScript and Python), and will add Swift and Kotlin later through Expo modules. Turborepo only orchestrates JavaScript package scripts, so the Python pipeline, the codegen chain (zod → JSON Schema → Pydantic) and Docker builds sit outside its graph. That gap is how the API Dockerfile came to hard-code the dependency graph and break when `packages/db` landed.

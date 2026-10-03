@@ -1,6 +1,6 @@
 # ADR-0019: Test strategy — ADR-derived TDD and red-team gates
 
-**Status:** Proposed · **Date:** 2026-10-03
+**Status:** Accepted (process set, owner, 2026-10-03) · **Date:** 2026-10-03
 
 ## Problem
 "Tests pass" has already proven unreliable on this repo:

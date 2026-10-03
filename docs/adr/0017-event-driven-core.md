@@ -1,6 +1,6 @@
 # ADR-0017: Event-driven core — transactional outbox, idempotency, ACID boundaries
 
-**Status:** Proposed · **Date:** 2026-10-03 · Builds on ADR-0009 (accepted two-hop pipeline)
+**Status:** Accepted (pattern set, owner, 2026-10-03) · **Date:** 2026-10-03 · Builds on ADR-0009 (accepted two-hop pipeline)
 
 ## Problem
 A submission must reliably become a published check through two async hops (`analyze`, `verify`) on scale-to-zero compute, with at-least-once delivery (QStash). Failure modes to design out:
