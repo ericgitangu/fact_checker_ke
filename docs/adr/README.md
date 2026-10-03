@@ -1,6 +1,6 @@
 # fact_checker_ke — Architecture Decision Records
 
-Status of all ADRs: **Proposed**, for grooming. None are accepted yet.
+Status of all ADRs: **Proposed**, for grooming. ~~None are accepted yet.~~ _(superseded — see "Red-team review (2026-10-03)": ADR-0002 and ADR-0009 are now **Accepted**; the rest remain Proposed.)_
 
 Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 sources, extracted 110 claims and adversarially verified the top 25 (3 votes each). All 25 were confirmed.
 
@@ -18,14 +18,14 @@ Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 
 | # | Title | Blocks weekend? |
 |---|---|---|
 | [0001](0001-scope-and-phasing.md) | Product scope and delivery phasing | defines it |
-| [0002](0002-content-ingestion.md) | Content ingestion: user-submitted links, no bulk scraping | yes |
+| [0002](0002-content-ingestion.md) | Content ingestion: user-submitted links, no bulk scraping **(Accepted)** | yes |
 | [0003](0003-outbound-publishing-bots.md) | Outbound publishing and the "counter-truth" bot | no (deferred) |
 | [0004](0004-verification-pipeline.md) | Claim verification pipeline (RAG + human verdicts) | yes |
 | [0005](0005-speech-and-language.md) | Speech-to-text and translation (Swahili/Sheng/English) | yes |
 | [0006](0006-synthetic-media.md) | Synthetic media and deepfake handling | no (triage only) |
 | [0007](0007-maandamano-tracker.md) | Maandamano tracker: safety, legal and data model | partial |
 | [0008](0008-legal-compliance.md) | Legal entity, ODPC registration and editorial policy | yes (gates accounts and comments) |
-| [0009](0009-runtime-topology.md) | Runtime topology, data stores and event flow | yes |
+| [0009](0009-runtime-topology.md) | Runtime topology, data stores and event flow **(Accepted)** | yes |
 | [0010](0010-client-strategy.md) | Client strategy: PWA first, Expo monorepo for stores | yes |
 | [0011](0011-ai-cost-controls.md) | LLM routing and cost controls | yes |
 | [0012](0012-monetization.md) | Monetization sequencing | no (deferred) |
@@ -82,3 +82,62 @@ Four parallel research agents covered the gaps above. Their findings are appende
 - AWS Transcribe price
 - Swahili, Sheng and code-switched WER
 - The primary texts of the 2026 CMCA judgments
+
+## Red-team review (2026-10-03)
+
+A red-team pass read the README plus ADR-0001 through ADR-0019 in full and produced a report with use-case coverage, contradictions, 16 edge-case REDs and 15 amendments. The amendments were applied additively to the owning ADRs (see each ADR's own "Red-team amendments (2026-10-03)" section). This section summarises the review for the set as a whole.
+
+### Use-case coverage (U1-U11)
+
+| U | Use case | Verdict |
+|---|---|---|
+| U1 | Check creator/politician claims | Partial — works for text platforms (X, Threads); unsafe for video until quote attribution is editor-verified (ADR-0002, ADR-0004) |
+| U2 | Near-real-time on live streams and speech | Redefined — live mode shows existing published checks beside licensed embeds; it never publishes a new named-person verdict live (ADR-0001, ADR-0005, ADR-0008) |
+| U3 | Maandamano tracker | Partial, honestly descoped — editor-curated, ward-level, delayed; gaps in advisory staleness and kill-switch mechanism now closed (ADR-0007) |
+| U4 | Deepfakes | Partial, contradicted by ADR-0002 — detection works only on user uploads/owner-authorized media until a licensed media path exists (ADR-0006) |
+| U5 | Comments, likes, sharing corrections | Deferred, no design — blocked on the forthcoming Identity and Trust & safety ADRs (0020, 0024) |
+| U6 | Counter-truth bots | Partial, honestly descoped — own-timeline only, human-gated, X plus Threads; TikTok/YouTube publishing unaddressed (ADR-0003) |
+| U7 | Founder content funnel | Gap — no conflict-of-interest rule; blocked on the forthcoming Creator funnel ADR (0030) |
+| U8 | Monetization and runway | Partial — no cost or runway model; blocked on the forthcoming Cost model ADR (0029) |
+| U9 | OSS, stores, PWA, SPA, launch soon | Partial — D-U-N-S is the critical path (3-4 weeks); no OSS licence decision yet (ADR-0010, ADR-0013, ADR-0016; forthcoming 0026) |
+| U10 | Near-zero cost, EDA, multi-tenant | Partial, with arithmetic errors now corrected — QStash/Neon budgets fixed (ADR-0009, ADR-0016, ADR-0017); "multi-tenant" is really "single-tenant, tenant-ready" |
+| U11 | Authoritative and legally compliant | Partial — drafts shown to the submitter are now excluded from publication (ADR-0004, ADR-0008); data residency and law-enforcement policy deferred to the forthcoming Data protection ADR (0021) |
+
+### The 16 edge-case REDs
+
+All sixteen scenarios below got at least one Acceptance-test row with `Status: RED` added to their owning ADR's Acceptance tests table.
+
+| # | Scenario | Owner ADR(s) |
+|---|---|---|
+| C-1 | Fabricated quote attributed to a named person | ADR-0004, ADR-0008 |
+| C-2 | A draft treated as published for defamation purposes | ADR-0004, ADR-0008 |
+| C-3 | QStash quota exhausted during a viral event | ADR-0009, ADR-0017, ADR-0011 |
+| C-4 | Neon never actually scales to zero | ADR-0016, ADR-0017 |
+| C-5 | Inline outbox relay throttled by Cloud Run request-based CPU | ADR-0017 |
+| C-6 | Hallucinated or misquoted citation | ADR-0004 |
+| C-7 | Kill switch is leaky (CDN/SW keep serving) | ADR-0007, ADR-0018 |
+| C-8 | Protest-viewer exposure via logs, EXIF, coarsening defeat | ADR-0007 (data-protection pieces deferred to forthcoming ADR-0021) |
+| C-9 | CGNAT false positives on per-IP limits | ADR-0018, ADR-0011 |
+| C-10 | Dedup negation collision / stale statistic reuse | ADR-0004 |
+| C-11 | Sheng opinion misrated as claim, or the reverse | ADR-0004, ADR-0011 |
+| C-12 | OSS repo is the attack surface (fork-PR, WIF, CI off) | ADR-0013, ADR-0016 |
+| C-13 | Politician's lawyers after a "False" verdict | ADR-0008 |
+| C-14 | Creator gaming (self-submission, mass-submission of rivals) | ADR-0008, ADR-0003 |
+| C-15 | Vercel commercial-use breach (sponsors/grants/incorporation) | ADR-0015 |
+| C-16 | Cloud Run custom domain in `africa-south1` may force a global LB | ADR-0016 |
+
+### Missing decisions: ADRs 0020-0030
+
+The amendments above close the sharpest edge cases but do not substitute for full decisions on eleven areas the current set has no ADR for. ADRs 0020 through 0030 are being added separately (by other agents; this ADR set's owner does not create them) to cover:
+
+- **0020** Identity, auth & roles
+- **0021** Data protection lifecycle
+- **0022** Observability & incident response
+- **0023** Adversarial AI & abuse resistance
+- **0024** Trust & safety / moderation
+- **0025** Editorial operations & capacity
+- **0026** Open-source boundary & licence
+- **0027** User media uploads
+- **0028** Client UX baseline (i18n, a11y, low-bandwidth, offline)
+- **0029** Cost model & runway
+- **0030** Creator funnel & conflict of interest
