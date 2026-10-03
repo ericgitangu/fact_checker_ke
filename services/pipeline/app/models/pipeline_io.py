@@ -94,3 +94,34 @@ class VerifyResult(BaseModel):
     reused_existing_check: bool = False
     valid_as_of: str | None = None
     usage: UsageRecord | None = None
+
+
+class MediaProcessResult(BaseModel):
+    """POST /hops/media-process response (ADR-0027). Deliberately does NOT
+    include the stripped media bytes: this service never re-hosts media
+    (ADR-0027's "Never re-hosted" rule) — echoing processed bytes back over
+    this HTTP boundary would normalize exactly the re-serving pattern the
+    ADR forbids. Downstream stages that need the stripped bytes (STT,
+    synthetic-media triage) consume them in-process in the same stage
+    chain, not via a round-trip through this response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    content_hash: str
+    perceptual_hash: str
+    exif_gps_stripped: bool
+    quarantined: bool
+
+
+class SyntheticMediaTriageResult(BaseModel):
+    """POST /hops/synthetic-media-triage response (ADR-0006). `label` is
+    one of the closed ADR-0006 allowlist values (app/stages/
+    synthetic_media_triage.py:TriageLabel) — "deepfake" is not a member of
+    that enum and cannot appear here (AT-0006)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    provenance_present: bool
+    earlier_copy_source_url: str | None = None
+    detector_score: float | None = None

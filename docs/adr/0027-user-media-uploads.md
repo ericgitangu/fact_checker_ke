@@ -41,7 +41,66 @@ Revisit once upload volume justifies PhotoDNA/StopNCII application overhead, or 
 |---|---|---|
 | AT-0027-1 | An upload request with no rights-attestation flag set is rejected before a signed URL is issued | RED |
 | AT-0027-2 | A signed PUT URL expires after 10 minutes and is scoped to exactly one object key; a second PUT to a different key with the same URL is rejected | RED |
-| AT-0027-3 | Every object retrieved from `uploads/scanned/**` has no `GPS*` or camera-serial EXIF tags remaining | RED |
+| AT-0027-3 | Every object retrieved from `uploads/scanned/**` has no `GPS*` or camera-serial EXIF tags remaining | GREEN (pipeline-owned processing step; see Implementation notes — the `uploads/scanned/**` *bucket* lifecycle itself is infra/services/api, out of scope here) |
 | AT-0027-4 | An object exceeding the per-type size/duration limit is rejected at the signed-URL `Content-Length-Range` condition, not only client-side | RED |
 | AT-0027-5 | Any object in `uploads/**` older than 24h (by object creation time) is absent from a bucket listing in a scheduled soak test | RED |
-| AT-0027-6 | A SafeSearch or hash-match flag on an uploaded object routes it to a quarantine queue distinct from the general editor review queue, and it never appears on a published check page | RED |
+| AT-0027-6 | A SafeSearch or hash-match flag on an uploaded object routes it to a quarantine queue distinct from the general editor review queue, and it never appears on a published check page | RED (pipeline's `AbuseScan` hash-match produces a `quarantined` flag — see Implementation notes — but queue routing/editor-UI separation is services/api + apps/web, out of scope here; still RED at the system level) |
+
+## Implementation notes (services/pipeline media processing, 2026-10-03)
+
+Implements the post-upload processing step this service owns (ADR-0027's
+Decision section: "enqueues a scan job ... feeding ADR-0005/ADR-0006") —
+NOT the signed-GCS-upload mechanics (Option 3's "Flow": signed URL
+issuance, rights attestation, size/type limits), which stay a
+services/api + apps/web concern.
+
+`POST /hops/media-process` (`app/stages/media_processing.py:process_media`):
+
+1. **EXIF/GPS strip (AT-0027-3)**: rebuilds a fresh Pillow `Image` from raw
+   pixel data only (never re-saves the original with metadata merely
+   omitted) so there is nothing left to carry forward — verified
+   (`tests/test_media_processing.py`) against a fixture crafted with both
+   a `GPSInfo` IFD and a `CameraSerialNumber` tag (via `piexif`, dev-only
+   dependency), asserting both are gone post-strip via a dedicated
+   `has_gps_or_camera_serial_exif` checker (not just "EXIF dict is empty",
+   which could pass vacuously for an image with no EXIF to begin with).
+2. **Content hash + perceptual hash**: sha256 (cryptographic identity) and
+   a dependency-free 8x8-grayscale average-hash (near-duplicate
+   fingerprint — not cryptographically secure, not a replacement for the
+   content hash). Scope: `image/*` only in this change; video
+   EXIF/perceptual-hash support needs a frame-extraction pipeline Pillow
+   doesn't provide — documented gap (`MediaProcessingError` on a
+   `video/*` mime type), not a silent mishandling.
+3. **AbuseScan (CSAM/NCII)**: `app/protocols/abuse_scan.py` +
+   `app/fakes/fake_abuse_scan.py` — a deterministic known-bad-hash-set
+   match (PhotoDNA/StopNCII-shaped), no vendor credentials wired (HARD
+   RULE). The module docstring states explicitly, every place it's
+   referenced, that **this catches only previously-known material**: per
+   this ADR's own evidence section, no free tool reliably detects novel
+   CSAM/NCII, so human review before any upload reaches a shared queue
+   remains the real, load-bearing control — never silently implied to be
+   solved by this scan.
+
+**Never re-hosted, enforced at the API boundary too**: `MediaProcessResult`
+(the `/hops/media-process` response model) deliberately has no field for
+the stripped bytes — only hashes and a `quarantined` flag. Returning
+processed image bytes over this HTTP response would itself be a form of
+re-serving the upload; downstream stages that need the stripped bytes
+consume them in-process in the same stage chain, never via a round-trip
+through this response. Verified: `tests/test_hops_media.py` asserts
+`"stripped_bytes" not in body` and `"media_base64" not in body` on the
+response.
+
+**Deviations / tech debt (explicit, not buried):**
+- Video media (EXIF/perceptual-hash) is out of scope — `process_media`
+  raises `MediaProcessingError` on any non-`image/*` mime type rather than
+  silently skipping steps.
+- The AbuseScan Protocol's only implementation is a toy in-memory hash-set
+  fake. A real PhotoDNA/StopNCII integration needs vetted-organization
+  application/approval (this ADR's evidence section) — out of scope for
+  this change, and intentionally not faked as if it were real detection.
+- Signed-URL issuance, rights attestation, size/duration limits, GCS
+  lifecycle rules, and quarantine-queue routing (AT-0027-1, -2, -4, -5,
+  -6's queue-separation half) are services/api + infra concerns, left RED
+  here per this change's file-ownership boundary
+  (`services/pipeline/**` only).

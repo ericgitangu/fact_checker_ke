@@ -44,9 +44,10 @@ tasks:
 
   eval:
     # ADR-0004/0023 eval harness scaffold: claim/opinion classification
-    # precision/recall/F1 on the starter 20-claim (8 en/7 sw/5 sheng) set.
-    # Not part of `moon ci` (it's a reporting tool, not a pass/fail gate --
-    # the 100-claim/30-Sheng threshold gate remains an explicit open AT).
+    # precision/recall/F1 on the 45-claim (8 en/7 sw/30 sheng) set -- the
+    # Sheng count now meets ADR-0023 section5's >=30 floor. Not part of
+    # `moon ci` (it's a reporting tool, not a pass/fail gate -- the full
+    # 100-claim count and an agreed F1 threshold remain an explicit open AT).
     command: 'uv run python -m app.eval'
     inputs:
       - '@group(sources)'

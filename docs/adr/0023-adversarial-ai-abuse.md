@@ -44,7 +44,7 @@ Revisit if the Sheng eval F1 threshold can't be met with available training exam
 | AT-0023-3 | A quoted span that doesn't substring-match its cited archived snapshot blocks auto-publish and is routed to editor review with a stated reason | GREEN |
 | AT-0023-4 | A claim differing only by negation ("raised" vs "did not raise") from an existing check does not reuse that check's verdict | GREEN |
 | AT-0023-5 | A submission failing Turnstile never produces a QStash message or an LLM API call (verified via request logs, not inferred) | RED (owned by services/api's submission endpoint; out of scope here) |
-| AT-0023-6 | The claim/opinion eval set contains ≥30 Sheng-language items, and the suite fails if the measured F1 on them drops below the recorded threshold | SCAFFOLD (5 Sheng items in the 20-claim starter set; the ≥30-item/threshold gate stays RED/open) |
+| AT-0023-6 | The claim/opinion eval set contains ≥30 Sheng-language items, and the suite fails if the measured F1 on them drops below the recorded threshold | SCAFFOLD (2026-10-03 update: the ≥30-Sheng-item floor is now MET — 30 of 45 rows in `app/eval/fixtures/claims.jsonl` are `lang: "sheng"`; the F1-drops-below-threshold *gate* behavior and the 100-claim total remain RED/open — see Implementation notes) |
 
 ## Implementation notes (services/pipeline baseline, 2026-10-03)
 
@@ -75,6 +75,23 @@ Revisit if the Sheng eval F1 threshold can't be met with available training exam
   harness (`app/eval`, see ADR-0004's Implementation notes) — the starter
   set has 5 Sheng items, not yet the required >=30, and no F1 threshold is
   recorded yet. Explicit open AT, not faked.
+- **Synthetic-media triage / media processing / admission-control
+  additions (2026-10-03, pipeline-triage wave)**: expanded
+  `app/eval/fixtures/claims.jsonl` from 20 to 45 rows, adding 25 Sheng
+  items (30 of 45 rows total) across all four `claim_type` classes
+  (checkable/opinion/prediction/rhetoric — "rhetoric" is this taxonomy's
+  home for satire) — this clears AT-0023-6's ">=30 Sheng items" floor.
+  The 100-claim total and an agreed launch F1 threshold are still not
+  implemented; neither is fabricated here (`uv run python -m app.eval`
+  prints whether the floor is met, it does not pass/fail CI on a
+  threshold that hasn't been agreed). Also added in this wave: the
+  `AdmissionControl` Protocol (`app/protocols/admission_control.py`) and
+  its deterministic `InMemoryAdmissionControl` reference implementation —
+  the typed rate/dedup pre-check *contract* ADR-0023 §4 says sits ahead of
+  Turnstile/QStash, for services/api to depend on once a shared contracts
+  package re-exports it (same TEMPORARY/wave-2-reconciliation status as
+  `app/models/hop_requests.py`). Turnstile verification itself
+  (AT-0023-5) remains out of scope / RED here, unchanged.
 - **Creator-gaming controls (§6)**: not implemented in this change — the
   credibility registry (`app/registry/credibility.py`,
   `app/data/credibility_registry.json`, ~10 Kenyan sources) covers §1's
