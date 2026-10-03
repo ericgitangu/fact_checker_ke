@@ -1,26 +1,810 @@
 @import "tailwindcss";
 
+/*
+ * fact_checker_ke — web app (PWA)
+ * Same "On the record" design system as apps/site (see
+ * apps/site/src/index.css for the full rationale). Ported here rather than
+ * shared as a package because apps/site is Vite+plain CSS and apps/web is
+ * Next.js+Tailwind v4 — duplicating the token values is cheaper than a
+ * cross-bundler CSS package for six custom properties' worth of drift risk.
+ * If these ever diverge, apps/site/src/index.css is the source of truth.
+ *
+ * Extensions for apps/web only (not in apps/site):
+ * - `--status-*` tokens: Maandamano demonstration-status chips. These are
+ *   DELIBERATELY NOT the verdict colours (--true/--false/etc.) — ADR-0007
+ *   frames the tracker as "what's happening, not a verdict", and reusing
+ *   --false for e.g. "cancelled" would visually conflate a protest status
+ *   with a fact-check rating. A small separate neutral/amber/grey scale.
+ * - `--focus-ring` alias, PWA offline/editor surface helpers.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* surfaces */
+  --paper: #fafaf7;
+  --paper-2: #f2f1ea;
+  --ink: #15181b;
+  --ink-2: #585f66;
+  --ink-3: #8a9198;
+  --rule: #e4e3dc;
+  --rule-strong: #d2d0c6;
+
+  /* verdict system — the only saturated colour tied to a fact-check rating */
+  --true: #0e8a4f;
+  --true-tint: #e7f2ec;
+  --mostly: #6f9a16;
+  --mostly-tint: #f1f5e3;
+  --misleading: #c07400;
+  --misleading-tint: #f8eedd;
+  --false: #c8102e;
+  --false-tint: #fbe6ea;
+  --unproven: #6b7280;
+  --unproven-tint: #eceef0;
+  --notcheckable: #7d64a8;
+  --notcheckable-tint: #efecf5;
+
+  /* night band (maandamano — "the live street") */
+  --night: #0e1613;
+  --night-2: #17241e;
+  --night-rule: #2a3a31;
+  --night-ink: #e9efeb;
+  --night-ink-2: #9db0a6;
+
+  /* maandamano status chips — NOT verdict colours, see header comment */
+  --status-neutral: #585f66;
+  --status-neutral-tint: #eceeef;
+  --status-amber: #9a6b16;
+  --status-amber-tint: #f6eedc;
+  --status-slate: #46525c;
+  --status-slate-tint: #e9edef;
+
+  --brand: var(--true);
+  --focus-ring: var(--brand);
+
+  --sans: "Archivo", system-ui, sans-serif;
+  /* Archivo Expanded isn't published as its own family on Google Fonts;
+     next/font/google only exposes the "Archivo" variable family (which
+     includes the expanded width axis internally but next/font pins a
+     single width per instance). We fall back to --sans at the same
+     weight rather than fabricating a family that doesn't exist — see
+     apps/web/app/fonts.ts for the font-loading side of this. */
+  --sans-x: "Archivo Expanded", "Archivo", system-ui, sans-serif;
+  --serif: "Newsreader", Georgia, serif;
+
+  --shell: 1120px;
+  --gutter: clamp(20px, 5vw, 64px);
+
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --font-sans: var(--sans);
+  --font-serif: var(--serif);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink-2);
+  font: 400 1.0625rem/1.6 var(--sans);
+  min-height: 100%;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--ink);
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--ink);
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration-color: var(--brand);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.shell {
+  width: min(100% - var(--gutter) * 2, var(--shell));
+  margin-inline: auto;
+}
+
+.shell-narrow {
+  width: min(100% - var(--gutter) * 2, 760px);
+  margin-inline: auto;
+}
+
+/* ---------- nav / footer (shared chrome) ---------- */
+.app-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 0;
+  gap: 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.wordmark-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 7px;
+  font: 700 0.9rem/1 var(--sans-x);
+  letter-spacing: -0.03em;
+  flex: none;
+}
+
+.wordmark-text {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: 0.92rem;
+}
+
+.nav-links a {
+  text-decoration: none;
+  color: var(--ink-2);
+}
+
+.nav-links a[aria-current="page"],
+.nav-links a:hover {
+  color: var(--ink);
+}
+
+.locale-switch {
+  appearance: none;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  background: #fff;
+}
+
+.locale-switch:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.app-footer {
+  padding: 32px 0 56px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px 28px;
+  align-items: baseline;
+  font-size: 0.9rem;
+  color: var(--ink-3);
+}
+
+.app-footer a {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.app-main {
+  min-height: calc(100vh - 140px);
+  padding: clamp(32px, 6vw, 64px) 0 clamp(56px, 8vw, 96px);
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 22px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.98rem;
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0b7343;
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+  transform: none;
+}
+
+.btn-ghost {
+  color: var(--ink);
+  border-color: var(--rule-strong);
+  background: transparent;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+/* ---------- form fields (submit flow) ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.field-help {
+  font-size: 0.82rem;
+  color: var(--ink-3);
+  line-height: 1.4;
+}
+
+.field input,
+.field textarea {
+  font: inherit;
+  font-size: 0.98rem;
+  padding: 12px 14px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--ink-3);
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+
+.form-note {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.form-note-success {
+  color: #0b5d34;
+  background: var(--true-tint);
+}
+
+.form-note-error {
+  color: #8a0f24;
+  background: var(--false-tint);
+}
+
+.form-note-muted {
+  color: var(--ink-2);
+  background: var(--paper-2);
+}
+
+/* ---------- the fact-check card ---------- */
+.checkcard {
+  margin: 0;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  padding: 26px 26px 22px;
+  box-shadow:
+    0 1px 0 var(--rule),
+    0 24px 48px -32px rgba(21, 24, 27, 0.4);
+}
+
+.checkcard-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 14px;
+}
+
+.checkcard-claim {
+  font-family: var(--serif);
+  font-size: 1.4rem;
+  line-height: 1.3;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+.checkcard-rationale {
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.checkcard-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+}
+
+.checkcard-meta dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+
+.checkcard-meta dd {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.lang-chip {
+  display: inline-block;
+  padding: 2px 10px;
+  margin-right: 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  color: var(--ink-2);
+}
+
+.source-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.source-list li {
+  font-size: 0.92rem;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+.source-tier {
+  margin-left: 8px;
+  font-size: 0.78rem;
+  color: var(--ink-3);
+  text-transform: capitalize;
+}
+
+/* ---------- verdict stamp + list-view chip ---------- */
+.verdict {
+  margin: 20px 0 16px;
+}
+
+.verdict-stamp {
+  display: inline-block;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  transform: rotate(-1.5deg);
+  animation: stamp-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s both;
+}
+
+.verdict-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.v-True .verdict-stamp,
+.v-True .verdict-chip {
+  color: var(--true);
+  background: var(--true-tint);
+  border: 1.5px solid color-mix(in srgb, var(--true) 45%, transparent);
+}
+.v-MostlyTrue .verdict-stamp,
+.v-MostlyTrue .verdict-chip {
+  color: var(--mostly);
+  background: var(--mostly-tint);
+  border: 1.5px solid color-mix(in srgb, var(--mostly) 45%, transparent);
+}
+.v-Misleading .verdict-stamp,
+.v-Misleading .verdict-chip {
+  color: var(--misleading);
+  background: var(--misleading-tint);
+  border: 1.5px solid color-mix(in srgb, var(--misleading) 45%, transparent);
+}
+.v-False .verdict-stamp,
+.v-False .verdict-chip {
+  color: var(--false);
+  background: var(--false-tint);
+  border: 1.5px solid color-mix(in srgb, var(--false) 45%, transparent);
+}
+.v-Unproven .verdict-stamp,
+.v-Unproven .verdict-chip {
+  color: var(--unproven);
+  background: var(--unproven-tint);
+  border: 1.5px solid color-mix(in srgb, var(--unproven) 45%, transparent);
+}
+.v-NotCheckable .verdict-stamp,
+.v-NotCheckable .verdict-chip {
+  color: var(--notcheckable);
+  background: var(--notcheckable-tint);
+  border: 1.5px solid color-mix(in srgb, var(--notcheckable) 45%, transparent);
+}
+
+/* draft / awaiting-editor state: explicitly NOT a stamp (AT-0004-B — no
+   rating is shown to the submitter pre-publish, not even a greyed one) */
+.awaiting-editor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin: 20px 0 16px;
+  border-radius: 10px;
+  background: var(--paper-2);
+  border: 1px dashed var(--rule-strong);
+  color: var(--ink-2);
+  font-size: 0.92rem;
+}
+
+.ai-assisted-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--misleading);
+  background: var(--misleading-tint);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+
+/* ---------- status pipeline (submit -> status) ---------- */
+.pipeline-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.pipeline-track li {
+  position: relative;
+  padding: 0 0 26px 30px;
+  border-left: 2px solid var(--rule-strong);
+}
+
+.pipeline-track li:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0;
+}
+
+.pipeline-track li::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--rule-strong);
+}
+
+.pipeline-track li[data-state="done"]::before {
+  background: var(--true);
+}
+
+.pipeline-track li[data-state="active"]::before {
+  background: var(--brand);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 25%, transparent);
+}
+
+.pipeline-track li[data-state="failed"]::before {
+  background: var(--false);
+}
+
+.pipeline-track h3 {
+  font-size: 1.02rem;
+  margin-bottom: 4px;
+}
+
+.pipeline-track p {
+  font-size: 0.9rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.pipeline-track li[data-state="pending"] h3,
+.pipeline-track li[data-state="pending"] p {
+  color: var(--ink-3);
+}
+
+/* ---------- maandamano status chips (NOT verdict colours) ---------- */
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.s-rumoured {
+  color: var(--status-neutral);
+  background: var(--status-neutral-tint);
+}
+.s-announced {
+  color: var(--status-slate);
+  background: var(--status-slate-tint);
+}
+.s-confirmed {
+  color: var(--status-amber);
+  background: var(--status-amber-tint);
+}
+.s-ongoing {
+  color: var(--status-amber);
+  background: var(--status-amber-tint);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--status-amber) 45%, transparent);
+}
+.s-ended {
+  color: var(--status-neutral);
+  background: var(--status-neutral-tint);
+}
+.s-cancelled {
+  color: var(--ink-3);
+  background: var(--paper-2);
+  text-decoration: line-through;
+}
+
+.advisory-card {
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.advisory-card h3 {
+  font-size: 1.05rem;
+}
+
+.advisory-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+
+.advisory-stale {
+  font-size: 0.78rem;
+  color: var(--misleading);
+  font-weight: 600;
+}
+
+/* ---------- night band (maandamano street framing) ---------- */
+.street {
+  background: var(--night);
+  color: var(--night-ink-2);
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  padding: clamp(40px, 7vw, 72px) clamp(24px, 5vw, 48px);
+}
+
+.street::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--night-rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--night-rule) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.28;
+  mask: radial-gradient(120% 90% at 15% 20%, black, transparent 75%);
+}
+
+.street-inner {
+  position: relative;
+}
+
+.street h2 {
+  color: var(--night-ink);
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  max-width: 20ch;
+}
+
+.street p {
+  margin-top: 16px;
+  max-width: 60ch;
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+
+.street-note {
+  margin-top: 14px !important;
+  font-size: 0.92rem !important;
+  color: var(--night-ink-2);
+  padding-left: 14px;
+  border-left: 2px solid var(--false);
+}
+
+.frozen-banner {
+  margin-top: 20px;
+  padding: 14px 18px;
+  border-radius: 10px;
+  background: var(--night-2);
+  border: 1px solid var(--night-rule);
+  color: var(--night-ink);
+  font-size: 0.95rem;
+}
+
+/* ---------- editor review ---------- */
+.editor-banner {
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--misleading-tint);
+  color: #6b4400;
+  border: 1px solid color-mix(in srgb, var(--misleading) 35%, transparent);
+}
+
+.draft-row {
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.draft-row-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* ---------- sr-only ---------- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 16px;
+  border-radius: 8px;
+  z-index: 50;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  top: 12px;
+}
+
+/* ---------- one orchestrated motion: the verdict stamp on load ---------- */
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: rotate(-1.5deg) scale(1.25);
+  }
+  60% {
+    opacity: 1;
+    transform: rotate(-1.5deg) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-1.5deg) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .verdict-stamp {
+    animation: none;
+  }
+  .btn,
+  .skip-link {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .nav-links {
+    gap: 14px;
+  }
+  .checkcard {
+    padding: 20px 18px 18px;
+  }
 }
