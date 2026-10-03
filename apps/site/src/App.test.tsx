@@ -122,7 +122,7 @@ describe("App (marketing site)", () => {
 
     await fillAndSubmit("jane@example.com");
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/something went wrong/i);
+    expect(await screen.findByRole("status")).toHaveTextContent(/check your connection/i);
   });
 
   it("never puts the submitted email in the request URL", async () => {
