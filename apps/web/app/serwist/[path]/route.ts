@@ -1,17 +1,15 @@
-import { spawnSync } from "node:child_process";
 import { createSerwistRoute } from "@serwist/turbopack";
+import { precacheRevision } from "@/lib/precache-revision";
 
-// Used as a cache-busting revision for the extra (non-build-hashed) files we
-// precache, e.g. the offline fallback page. Falls back to a random UUID
-// (forces a precache update every build) if `git` isn't available, such as
-// in some container builds.
-const revision =
-  spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf-8" }).stdout?.trim() ||
-  crypto.randomUUID();
+// Files whose content renders /~offline. Keep in sync when the offline page
+// gains new imports (its layout and global styles are part of its output).
+const OFFLINE_PAGE_INPUTS = ["app/~offline/page.tsx", "app/layout.tsx", "app/globals.css"] as const;
 
 export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } =
   createSerwistRoute({
-    additionalPrecacheEntries: [{ url: "/~offline", revision }],
+    additionalPrecacheEntries: [
+      { url: "/~offline", revision: precacheRevision(OFFLINE_PAGE_INPUTS) },
+    ],
     swSrc: "app/sw.ts",
     useNativeEsbuild: true,
   });
