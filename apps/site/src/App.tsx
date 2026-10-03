@@ -1,9 +1,14 @@
 import { useState } from "react";
 import { WaitlistForm } from "./waitlist-form";
-import { Wordmark } from "./components/wordmark";
 import { TypedClaim } from "./components/typed-claim";
-import { ExternalLinkIcon, MoonIcon, ShieldCheckIcon, SunIcon } from "./components/icons";
-import { useTheme } from "./use-theme";
+import {
+  Wordmark,
+  ExternalLinkIcon,
+  MoonIcon,
+  ShieldCheckIcon,
+  SunIcon,
+  useTheme,
+} from "@fact-checker-ke/brand";
 
 const GITHUB_URL = "https://github.com/ericgitangu";
 const SAMPLE_CLAIM = "“Unemployment in Kenya fell to 2% last year.”";

@@ -5,6 +5,9 @@ import { useEffect, useId, useState } from "react";
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
+    // Guard for environments without matchMedia (jsdom tests, Next SSR):
+    // default to motion-on; reduced-motion is honoured where the API exists.
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = (): void => setReduced(mq.matches);
     update();
