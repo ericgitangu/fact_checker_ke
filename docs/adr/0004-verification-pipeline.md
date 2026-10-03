@@ -14,7 +14,7 @@ We need to turn transcripts and text into checkable claims and ground them again
 ## Decision (proposed)
 **Pipeline stages.** Each stage is an event (ADR-0009) and is idempotent on its content hash.
 
-1. **Normalize.** Produce transcript or text, then segment it with timestamps. ~~(applies uniformly to any submitted URL)~~ _(superseded — for third-party YouTube/TikTok video there is no transcript: the submitter's quote + timestamp is the input, carrying `attribution: unverified` until an editor confirms it; see "Red-team amendments" and ADR-0002's decision update)_
+1. **Normalize.** Produce transcript or text, then segment it with timestamps. _(superseded — this does not apply uniformly to every URL: for third-party YouTube/TikTok video there is no transcript: the submitter's quote + timestamp is the input, carrying `attribution: unverified` until an editor confirms it; see "Red-team amendments" and ADR-0002's decision update)_
 2. **Claim detection.** Use a cheap model (ADR-0011) to sort statements into *checkable factual claim*, *opinion*, *prediction* or *rhetoric*. Only checkable claims continue. This is how we "don't dismiss personal opinions".
 3. **Claim dedup.** Embed the claim (pgvector) and match it against existing claims. A hit reuses the existing check, which is the biggest cost lever.
 4. **Retrieve.** Pull from three places:
