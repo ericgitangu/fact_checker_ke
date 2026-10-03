@@ -41,3 +41,29 @@ Revisit if a commercial fork appears, if a funded entity needs CLA-grade IP assi
 | AT-0026-3 | No workflow file under `.github/workflows/**` uses `pull_request_target`; any workflow checking out a fork head runs with zero secrets | RED |
 | AT-0026-4 | GitHub repo settings (via `gh api repos/:owner/:repo`) report `secret_scanning.status == "enabled"` and `secret_scanning_push_protection.status == "enabled"` | RED |
 | AT-0026-5 | Once Actions billing is restored, the WIF provider's attribute condition string in Terraform contains both `repository_owner` and `refs/heads/main` | RED |
+
+## Implementation notes (2026-10-03)
+
+Root-level OSS boundary artifacts landed on `docs/adr-0013-0019-platform`:
+`LICENSE` (Apache-2.0, SPDX identifier line, copyright holder "Eric
+Gitangu"), `TRADEMARKS.md` (name/logo/verdict-badge reservation, separate
+from the code licence per decision §"Trademark/badge policy"),
+`SECURITY.md` (private disclosure via GitHub security advisory, 90-day
+coordinated-disclosure target, explicit private/out-of-scope list for the
+credibility registry, abuse thresholds, and prompt variants),
+`CONTRIBUTING.md` (DCO sign-off, no CLA, Conventional Commits, the
+no-AI-attribution commit rule, `moon ci`/AT-script instructions, the
+ADR-0013 branch/PR flow), and `CODE_OF_CONDUCT.md` (Contributor Covenant
+v2.1, enforcement contact routed through `SECURITY.md`).
+
+**AT-0026-1: GREEN** — `test -f LICENSE SECURITY.md CONTRIBUTING.md
+CODE_OF_CONDUCT.md TRADEMARKS.md` all pass;
+`rg -c 'Apache License' LICENSE` returns a non-zero count; `LICENSE`
+carries an `SPDX-License-Identifier: Apache-2.0` line.
+
+**AT-0026-2/3/4/5** remain **RED** — they require a code/CI/GitHub-settings
+change (scanning `packages/`/`services/` for hardcoded values, auditing
+`.github/workflows/**`, reading back live GitHub repo settings via `gh
+api`, and a Terraform WIF condition string) that is out of scope for this
+docs-only pass; owned by whichever agent next touches CI/infra/GitHub
+settings. Not claimed here.
