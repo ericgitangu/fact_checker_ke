@@ -1,4 +1,6 @@
-import { defaultCache } from "@serwist/next/worker";
+/// <reference lib="esnext" />
+/// <reference lib="webworker" />
+import { defaultCache } from "@serwist/turbopack/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { Serwist } from "serwist";
 
@@ -16,6 +18,19 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: defaultCache,
+  // Offline fallback: any navigation (document request) that fails while
+  // offline is served the precached /~offline page instead of the browser's
+  // default offline interstitial.
+  fallbacks: {
+    entries: [
+      {
+        url: "/~offline",
+        matcher({ request }) {
+          return request.destination === "document";
+        },
+      },
+    ],
+  },
 });
 
 serwist.addEventListeners();

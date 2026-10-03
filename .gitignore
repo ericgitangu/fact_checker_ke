@@ -36,7 +36,7 @@ pnpm-debug.log*
 # Docker
 *.pid
 
-# Serwist-generated service worker (apps/web next.config.ts swDest)
-apps/web/public/sw.js
-apps/web/public/sw.js.map
-apps/web/public/swe-worker-*.js
+# apps/web's service worker is now built via @serwist/turbopack's Route
+# Handler (app/serwist/[path]/route.ts) instead of a webpack plugin that
+# wrote public/sw.js — nothing is generated into the repo tree to ignore
+# here anymore; output lives under the already-ignored .next/.

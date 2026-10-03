@@ -12,10 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Serwist build output (swDest in next.config.ts) — generated, minified bundle.
-    "public/sw.js",
-    "public/sw.js.map",
-    "public/swe-worker-*.js",
+    // @serwist/turbopack (see next.config.ts) builds the service worker
+    // on-the-fly through app/serwist/[path]/route.ts — unlike the old
+    // @serwist/next (webpack) setup, it no longer writes a generated
+    // public/sw.js bundle to disk, so there is nothing to ignore here.
   ]),
 ]);
 
