@@ -33,4 +33,7 @@ commit-msg:
 pre-push:
   jobs:
     - name: moon ci (affected projects only)
-      run: moon ci
+      # Dev placeholders for site:build's VITE_API_URL production guard --
+      # mirrors .github/workflows/ci.yml. Real values come from Vercel at
+      # deploy time; these never ship (ADR-0015/0016).
+      run: VITE_API_URL="${VITE_API_URL:-http://localhost:8080}" VITE_WEB_URL="${VITE_WEB_URL:-http://localhost:3000}" moon ci
