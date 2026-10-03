@@ -54,3 +54,29 @@ Revisit if our eval set shows the open Apache model within 5 points of WER of th
 Source: fact_checker_ke ADR set red-team report, Section D #9 (also applied to ADR-0001).
 
 - **U2 redefined.** "Near-real-time" checking of live streams/speech does not mean a new named-person "False" verdict shipping live. ADR-0008 §3's right-of-reply window (fixed at 48h by that ADR's amendments) applies regardless of stream latency. Live mode's job is to show **existing published checks** and context cards beside licensed embeds with a lag of a minute or two, not to publish new verdicts in near-real-time. STT inputs remain scoped to live streams we're permitted to capture, partner/broadcaster content, our own uploads, and openly-licensed official audio (Bunge) — this was already correct above and is unchanged; the correction is to the *publishing* claim, not the *transcription* claim.
+
+---
+## ASR/translation amendments (2026-10-03, owner pushback)
+
+### Production evidence from the owner's own project [V-OBSERVED]
+`~/Development/pawa_assessment` (the pawacloud deploy) shipped multilingual document handling on **Gemini 2.5 Flash** (`google-generativeai==0.8.4`) with **translation done LLM-inline** — a "Translate → sw" document flow streamed over SSE, a prompt-level language policy (respond in the user's language; Swahili, Amharic, Yoruba, Hausa, Zulu, French; keep technical terms like "Cloud Run" in English), and a Protocol-shaped client built to swap Gemini for Claude/OpenAI (`backend/app/services/llm_service.py`). No dedicated Translation API, no separate STT. This makes **inline translation the default-to-beat**, not a hypothesis.
+
+### Free-tier terms: verified, and prohibitive [V-PRIMARY]
+Gemini API Data Usage terms (ai.google.dev/gemini-api/terms, updated 2026-03-23): unpaid tier — "Google uses the content you submit to the Services and any generated responses to provide, improve, and develop Google products", human reviewers may read submissions, and "Do not submit sensitive, confidential, or personal information to the Unpaid Services." Paid tier — "Google doesn't use your prompts…or responses to improve our products."
+**Decision:** the unpaid tier is **prohibited for any user-submitted or protest-related content** (ADR-0021/DPA 2019). It may be used only for building the eval set from owned/public-broadcast clips. Production STT/LLM calls run on paid tiers; the near-zero goal is met by the content-addressed result cache (ADR-0017 — a viral clip submitted 500× is paid once), on-demand-only transcription, and per-device audio caps — not by free tiers. This closes the round-2 "[GAP] free-tier training terms". Google Cloud Translation's free quota (recalled ~500K chars/month under no-training Cloud terms) remains **[GAP: verify]** and only matters if inline translation fails the eval.
+
+### Translation decision (proposed)
+Default: **inline** — the claim-detection call (Haiku 4.5, ADR-0011) emits the English working translation in the same structured output, near-zero marginal tokens, pawacloud-validated. The original language stays the source of truth; verdicts quote the original (unchanged from the main decision). A dedicated translation hop enters only if the eval set shows inline sw→en materially worse than Cloud Translation/Gemini-dedicated.
+
+### WER commitment (closes "which WER are we committed to?")
+- **Provider gate:** lowest WER on the 30-clip Kenyan eval set wins; **disqualify any provider >25% WER on the noisy subset** — beyond that, claim extraction invents claims, which here is a defamation hazard, not a UX blemish.
+- **Two-tier tolerance, architecturally honest:** machine transcription is *triage* (tolerates ≤25%); *publication* tolerates 0% unverified — AT-0004-A already requires an editor to confirm any named-person quote against the source before a rating renders, so no published verdict ever rests on raw ASR.
+- Eval set composition fixed: 30 clips (Bunge, Citizen TV, creator TikToks), **≥10 Sheng/code-switched, ≥10 noisy/crowd**, scoring both WER and sw→en translation quality across Gemini-paid, Chirp, and Haiku-inline.
+
+## Acceptance tests
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0005-1 | The eval set exists: 30 Kenyan clips with ≥10 Sheng/code-switched and ≥10 noisy, each with reference transcript + reference translation | RED |
+| AT-0005-2 | The chosen STT provider scores ≤25% WER on the noisy subset; the decision is recorded here with per-provider numbers | RED |
+| AT-0005-3 | No production code path can call an unpaid-tier Gemini/AI-Studio endpoint: config test asserts paid-tier keys/billing project, and CI greps for AI-Studio free-tier usage | RED |
+| AT-0005-4 | Inline sw→en translation quality is within the agreed threshold of the best dedicated option on the eval set, or a dedicated hop is added and this row updated | RED |
