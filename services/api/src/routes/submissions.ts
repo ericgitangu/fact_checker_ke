@@ -55,6 +55,8 @@ export async function submissionRoutes(
       url: input.url ?? null,
       text: input.text ?? null,
       submittedBy: input.submittedBy ?? null,
+      quote: input.quote ?? null,
+      timestampSec: input.timestampSec ?? null,
     };
     const requestHash = hashRequestBody(submission);
 

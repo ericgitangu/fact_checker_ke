@@ -1,6 +1,8 @@
 """Pipeline-local QStash hop request models.
 
-# TEMPORARY until reconciled with packages/core event schemas (wave-2 integration)
+# RECONCILED (2026-10-03): /hops/analyze now accepts the canonical
+# submission.received event envelope (ADR-0017) via AnalyzeHopEnvelope below;
+# AnalyzeHopRequest/HopContent remain the internal shape run_analyze_hop uses.
 
 ADR-0017 defines the cross-service event envelope
 (`{event_id, occurred_at, submission_id, org_id, schema_version}`) and its
@@ -61,6 +63,47 @@ class AnalyzeHopRequest(BaseModel):
     org_id: str = Field(min_length=1)
     content: HopContent
     language_hint: str | None = None
+
+
+class SubmissionReceivedPayload(BaseModel):
+    """The `payload` of a submission.received event (packages/core
+    SubmissionReceivedEventSchema). `extra="ignore"` so a future payload
+    field doesn't 422 the hop."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    url: str | None = None
+    text: str | None = None
+    submitted_by: str | None = None
+    quote: str | None = None
+    timestamp_sec: int | None = None
+
+
+class AnalyzeHopEnvelope(BaseModel):
+    """POST /hops/analyze body: the canonical submission.received event
+    (ADR-0017). The outbox relay posts the whole OutboxEvent; we accept it and
+    IGNORE envelope metadata (event_id/occurred_at/event_type/schema_version)
+    we don't need, then map payload -> AnalyzeHopRequest. Fixes the
+    envelope-vs-hop-shape 422 (code-review blocker #1)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    submission_id: str = Field(min_length=1)
+    org_id: str = Field(min_length=1)
+    payload: SubmissionReceivedPayload
+
+    def to_hop_request(self) -> AnalyzeHopRequest:
+        return AnalyzeHopRequest(
+            submission_id=self.submission_id,
+            org_id=self.org_id,
+            content=HopContent(
+                url=self.payload.url,
+                text=self.payload.text,
+                quote=self.payload.quote,
+                timestamp_sec=self.payload.timestamp_sec,
+            ),
+            language_hint=None,
+        )
 
 
 class VerifyHopRequest(BaseModel):
