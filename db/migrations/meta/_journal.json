@@ -22,6 +22,20 @@
       "when": 1790999802646,
       "tag": "0002_seed_default_org",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791038735763,
+      "tag": "0003_outbox_idempotency_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791039214112,
+      "tag": "0004_submissions_updated_at",
+      "breakpoints": true
     }
   ]
 }

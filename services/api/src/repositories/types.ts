@@ -29,3 +29,20 @@ export interface WaitlistRepository {
    */
   join(input: WaitlistSignupInput): Promise<RepoResult<WaitlistSignupResult>>;
 }
+
+/**
+ * ADR-0020 §1 (anonymous-token slice). Issues and validates the opaque
+ * device token that is the quota/stream-concurrency key everywhere else
+ * in the codebase (never the bare IP).
+ */
+export interface DeviceTokenRepository {
+  /** Issues a new token and persists only its hash. */
+  issue(): Promise<{ token: string; createdAt: string }>;
+  /**
+   * Verifies `token` exists (by hash) and bumps `last_seen_at`. A device
+   * token that was never issued (or was rotated away, per AT-0020-5) is
+   * `not_found` — the caller treats that as "start a fresh identity",
+   * never as an error that blocks the request.
+   */
+  touch(token: string): Promise<RepoResult<{ tokenHash: string }>>;
+}

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresRepositories } from "../repositories/postgres.js";
 import type { CheckRepository, SubmissionRepository, WaitlistRepository } from "../repositories/types.js";
+import { requireIntegrationDatabaseUrl } from "./integration-env.js";
 
 /**
  * Exercises the real Postgres repositories (not the in-memory doubles)
@@ -10,7 +11,7 @@ import type { CheckRepository, SubmissionRepository, WaitlistRepository } from "
  * branch; in CI it's the pgvector/pgvector:pg16 service container with
  * migrations run as a prior workflow step (.github/workflows/ci.yml).
  */
-const connectionString = process.env.DATABASE_URL_TEST;
+const connectionString = requireIntegrationDatabaseUrl();
 
 describe.skipIf(!connectionString)("Postgres repositories (integration)", () => {
   let submissions: SubmissionRepository;
