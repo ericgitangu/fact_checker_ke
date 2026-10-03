@@ -12,7 +12,7 @@
     "lint": "eslint src --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.json --outDir dist && cp src/wordmark.css dist/wordmark.css"
+    "build": "tsc -p tsconfig.json --outDir dist && cp src/wordmark.css dist/wordmark.css && cp src/waving-flag.css dist/waving-flag.css"
   },
   "peerDependencies": {
     "react": "^19.2.8",
