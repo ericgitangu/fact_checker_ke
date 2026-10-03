@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fact-checker-ke/brand": "workspace:*",
     "@fact-checker-ke/core": "workspace:*",
     "@fact-checker-ke/i18n": "workspace:*",
     "@serwist/turbopack": "^9.5.12",
