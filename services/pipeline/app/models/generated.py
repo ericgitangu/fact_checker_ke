@@ -36,6 +36,12 @@ class SpanEnd(RootModel[int]):
     root: Annotated[int, Field(ge=0, le=9007199254740991)]
 
 
+class Attribution(StrEnum):
+    unverified = 'unverified'
+    confirmed = 'confirmed'
+    not_applicable = 'not_applicable'
+
+
 class ClaimType(StrEnum):
     checkable = 'checkable'
     opinion = 'opinion'
@@ -170,6 +176,8 @@ class Claim(BaseModel):
     claim_type: Annotated[ClaimType, Field(alias='claimType')]
     span_start: Annotated[SpanStart | None, Field(alias='spanStart')]
     span_end: Annotated[SpanEnd | None, Field(alias='spanEnd')]
+    named_person: Annotated[bool, Field(alias='namedPerson')]
+    attribution: Attribution
     created_at: Annotated[
         AwareDatetime,
         Field(

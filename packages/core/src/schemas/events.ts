@@ -84,12 +84,29 @@ export type CheckPublishedEvent = z.infer<typeof CheckPublishedEventSchema>;
  * so an unrecognised `event_type` in a stored row is a validation error,
  * not a silent `any`.
  */
+/**
+ * ADR-0025 §6: a correction is always additive, never a rewrite of the
+ * prior verdict row (AT-0025-4). `previous_check_id` lets a consumer
+ * (apps/web's history view) chain corrections back to the original.
+ */
+export const CheckCorrectedEventSchema = EventEnvelopeSchema.extend({
+  event_type: z.literal("check.corrected"),
+  schema_version: z.literal("v1"),
+  payload: z.object({
+    check_id: z.string().uuid(),
+    previous_check_id: z.string().uuid(),
+    rating: RatingSchema,
+  }),
+});
+export type CheckCorrectedEvent = z.infer<typeof CheckCorrectedEventSchema>;
+
 export const OutboxEventSchema = z.discriminatedUnion("event_type", [
   SubmissionReceivedEventSchema,
   SubmissionAnalyzedEventSchema,
   CheckDraftedEventSchema,
   CheckFailedEventSchema,
   CheckPublishedEventSchema,
+  CheckCorrectedEventSchema,
 ]);
 export type OutboxEvent = z.infer<typeof OutboxEventSchema>;
 
@@ -99,5 +116,6 @@ export const EVENT_TYPES = [
   "check.drafted",
   "check.failed",
   "check.published",
+  "check.corrected",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
