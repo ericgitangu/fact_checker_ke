@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../app.js";
+import { requireIntegrationDatabaseUrl } from "./integration-env.js";
 
-const connectionString = process.env.DATABASE_URL_TEST;
+const connectionString = requireIntegrationDatabaseUrl();
 
 /**
  * End-to-end through the Fastify route (not just the repository) against
@@ -20,6 +21,12 @@ describe.skipIf(!connectionString)("POST /v1/waitlist (integration, Postgres)", 
         upstashRedisRestUrl: null,
         upstashRedisRestToken: null,
         isProduction: false,
+        qstashToken: null,
+        analyzeHopUrl: "http://localhost:8000/internal/analyze",
+        qstashCurrentSigningKey: null,
+        qstashNextSigningKey: null,
+        capabilityTokenSecret: "test-capability-secret",
+        redisTcpUrl: null,
       },
       rateLimiter: { check: async () => true },
     });

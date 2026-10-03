@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { Check, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
-import type { CheckRepository, RepoResult, SubmissionRepository, WaitlistRepository } from "./types.js";
+import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
+import type {
+  CheckRepository,
+  DeviceTokenRepository,
+  RepoResult,
+  SubmissionRepository,
+  WaitlistRepository,
+} from "./types.js";
 
 /**
  * In-memory implementation used for the skeleton and tests. Not safe across
@@ -11,18 +18,30 @@ import type { CheckRepository, RepoResult, SubmissionRepository, WaitlistReposit
 export class InMemorySubmissionRepository implements SubmissionRepository {
   private readonly store = new Map<string, Submission>();
 
+  /**
+   * Directly inserts a fully-formed `Submission` — used by
+   * `InMemorySubmissionService` so the dev/test POST and GET paths
+   * share one store (not two independent ones) even outside Postgres,
+   * where the real path is one transaction against one table.
+   */
+  insert(submission: Submission): void {
+    this.store.set(submission.id, submission);
+  }
+
   async create(input: {
     url: string | null;
     text: string | null;
     submittedBy: string | null;
   }): Promise<Submission> {
+    const now = new Date().toISOString();
     const submission: Submission = {
       id: randomUUID(),
       url: input.url,
       text: input.text,
       submittedBy: input.submittedBy,
       status: "received",
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
     this.store.set(submission.id, submission);
     return submission;
@@ -62,5 +81,23 @@ export class InMemoryWaitlistRepository implements WaitlistRepository {
     }
     this.emails.add(input.email);
     return { ok: true, value: { status: "joined" } };
+  }
+}
+
+export class InMemoryDeviceTokenRepository implements DeviceTokenRepository {
+  private readonly hashes = new Set<string>();
+
+  async issue(): Promise<{ token: string; createdAt: string }> {
+    const { token, tokenHash } = generateDeviceToken();
+    this.hashes.add(tokenHash);
+    return { token, createdAt: new Date().toISOString() };
+  }
+
+  async touch(token: string): Promise<RepoResult<{ tokenHash: string }>> {
+    const tokenHash = hashDeviceToken(token);
+    if (!this.hashes.has(tokenHash)) {
+      return { ok: false, error: { kind: "not_found", message: "device token not recognised" } };
+    }
+    return { ok: true, value: { tokenHash } };
   }
 }

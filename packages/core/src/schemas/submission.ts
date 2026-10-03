@@ -28,13 +28,43 @@ export const SubmissionInputSchema = z
   });
 export type SubmissionInput = z.infer<typeof SubmissionInputSchema>;
 
+/**
+ * ADR-0017 state machine: received -> analyzing -> analyzed -> verifying
+ * -> ready | failed. This is the single source of truth for the status
+ * enum; packages/db's pgEnum derives from `.options` (see
+ * packages/db/src/schema.ts) so there is exactly one place that can add
+ * or rename a status.
+ *
+ * "processing" (the pre-ADR-0017 value) is retired in favour of the two
+ * named hops so a conditional `UPDATE ... WHERE status=$expected` can
+ * target a specific hop rather than a catch-all bucket (ADR-0017 S3).
+ */
 export const SubmissionStatusSchema = z.enum([
   "received",
-  "processing",
+  "analyzing",
+  "analyzed",
+  "verifying",
   "ready",
   "failed",
 ]);
 export type SubmissionStatus = z.infer<typeof SubmissionStatusSchema>;
+
+/**
+ * The ADR-0017 state machine's valid hops, as an adjacency map. Used by
+ * the conditional-update helper (services/api/src/lib/state-machine.ts)
+ * to reject an invalid transition before it ever reaches a WHERE clause,
+ * and by tests asserting the machine's shape matches the ADR.
+ */
+export const SUBMISSION_STATUS_TRANSITIONS: Readonly<
+  Record<SubmissionStatus, readonly SubmissionStatus[]>
+> = {
+  received: ["analyzing", "failed"],
+  analyzing: ["analyzed", "failed"],
+  analyzed: ["verifying", "failed"],
+  verifying: ["ready", "failed"],
+  ready: [],
+  failed: [],
+};
 
 export const SubmissionSchema = z.object({
   id: z.string().uuid(),
@@ -43,5 +73,8 @@ export const SubmissionSchema = z.object({
   submittedBy: z.string().nullable(),
   status: SubmissionStatusSchema,
   createdAt: z.string().datetime(),
+  // ADR-0018: the polling ETag is derived from (status, updatedAt) --
+  // see services/api/src/lib/cache-headers.ts.
+  updatedAt: z.string().datetime(),
 });
 export type Submission = z.infer<typeof SubmissionSchema>;
