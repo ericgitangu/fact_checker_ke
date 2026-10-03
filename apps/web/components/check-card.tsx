@@ -60,6 +60,44 @@ export async function CheckCard({ check }: { check: Check }): Promise<React.JSX.
           {t("reviewedBy")}
         </p>
       )}
+
+      {/* ADR-0031: a published Check is an assessment, not an accusation —
+          the calibrated confidence weight, cited evidence, and the
+          falsifiability note are all surfaced here so the reader (not a
+          bare verdict) does the judging. `CheckSchema`'s `superRefine`
+          (packages/core/src/schemas/check.ts) is what guarantees these
+          are non-null on any check that reaches this component with
+          `isDraft: false`. */}
+      {!check.isDraft && check.calibratedConfidence !== null && (
+        <p className="checkcard-confidence">
+          {t("guidance.confidenceLabel")}: {Math.round(check.calibratedConfidence * 100)}%
+        </p>
+      )}
+
+      {!check.isDraft && check.evidence.length > 0 && (
+        <section aria-labelledby="evidence-h">
+          <h2 id="evidence-h" className="sr-only">
+            {t("guidance.evidenceHeading")}
+          </h2>
+          <ul className="source-list">
+            {check.evidence.map((item) => {
+              const source = check.sources.find((s) => s.id === item.sourceId);
+              return (
+                <li key={`${item.sourceId}-${item.quote}`}>
+                  &ldquo;{item.quote}&rdquo;
+                  {source ? <span className="source-tier"> — {source.title}</span> : null}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {!check.isDraft && check.whatWouldChangeThis && (
+        <p className="checkcard-rationale">
+          <strong>{t("guidance.whatWouldChangeThisHeading")}:</strong> {check.whatWouldChangeThis}
+        </p>
+      )}
     </article>
   );
 }

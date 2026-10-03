@@ -46,6 +46,11 @@ export const AuditActionSchema = z.enum([
   "comment.hidden",
   "comment.auto_hidden",
   "dsar.exported",
+  // ADR-0031 hard constraint 2 / AT-0031-5: any tier-threshold change is
+  // audit-logged; relaxing Tier C additionally records an advocate
+  // sign-off reference (see services/api/src/lib/policy-audit.ts).
+  "policy.threshold_changed",
+  "policy.tier_c_relaxed",
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;
 
