@@ -48,3 +48,9 @@ Revisit if our eval set shows the open Apache model within 5 points of WER of th
   - Gemini audio input is about 25 tokens per second of audio.
 - **Budget for paid STT from day one.** Don't assume a free tier.
 - Still no Swahili, Sheng or code-switched WER data beyond FLEURS. The 30-clip eval set remains the deciding test.
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #9 (also applied to ADR-0001).
+
+- **U2 redefined.** "Near-real-time" checking of live streams/speech does not mean a new named-person "False" verdict shipping live. ADR-0008 §3's right-of-reply window (fixed at 48h by that ADR's amendments) applies regardless of stream latency. Live mode's job is to show **existing published checks** and context cards beside licensed embeds with a lag of a minute or two, not to publish new verdicts in near-real-time. STT inputs remain scoped to live streams we're permitted to capture, partner/broadcaster content, our own uploads, and openly-licensed official audio (Bunge) — this was already correct above and is unchanged; the correction is to the *publishing* claim, not the *transcription* claim.

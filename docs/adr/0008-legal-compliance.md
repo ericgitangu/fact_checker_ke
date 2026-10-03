@@ -58,3 +58,20 @@ Revisit on any legal opinion, any NC4 or ODPC correspondence, or when the DPA Am
 5. Does embedding a licensed broadcaster's live stream create derivative liability under KICA?
 6. What is the exposure for republishing Public Order Act-notified protest details, including when a protest is later declared unlawful?
 7. What is the status of the DPA (Amendment) Bill 2025?
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #10 (high severity).
+
+- **Right-of-reply window fixed at 48h.** The existing decision text (point 3) names a "response window" without a number; this amendment fixes it at 48 hours minimum before a "False"/"Misleading" verdict involving a named person publishes.
+- **Public-safety exception needs a recorded reason.** The existing "except for urgent public-safety claims" carve-out may only be invoked with the specific reason logged against the check (who invoked it, and why), auditable after the fact — this prevents the exception from becoming the default path for politically inconvenient verdicts.
+- **Takedown and complaint SLA added:** a published check that receives a takedown demand or formal complaint gets an initial response within a defined SLA (to be set by the retained advocate; not lower than legal minimums).
+- **Law-enforcement request policy** is required before any user data (submissions, IPs, account data) is disclosed to a law-enforcement or government request — this is a placeholder gate pending the forthcoming Data protection lifecycle ADR (see README pointer list); this ADR owns the *editorial* consequence (no disclosure without the policy existing), not the full DP design.
+- **Media-liability insurance is a Phase 1 gate** — added to the editorial-policy rollout alongside ODPC registration and the retained advocate, given the defamation exposure evidenced in Research round 2 (KES 6-20M awards, no Kenyan precedent for a fact-checker's ratings).
+
+## Acceptance tests
+
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0008-A | A named-person publish is blocked without an evidence file, archived sources, a logged right-of-reply attempt and a window of 48h or more (unless the public-safety flag is set *with the reason recorded*). | RED |
+| AT-0008-B | A check page rates a claim, never an account. The badge or embed carries the claim text and date. Per-account submission caps apply to any one target handle. | RED |

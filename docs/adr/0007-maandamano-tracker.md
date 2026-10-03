@@ -38,3 +38,21 @@ Revisit after a legal opinion (ADR-0008), or after the first incident report or 
 - CA live-broadcast ban quashed (Chigiti J; Katiba Institute petition; directive dated 25 Jun 2025) **[V2-SECONDARY: no case number]**. It covers broadcasters. Embedding licensed broadcasters' streams fits that precedent.
 - **Public Order Act (Cap 56) s.5:** the duty to give 3-14 days' notice falls on *organisers* **[V2-PRIMARY: kenyalaw.org]**. A useful data source: a "notified to regulating officer" field can strengthen `announced`/`confirmed` status when the notice is public. No ruling covers third parties republishing protest schedules **[GAP: advocate question]**.
 - **Google Play sensitive-events policy** allows content with educational or documentary value that raises awareness, but enforcement is judgment-based **[V2-SECONDARY]**. Keep the tracker's framing informational (safety advisories, sources), never mobilising.
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #11 (high severity).
+
+- **Kill-switch mechanism, specified.** The kill switch is a runtime flag in the DB/edge config (not a deploy), and flipping it must also: purge the ISR tag for tracker routes so the Vercel CDN stops serving stale pages, and flip the PWA service worker to network-first on tracker routes so the SW cache can't keep serving a frozen protest area. (Closes red-team C-7: "kill switch is leaky" — a flag flip alone leaves CDN/SW layers serving stale content.)
+- **Log redaction on tracker routes.** Cloud Run and Vercel request logs must exclude or redact IPs of people who viewed `/maandamano` (Terraform-enforced log exclusion filter). (Closes part of red-team C-8.)
+- **EXIF stripping on upload**, for any photo attached to a tracker advisory or (future) comment.
+- **Advisories auto-grey after 2h without re-verification.** A "road open"/status advisory that hasn't been re-confirmed by an editor within 2 hours is visually marked stale rather than silently continuing to display as current — this closes the staleness gap noted for safety-relevant advisories.
+- **Ongoing-event comments are off** (comments remain Phase 1 per the existing decision above, but ward-level coarsening is defeated by comments like "tuko Kenol sasa" — so comments on *ongoing* events specifically stay off or go to editor-held review, even once Phase 1 UGC otherwise ships).
+- The full data-protection treatment of protest-viewer exposure (log retention policy, DSAR interaction, cross-border transfer basis) is tracked in the forthcoming Data protection lifecycle ADR (see README pointer list) — this amendment covers only the mechanical log-exclusion/EXIF pieces that belong to this ADR's tracker design.
+
+## Acceptance tests
+
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0007-A | Within 60s of the kill-switch flag flipping, tracker routes return a frozen notice from CDN, API and service worker (the SW revalidates tracker routes network-first). | RED |
+| AT-0007-B | A log exclusion/redaction filter is enforced (Terraform) on tracker routes. EXIF is stripped on upload. Comments on ongoing events are off or held for review. | RED |
