@@ -49,12 +49,19 @@ A user who submits a claim should watch it move through `received → analyzing 
 Revisit if pub/sub metering turns out to be expensive (then switch to poll-only with long-poll), or if checks routinely exceed 90s.
 
 ## Acceptance tests
-| ID | Behaviour |
-|---|---|
-| AT-0018-1 | Subscribing *after* completion immediately yields the terminal event, then the stream closes |
-| AT-0018-2 | Reconnecting with `Last-Event-ID` replays only the newer events, with no duplicates |
-| AT-0018-3 | The stream closes at 90s when nothing arrives, with heartbeats at 15s intervals |
-| AT-0018-4 | A third concurrent stream from one IP gets 429 |
-| AT-0018-5 | Draft and submission responses carry `no-store`. Published checks carry `s-maxage` and a strong ETag |
-| AT-0018-6 | `check.corrected` invalidates the ISR tag. The next request shows the corrected rating (e2e) |
-| AT-0018-7 | With Redis down, SSE still delivers the current state from Postgres and the client falls back to polling (degraded, not broken) |
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0018-1 | Subscribing *after* completion immediately yields the terminal event, then the stream closes | RED |
+| AT-0018-2 | Reconnecting with `Last-Event-ID` replays only the newer events, with no duplicates | RED |
+| AT-0018-3 | The stream closes at 90s when nothing arrives, with heartbeats at 15s intervals | RED |
+| AT-0018-4 | A third concurrent stream from one IP gets 429 | RED |
+| AT-0018-5 | Draft and submission responses carry `no-store`. Published checks carry `s-maxage` and a strong ETag | RED |
+| AT-0018-6 | `check.corrected` invalidates the ISR tag. The next request shows the corrected rating (e2e) | RED |
+| AT-0018-7 | With Redis down, SSE still delivers the current state from Postgres and the client falls back to polling (degraded, not broken) | RED |
+| AT-0018-8 | Stream/connection limits are keyed on device or session token, not bare IP. IP is only a coarse ceiling, at 50 or more. | RED |
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D (Section C C-9; high severity).
+
+- **CGNAT false positives.** The existing guard "at most 2 concurrent streams per IP" (point 5 above) blocks many Safaricom users who share one egress IP under CGNAT. Limits are keyed on device or session token; IP remains only a coarse ceiling, raised to 50 or more. (See also ADR-0011 amendments, which apply the same device/session-keying principle to submission quotas.)

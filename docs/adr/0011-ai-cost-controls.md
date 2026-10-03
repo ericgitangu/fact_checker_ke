@@ -37,3 +37,15 @@ Revisit if cost per published check goes above a target set after week 1.
 - On Haiku, the cached static prefix (rubric, credibility registry, examples) must reach 4,096 tokens or caching does nothing. Build the claim-detection prompt with few-shot Kenyan examples, which raises quality and crosses the threshold.
 - Use the 5-minute TTL for bursty viral traffic. The 1-hour TTL (2× write) pays off only if the prefix is read about 3 or more times within the hour **[I]**.
 - Batch (50% off) suits backfills and the nightly re-check sweep. It isn't suitable for user-facing submissions.
+
+## Red-team amendments (2026-10-03)
+
+Source: fact_checker_ke ADR set red-team report, Section D #12 (high severity).
+
+- **Admission control before QStash.** Today the global cap (point 6 above) degrades to "queued for review" when exceeded, but human review is already the bottleneck, so overflow just piles up in an unstaffed queue (red-team contradiction #8) and a viral event can exhaust the QStash daily quota (red-team C-3). Add: Turnstile (or equivalent) on anonymous submit; device/session-keyed quotas, with IP used only as a coarse ceiling (50+) — per-IP alone breaks under mobile CGNAT sharing one egress IP (red-team C-9); and a per-stage breaker that keeps serving dedup hits (cache reuse) while queuing genuinely new submissions in Postgres rather than dropping or silently stalling them.
+
+## Acceptance tests
+
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0011-A | At 80% of the QStash quota, new unique submissions queue in Postgres while dedup hits still return normally. | RED |
