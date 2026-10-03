@@ -24,29 +24,28 @@ import {
 } from "@fact-checker-ke/core";
 
 /**
+ * zod v4 types `.options` as `T[]`; Drizzle's pgEnum requires a non-empty
+ * tuple. Assert non-emptiness at module load (an empty enum is a contract bug)
+ * instead of casting blindly.
+ */
+function enumValues<T extends string>(name: string, values: readonly T[]): [T, ...T[]] {
+  const [first, ...rest] = values;
+  if (first === undefined) throw new Error(`pgEnum ${name}: zod enum has no values`);
+  return [first, ...rest];
+}
+
+/**
  * Postgres enums built from the zod enums exported by @fact-checker-ke/core,
  * so enum values have exactly one source of truth (ADR-0009 decision). Any
  * future enum value added in core/src/schemas/*.ts is picked up here
  * automatically on the next `drizzle-kit generate`.
  */
-export const submissionStatusEnum = pgEnum(
-  "submission_status",
-  SubmissionStatusSchema.options,
-);
-export const ratingEnum = pgEnum("rating", RatingSchema.options);
-export const claimTypeEnum = pgEnum("claim_type", ClaimTypeSchema.options);
-export const credibilityTierEnum = pgEnum(
-  "credibility_tier",
-  CredibilityTierSchema.options,
-);
-export const demonstrationStatusEnum = pgEnum(
-  "demonstration_status",
-  DemonstrationStatusSchema.options,
-);
-export const waitlistSourceEnum = pgEnum(
-  "waitlist_source",
-  WaitlistSourceSchema.options,
-);
+export const submissionStatusEnum = pgEnum("submission_status", enumValues("submission_status", SubmissionStatusSchema.options));
+export const ratingEnum = pgEnum("rating", enumValues("rating", RatingSchema.options));
+export const claimTypeEnum = pgEnum("claim_type", enumValues("claim_type", ClaimTypeSchema.options));
+export const credibilityTierEnum = pgEnum("credibility_tier", enumValues("credibility_tier", CredibilityTierSchema.options));
+export const demonstrationStatusEnum = pgEnum("demonstration_status", enumValues("demonstration_status", DemonstrationStatusSchema.options));
+export const waitlistSourceEnum = pgEnum("waitlist_source", enumValues("waitlist_source", WaitlistSourceSchema.options));
 
 /**
  * `llm_calls.stage` is internal pipeline bookkeeping, not part of the
