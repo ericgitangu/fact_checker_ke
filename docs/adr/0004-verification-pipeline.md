@@ -54,8 +54,8 @@ Source: fact_checker_ke ADR set red-team report, Section D #5-#8 (blocker/high s
 
 | ID | Behaviour | Status |
 |---|---|---|
-| AT-0004-A | A user-supplied quote on a named person gets `attribution: unverified`. No rating is rendered until an editor confirms the quote against the embed at the timestamp. | RED (owned by services/api + editor UI; see note below) |
-| AT-0004-B | A draft that involves a named person returns evidence and sources only, with `rating: null`, to the submitter. | RED (owned by services/api + editor UI; see note below) |
+| AT-0004-A | A user-supplied quote on a named person gets `attribution: unverified`. No rating is rendered until an editor confirms the quote against the embed at the timestamp. | GREEN (services/api; see "People & adjudication" implementation notes, 2026-10-03 — editor UI confirmation surface itself is apps/web territory, out of this change's ownership) |
+| AT-0004-B | A draft that involves a named person returns evidence and sources only, with `rating: null`, to the submitter. | GREEN (services/api; see implementation notes) |
 | AT-0004-C | Every `citations[].doc_id` is in the retrieved set, every quoted span substring-matches the archived snapshot, otherwise the draft is rejected. | GREEN |
 | AT-0004-D | Negation, number, date and entity mismatches block claim-dedup reuse. Reused checks show `valid_as_of`. | GREEN |
 | AT-0004-E | The 100-claim eval set includes at least 30 Sheng items. Claim/opinion F1 must clear a threshold before launch. At least 10% of dropped items are sampled to editors. | SCAFFOLD (GREEN on harness/sampling; 100-claim/30-Sheng threshold gate stays RED/open, see note) |
@@ -120,3 +120,12 @@ citation-integrity gate). See `services/pipeline/app/stages/analyze.py`,
   `PIPELINE_USE_REAL_EMBEDDER=1` is set, keeping default test runs
   network-free; real-embedder behaviour is therefore only exercised when
   that flag is set (see `app/clients/embedder_factory.py`).
+
+## Implementation notes, "People & adjudication" wave addendum (2026-10-03)
+
+Landing AT-0004-A/AT-0004-B closes the services/api half of the gap the original note below ("owned by services/api + editor UI") called out:
+
+- `packages/core/src/schemas/claim.ts`'s `Claim` now carries `namedPerson: boolean` and `attribution: "unverified" | "confirmed" | "not_applicable"` — one source of truth, mirrored into `packages/db`'s `claims.named_person`/`claims.attribution` columns.
+- `GET /v1/checks/:id` (`services/api/src/routes/checks.ts`) redacts `rating` to `null` whenever a check is still a draft AND any of its claims is `namedPerson: true` — regardless of whether that claim's attribution is confirmed yet, since it's the editor's **approval** (not attribution confirmation alone) that makes a verdict publishable (ADR-0025 §5's gate, `services/api/src/lib/editorial.ts#approveCheck`).
+- The editor-side confirmation action (`POST /v1/editor/claims/:claimId/confirm-attribution`) and the publish gate that refuses to approve a check with any `unverified` named-person claim are both new in this wave (ADR-0025's implementation notes have the full gate description).
+- **Still owned by apps/web, not this wave:** the actual editor UI for watching the embed at the cited timestamp and clicking "confirm" — this wave only ships the API endpoint that records the confirmation; nothing here claims a UI exists.
