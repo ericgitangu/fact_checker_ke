@@ -3,13 +3,19 @@ import { withSerwist } from "@serwist/turbopack";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const nextConfig: NextConfig = {
-  // packages/core and packages/i18n are consumed as workspace:* deps.
-  // @fact-checker-ke/core is TS source needing transpilation; @fact-
-  // checker-ke/i18n ships a built dist + plain JSON message files, which
-  // Next resolves fine from node_modules without transpilation, but it is
-  // still listed so a `pnpm install` without a prior `i18n:build` fails
-  // loudly (missing dist) rather than silently falling back to stale JS.
-  transpilePackages: ["@fact-checker-ke/core"],
+  // packages/core, packages/i18n and packages/brand are consumed as
+  // workspace:* deps. @fact-checker-ke/core is TS source needing
+  // transpilation; @fact-checker-ke/i18n ships a built dist + plain JSON
+  // message files, which Next resolves fine from node_modules without
+  // transpilation, but it is still listed so a `pnpm install` without a
+  // prior `i18n:build` fails loudly (missing dist) rather than silently
+  // falling back to stale JS. @fact-checker-ke/brand ships a built dist
+  // PLUS a plain CSS file (wordmark.css) that its Wordmark component
+  // imports directly -- Next's bundler only runs its CSS loader over
+  // workspace packages it's told to transpile, so without this, importing
+  // @fact-checker-ke/brand from app/ would fail to process that CSS import
+  // (treated as an opaque, un-transpiled node_modules dependency).
+  transpilePackages: ["@fact-checker-ke/core", "@fact-checker-ke/brand"],
 };
 
 // @serwist/turbopack (stable since 9.5, see

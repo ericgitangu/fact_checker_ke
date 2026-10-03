@@ -61,17 +61,14 @@
   --focus-ring: var(--brand);
 
   --sans: var(--font-archivo), "Archivo", system-ui, sans-serif;
-  /* `--sans-x` is the SAME self-hosted variable font as `--sans` — see
-     app/layout.tsx's header comment for why "Archivo Expanded" as a
-     separate family doesn't exist in the current Google Fonts catalog
-     (verified against the live API, not assumed) and why next/font's
-     `axes: ["wdth"]` on plain Archivo is the real fix. The visual
-     "expanded" look comes from `font-stretch` (the `--stretch-expanded`
-     value below, which the font's `wdth` axis maps to directly), applied
-     together with `--sans-x` wherever a headline needs the display cut —
-     see `.wordmark-mark` and `.font-expanded` for the two call sites. */
-  --sans-x: var(--font-archivo), "Archivo", system-ui, sans-serif;
-  --stretch-expanded: 125%;
+  /* Display/headline typeface — Bricolage Grotesque, SAME family + weight
+     range as apps/site (see packages/brand/README.md's "Font parity"
+     section). This replaces the previous `--sans-x` "Archivo wdth-axis
+     expanded" hack: that was brand drift (apps/web rendering headlines in
+     a different display typeface than apps/site), not a deliberate
+     choice — see `.font-expanded` below, and app/layout.tsx's Bricolage
+     Grotesque next/font load, for the fix. */
+  --display: var(--font-bricolage-grotesque), "Bricolage Grotesque", var(--sans);
   --serif: var(--font-newsreader), "Newsreader", Georgia, serif;
 
   --shell: 1120px;
@@ -111,6 +108,7 @@ h2,
 h3 {
   color: var(--ink);
   margin: 0;
+  font-family: var(--display);
   font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.05;
@@ -164,34 +162,15 @@ a:hover {
   color: var(--ink);
 }
 
-.wordmark-mark {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  background: var(--ink);
-  color: var(--paper);
-  border-radius: 7px;
-  font: 700 0.9rem/1 var(--sans-x);
-  font-stretch: var(--stretch-expanded);
-  letter-spacing: -0.03em;
-  flex: none;
-}
-
-/* Display/headline utility: the "Archivo Expanded" look, via the real
-   font-loading fix described in globals.css's --sans-x comment above.
-   Apply to any heading that should read as the expanded display cut
-   (hero h1s, section headers that want the heavier voice). */
+/* Display/headline utility: the heavier Bricolage Grotesque voice. Apply
+   to any heading that wants it (hero h1s, section headers). Previously
+   this faked an "Archivo Expanded" look via `font-stretch` on plain
+   Archivo (brand drift, since fixed — see `--display` above); now it's
+   just the real display family at a heavier weight, same as apps/site. */
 .font-expanded {
-  font-family: var(--sans-x);
-  font-stretch: var(--stretch-expanded);
+  font-family: var(--display);
   font-weight: 800;
   letter-spacing: -0.02em;
-}
-
-.wordmark-text {
-  font-weight: 600;
-  letter-spacing: -0.01em;
 }
 
 .nav-links {
