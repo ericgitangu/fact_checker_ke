@@ -23,14 +23,27 @@ export function totpUri(secret: string, accountEmail: string, issuer = "fact_che
 
 /** Verifies `code` against `secret` allowing +/-1 time step (90s window) for clock drift. */
 export function verifyTotpCode(secret: string, code: string, at: number = Date.now()): boolean {
-  if (!/^\d{6}$/.test(code)) return false;
+  return matchTotpCounter(secret, code, at) !== null;
+}
+
+/**
+ * SEC-3 (security-hardening finding #3, 2026-10-04): returns the exact
+ * HOTP counter (time step) `code` matched within the +/-1 drift window,
+ * or `null` if it matches none. Callers that need single-use / replay
+ * tracking (AuthService.verifyAndConsumeTotpCode) use the returned
+ * counter as the row they record as "used" -- `verifyTotpCode` above
+ * stays a pure yes/no check (unchanged signature/behaviour) for callers
+ * that only need validity, not consumption.
+ */
+export function matchTotpCounter(secret: string, code: string, at: number = Date.now()): number | null {
+  if (!/^\d{6}$/.test(code)) return null;
   const key = base32Decode(secret);
   const stepSeconds = 30;
   const counter = Math.floor(at / 1000 / stepSeconds);
   for (const drift of [0, -1, 1]) {
-    if (hotp(key, counter + drift) === code) return true;
+    if (hotp(key, counter + drift) === code) return counter + drift;
   }
-  return false;
+  return null;
 }
 
 /** Exported for the RFC 4226 Appendix D test-vector unit test only. */
