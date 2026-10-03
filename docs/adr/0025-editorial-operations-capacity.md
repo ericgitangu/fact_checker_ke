@@ -1,6 +1,6 @@
 # ADR-0025: Editorial operations and capacity
 
-**Status:** Proposed · **Date:** 2026-10-03 · Builds on ADR-0004, ADR-0008, ADR-0011's breaker, ADR-0024
+**Status:** Accepted (4-8/day ceiling; 48h right of reply, owner, 2026-10-03) · **Date:** 2026-10-03 · Builds on ADR-0004, ADR-0008, ADR-0011's breaker, ADR-0024
 
 ## Problem
 ADR-0008 asks for "≥1 check/week" with no ceiling, no SLA, and no plan for what happens when submissions outpace a one-person review capacity. ADR-0011's cost breaker degrades overflow to "queued for review," but human review is already the stated bottleneck (ADR-0004 trade-offs) — the queue has nowhere to drain to (red-team amendment #8, C-3). There is also no defined right-of-reply workflow (ADR-0008 §3 requires one but doesn't operationalize it), no corrections/complaints process, and no step confirming a quote-attribution before publish (closing the C-1 fabricated-quote gap from the pipeline side, operationally rather than technically).
