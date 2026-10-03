@@ -29,6 +29,22 @@
 # full `fastembed` extras, or (b) moving embedding to a separate, smaller
 # service/image (the ADR-0009 Rust-service roadmap already points this
 # direction for a different reason: performance, not just image size).
+#
+# IMAGE SIZE FLAG, update (synthetic-media triage wave, 2026-10-03): this
+# image now measures ~568MB (`docker images`, verified live), up ~90MB from
+# the ~478MB baseline above. Cause: `c2pa-python` (ADR-0006 signal #1, the
+# C2PA manifest reader) pulls in `cryptography` + `cffi` as transitive
+# deps (a compiled OpenSSL binding) -- these are the bulk of the add. This
+# is accepted, not hidden: c2pa-python is the one real (non-fake) vendor
+# dependency this change adds, chosen specifically because it installs
+# cleanly and runs fully local/offline (no network call, no vendor key --
+# see app/clients/provenance_c2pa.py's docstring), unlike every other new
+# Protocol in this change (synthetic-media detector, reverse-image search,
+# abuse scan), which stay fakes/heuristics with zero new runtime deps.
+# Tracked as tech debt alongside the fastembed note above: revisit if the
+# combined image crosses a harder budget, options being (a) a slimmer
+# c2pa build without the full cryptography extras if upstream offers one,
+# or (b) moving the C2PA read to pass #2 above (a separate smaller image).
 
 FROM dhi.io/python:3.12-debian12-dev@sha256:86d4db28585ae3de3bc0e4c21e42d3a1404ef20b4b858decd48134836ace7cf3 AS build
 WORKDIR /app
