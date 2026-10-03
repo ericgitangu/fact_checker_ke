@@ -36,6 +36,27 @@
       "when": 1791039214112,
       "tag": "0004_submissions_updated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791054265195,
+      "tag": "0005_identity_editorial_moderation_retention",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791054300000,
+      "tag": "0006_seed_retention_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791054396770,
+      "tag": "0007_users_role_nullable",
+      "breakpoints": true
     }
   ]
 }
