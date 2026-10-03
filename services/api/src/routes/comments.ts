@@ -37,7 +37,12 @@ export async function commentRoutes(app: FastifyInstance, deps: { db: Database; 
 
     const result = await postComment(db, { checkId: request.params.checkId, authorDeviceToken: token, body: parsed.data.body });
     if (!result.ok) {
-      const status = result.error.kind === "not_found" ? 404 : result.error.kind === "comments_disabled_ongoing_event" ? 403 : 422;
+      const status =
+        result.error.kind === "not_found"
+          ? 404
+          : result.error.kind === "comments_disabled_ongoing_event" || result.error.kind === "check_not_published"
+            ? 403
+            : 422;
       return reply.status(status).send({ error: result.error.kind, message: result.error.message });
     }
     return reply.status(201).send(result.value);
