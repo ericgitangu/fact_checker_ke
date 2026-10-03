@@ -3,7 +3,7 @@ import { eq, count } from "drizzle-orm";
 import { schema, type Database } from "@fact-checker-ke/db";
 import type { Role } from "@fact-checker-ke/core";
 import { hashPassword, verifyPassword } from "./password.js";
-import { generateTotpSecret, totpUri, verifyTotpCode } from "./totp.js";
+import { generateTotpSecret, matchTotpCounter, totpUri } from "./totp.js";
 import { writeAuditLog } from "../audit.js";
 
 export type AuthResult<T> = { ok: true; value: T } | { ok: false; error: { kind: string; message: string } };
@@ -69,8 +69,8 @@ export class AuthService {
   async verifyTotpEnrollment(userId: string, code: string): Promise<AuthResult<{ verified: true }>> {
     const [row] = await this.db.select().from(schema.totpSecrets).where(eq(schema.totpSecrets.userId, userId)).limit(1);
     if (!row) return { ok: false, error: { kind: "not_found", message: "No TOTP enrollment in progress." } };
-    if (!verifyTotpCode(row.secretBase32, code)) {
-      return { ok: false, error: { kind: "invalid_code", message: "Invalid or expired TOTP code." } };
+    if (!(await this.verifyAndConsumeTotpCode(userId, row.secretBase32, code))) {
+      return { ok: false, error: { kind: "invalid_code", message: "Invalid, expired, or already-used TOTP code." } };
     }
 
     await this.db.transaction(async (tx) => {
@@ -84,14 +84,21 @@ export class AuthService {
 
   /**
    * ADR-0020 §4 / AT-0020-3: rejected unless the TARGET has verified
-   * MFA. `actorId: null` is the one-time bootstrap path — allowed ONLY
-   * to grant `admin` to a user granting it to THEMSELVES, and ONLY
-   * while zero admins exist yet (otherwise every later grant requires a
-   * real admin actor). This is the documented, narrow answer to "who
-   * grants the first admin" without a side-channel seed script.
+   * MFA. The bootstrap path (zero admins exist yet) is allowed ONLY
+   * when the AUTHENTICATED caller grants `admin` to THEMSELVES — this
+   * is the documented, narrow answer to "who grants the first admin"
+   * without a side-channel seed script. `actor` is always a real,
+   * authenticated identity (the caller's own session); there is no
+   * "fully unauthenticated" path — that was SEC-1 (2026-10-04
+   * security-hardening finding #1): a caller with no session at all
+   * could previously bootstrap-grant admin to an ARBITRARY other
+   * MFA-verified userId, not just to itself, as long as zero admins
+   * existed. The invariant enforced below is self-grant-only during the
+   * bootstrap window, not merely "zero admins exist" — once a real
+   * admin exists, only that admin's session may grant any role at all.
    */
   async grantRole(
-    actor: { id: string; role: Role | null } | null,
+    actor: { id: string; role: Role | null },
     targetUserId: string,
     role: Role,
   ): Promise<AuthResult<{ granted: true }>> {
@@ -101,7 +108,7 @@ export class AuthService {
     if (!target.mfaEnabled) {
       await this.db.transaction(async (tx) => {
         await writeAuditLog(tx, {
-          actorId: actor?.id ?? null,
+          actorId: actor.id,
           action: "role_grant_rejected_no_mfa",
           targetType: "user",
           targetId: targetUserId,
@@ -111,12 +118,31 @@ export class AuthService {
       return { ok: false, error: { kind: "mfa_required", message: "Target account has no verified TOTP enrollment." } };
     }
 
-    const isBootstrap = actor === null;
-    if (isBootstrap) {
-      const [row] = await this.db.select({ n: count() }).from(schema.users).where(eq(schema.users.role, "admin"));
-      const adminCount = row?.n ?? 0;
-      if (adminCount > 0 || role !== "admin") {
-        return { ok: false, error: { kind: "forbidden", message: "Bootstrap role grant is only valid for the first admin." } };
+    const [row] = await this.db.select({ n: count() }).from(schema.users).where(eq(schema.users.role, "admin"));
+    const adminCount = row?.n ?? 0;
+    const isBootstrapWindow = adminCount === 0;
+
+    if (isBootstrapWindow) {
+      // SEC-1: bootstrap may ONLY self-grant admin to the caller's own,
+      // freshly-enrolled account — never an arbitrary other userId,
+      // even though zero admins exist yet.
+      if (role !== "admin" || actor.id !== targetUserId) {
+        await this.db.transaction(async (tx) => {
+          await writeAuditLog(tx, {
+            actorId: actor.id,
+            action: "role_grant_rejected_bootstrap_scope",
+            targetType: "user",
+            targetId: targetUserId,
+            metadata: { requestedRole: role },
+          });
+        });
+        return {
+          ok: false,
+          error: {
+            kind: "forbidden",
+            message: "Bootstrap role grant is only valid for the caller's own account while no admin exists yet.",
+          },
+        };
       }
     } else if (actor.role !== "admin") {
       return { ok: false, error: { kind: "forbidden", message: "Only an admin may grant roles." } };
@@ -125,11 +151,11 @@ export class AuthService {
     await this.db.transaction(async (tx) => {
       await tx.update(schema.users).set({ role }).where(eq(schema.users.id, targetUserId));
       await writeAuditLog(tx, {
-        actorId: actor?.id ?? null,
+        actorId: actor.id,
         action: "role_granted",
         targetType: "user",
         targetId: targetUserId,
-        metadata: { grantedRole: role, bootstrap: isBootstrap },
+        metadata: { grantedRole: role, bootstrap: isBootstrapWindow },
       });
     });
 
@@ -191,7 +217,27 @@ export class AuthService {
   private async verifyLoginTotp(userId: string, code: string): Promise<boolean> {
     const [row] = await this.db.select().from(schema.totpSecrets).where(eq(schema.totpSecrets.userId, userId)).limit(1);
     if (!row || !row.verifiedAt) return false;
-    return verifyTotpCode(row.secretBase32, code);
+    return this.verifyAndConsumeTotpCode(userId, row.secretBase32, code);
+  }
+
+  /**
+   * SEC-3 (security-hardening finding #3, 2026-10-04): verifies `code`
+   * against `secret` AND atomically consumes the matched (userId,
+   * counter) pair so the same code can never be accepted twice, across
+   * BOTH enrollment-verification and login call sites (the replay store
+   * is keyed by userId, not by which endpoint is calling). A duplicate
+   * insert for an already-consumed counter (`ON CONFLICT DO NOTHING`,
+   * checked by rows-returned) is the replay rejection.
+   */
+  private async verifyAndConsumeTotpCode(userId: string, secret: string, code: string): Promise<boolean> {
+    const counter = matchTotpCounter(secret, code);
+    if (counter === null) return false;
+    const inserted = await this.db
+      .insert(schema.totpUsedCodes)
+      .values({ userId, counter })
+      .onConflictDoNothing({ target: [schema.totpUsedCodes.userId, schema.totpUsedCodes.counter] })
+      .returning({ id: schema.totpUsedCodes.id });
+    return inserted.length > 0;
   }
 
   async logout(rawToken: string): Promise<void> {
