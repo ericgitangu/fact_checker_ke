@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { getDeviceToken } from "../lib/device-token";
+import { detectSource } from "../lib/claim-source-detection";
+import { detectLanguages } from "../lib/language-detect";
+import { SourcePreview } from "../components/submit/source-preview";
+import { VideoMomentMarker } from "../components/submit/video-moment-marker";
+import { MediaDropzone } from "../components/submit/media-dropzone";
+import { LanguageChips } from "../components/submit/language-chips";
+import { NextStepsPreview } from "../components/submit/next-steps-preview";
+import { AwaitingReviewStamp } from "../components/submit/awaiting-review-stamp";
 
 type SubmitState =
   | { status: "idle" }
@@ -15,27 +23,36 @@ function randomIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
-  // Fallback for environments without crypto.randomUUID (older Safari);
-  // not cryptographically strong, but this key only needs to be unique
-  // per attempt, not unguessable.
   return `fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * The "smart input" submit screen (redesigned per owner escalation,
+ * 2026-10-03). One prominent field replaces the old cold 3-field form;
+ * everything else (video moment marker, media upload, language chips,
+ * next-steps preview) is progressive disclosure driven by client-side
+ * detection on what was pasted — see lib/claim-source-detection.ts and
+ * lib/language-detect.ts for the (heuristic, no-backend-call) detection
+ * logic itself.
+ */
 export function SubmitForm(): React.JSX.Element {
   const t = useTranslations("submit");
   const tCommon = useTranslations("common");
   const router = useRouter();
-  const [url, setUrl] = useState("");
+
+  const [rawInput, setRawInput] = useState("");
   const [quote, setQuote] = useState("");
-  const [timestampSec, setTimestampSec] = useState("");
+  const [timestampSec, setTimestampSec] = useState(0);
+  // Captured for the upload UI's own lifecycle, but NOT yet sent with the
+  // submission: SubmissionInputSchema (packages/core, read-only to this
+  // agent) has no field for an attached media asset id today. This is a
+  // documented gap, not a silent drop — see the final report's seam list.
+  const [uploadedAssetId, setUploadedAssetId] = useState<string | null>(null);
   const [state, setState] = useState<SubmitState>({ status: "idle" });
   const [isOffline, setIsOffline] = useState(
     typeof navigator !== "undefined" ? !navigator.onLine : false,
   );
 
-  // ADR-0028: no offline submission queueing in Phase 0-1 — disable
-  // submit with a clear message instead of silently queueing a claim
-  // that might go stale by the time it actually sends.
   useEffect(() => {
     const goOnline = () => setIsOffline(false);
     const goOffline = () => setIsOffline(true);
@@ -47,14 +64,33 @@ export function SubmitForm(): React.JSX.Element {
     };
   }, []);
 
+  const detection = useMemo(() => detectSource(rawInput), [rawInput]);
+  const languageSampleText = detection.kind === "text" ? detection.text : quote;
+  const languages = useMemo(
+    () => (languageSampleText.trim() ? detectLanguages(languageSampleText) : []),
+    [languageSampleText],
+  );
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (detection.kind === "empty") {
+      setState({ status: "error", message: t("error.empty") });
+      return;
+    }
     setState({ status: "submitting" });
     try {
-      const trimmedQuote = quote.trim();
-      const parsedTimestamp = timestampSec.trim() === "" ? undefined : Number(timestampSec);
       const deviceToken = await getDeviceToken();
       const idempotencyKey = randomIdempotencyKey();
+
+      const trimmedQuote = quote.trim();
+      const payload =
+        detection.kind === "url"
+          ? {
+              url: detection.url,
+              ...(detection.isVideoPlatform && trimmedQuote ? { quote: trimmedQuote } : {}),
+              ...(detection.isVideoPlatform && trimmedQuote ? { timestampSec } : {}),
+            }
+          : { text: detection.text };
 
       const res = await fetch("/api/submissions", {
         method: "POST",
@@ -63,13 +99,7 @@ export function SubmitForm(): React.JSX.Element {
           "idempotency-key": idempotencyKey,
           ...(deviceToken ? { "x-device-token": deviceToken } : {}),
         },
-        body: JSON.stringify({
-          url,
-          ...(trimmedQuote ? { quote: trimmedQuote } : {}),
-          ...(parsedTimestamp !== undefined && Number.isFinite(parsedTimestamp)
-            ? { timestampSec: parsedTimestamp }
-            : {}),
-        }),
+        body: JSON.stringify(payload),
       });
       if (res.status !== 202) {
         const body: unknown = await res.json().catch(() => ({}));
@@ -89,63 +119,76 @@ export function SubmitForm(): React.JSX.Element {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-4" aria-describedby={isOffline ? "offline-note" : undefined}>
+    <form onSubmit={handleSubmit} className="smart-submit" aria-describedby={isOffline ? "offline-note" : undefined}>
       {isOffline && (
         <p id="offline-note" className="form-note form-note-muted" role="status">
           {t("error.offline")}
         </p>
       )}
 
-      <div className="field">
-        <label htmlFor="url" className="field-label">
-          {t("field.url")}
+      <div className="smart-input-wrap">
+        <label htmlFor="smart-input" className="sr-only">
+          {t("smartInput.label")}
         </label>
-        <input
-          id="url"
-          name="url"
-          type="url"
-          required
-          placeholder="https://..."
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-      </div>
-
-      <div className="field">
-        <label htmlFor="quote" className="field-label">
-          {t("field.quote")}
-        </label>
-        <p className="field-help">{t("field.quoteHelp")}</p>
         <textarea
-          id="quote"
-          name="quote"
-          rows={2}
-          placeholder="&ldquo;...&rdquo;"
-          value={quote}
-          onChange={(e) => setQuote(e.target.value)}
+          id="smart-input"
+          className="smart-input"
+          placeholder={t("smartInput.placeholder")}
+          value={rawInput}
+          onChange={(e) => setRawInput(e.target.value)}
+          rows={3}
         />
       </div>
 
-      <div className="field">
-        <label htmlFor="timestampSec" className="field-label">
-          {t("field.timestamp")}
-        </label>
-        <input
-          id="timestampSec"
-          name="timestampSec"
-          type="number"
-          min={0}
-          max={86_400}
-          step={1}
-          placeholder="e.g. 95"
-          value={timestampSec}
-          onChange={(e) => setTimestampSec(e.target.value)}
-        />
-      </div>
+      {detection.kind === "url" && (
+        <>
+          <SourcePreview detection={detection} />
+          {detection.isVideoPlatform && (
+            <VideoMomentMarker
+              detection={detection}
+              timestampSec={timestampSec}
+              onTimestampChange={setTimestampSec}
+              quote={quote}
+              onQuoteChange={setQuote}
+            />
+          )}
+        </>
+      )}
 
-      <button type="submit" className="btn btn-primary" disabled={state.status === "submitting" || isOffline}>
-        {state.status === "submitting" ? tCommon("action.submitting") : tCommon("action.submit")}
-      </button>
+      {detection.kind === "text" && (
+        <span className="detected-pill reveal-in">
+          <span className="dot" aria-hidden="true" />
+          {t("detected.text")}
+        </span>
+      )}
+
+      {languages.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h3 style={{ fontSize: "0.85rem", color: "var(--ink-3)" }}>{t("languages.heading")}</h3>
+          <LanguageChips languages={languages} />
+        </div>
+      )}
+
+      <MediaDropzone onUploaded={setUploadedAssetId} />
+      {uploadedAssetId && (
+        // Honest gap, surfaced rather than hidden: SubmissionInputSchema
+        // (packages/core) has no field to carry an uploaded media asset
+        // id yet, so this upload is captured but not yet attached to the
+        // submission below. See the final report's seam list.
+        <p className="trust-note" role="status">
+          Media uploaded (asset {uploadedAssetId.slice(0, 8)}…) — not yet linked to this submission; that
+          contract needs a core schema update.
+        </p>
+      )}
+
+      <NextStepsPreview />
+
+      <div className="submit-cta-row" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <AwaitingReviewStamp />
+        <button type="submit" className="btn btn-primary" disabled={state.status === "submitting" || isOffline}>
+          {state.status === "submitting" ? tCommon("action.submitting") : tCommon("action.submit")}
+        </button>
+      </div>
 
       {state.status === "success" && (
         <p className="form-note form-note-success" role="status">

@@ -54,16 +54,50 @@
   "submit": {
     "heading": "fact_checker_ke",
     "lede": "Tuma kiungo au bandika maandishi. Tunanakili, tunatoa madai, tunalinganisha na vyanzo vinavyojulikana, na kuandaa uamuzi — daima hukaguliwa na binadamu kabla ya kuchapishwa.",
-    "field": {
-      "url": "Kiungo cha dai, video, au makala",
-      "quote": "Nukuu kamili kutoka kwa video (si lazima)",
-      "quoteHelp": "Kwa viungo vya video, tunahakiki maandishi uliyonukuu hapa badala ya kupakua sauti ya video. Acha wazi kwa makala au machapisho ya maandishi.",
-      "timestamp": "Muda, kwa sekunde (si lazima)"
+    "smartInput": {
+      "placeholder": "Bandika kiungo, au andika walichosema…",
+      "label": "Bandika kiungo au andika dai"
     },
+    "detected": {
+      "youtube": "Video ya YouTube imegunduliwa",
+      "tiktok": "Video ya TikTok imegunduliwa",
+      "x": "Chapisho kutoka X limegunduliwa",
+      "threads": "Chapisho la Threads limegunduliwa",
+      "news": "Kiungo cha makala kimegunduliwa",
+      "unknown": "Kiungo kimegunduliwa",
+      "text": "Maandishi huru — tutahakiki dai hili moja kwa moja"
+    },
+    "moment": {
+      "heading": "Weka alama ya wakati + dai",
+      "help": "Buruta hadi wakati walisema hivyo, kisha andika au bandika hasa walichosema — tunahakiki maandishi hayo yaliyonukuliwa, hatupakui au kukata video yenyewe.",
+      "claimPlaceholder": "mfano \"ukosefu wa ajira ulishuka hadi 2% mwaka jana\"",
+      "noEmbed": "Hatuna muonekano wa moja kwa moja kwa jukwaa hili bado — kiungo chenyewe bado kimetumwa na kitahakikiwa."
+    },
+    "upload": {
+      "heading": "Au shiriki picha au video yako",
+      "help": "Buruta faili hapa, bofya kuvinjari, au bandika kutoka kwenye ubao wako wa kunakili.",
+      "trust": "Mapakiwa huchunguzwa na kuondolewa data ya eneo/kifaa kwenye seva yetu kabla ya mhariri yeyote kuyapitia (ADR-0027).",
+      "rights": "Ninamiliki maudhui haya au nina haki ya kuyashiriki, siyo ya mtoto mdogo, na ninakubali matumizi yake kwa uhakiki wa habari.",
+      "uploading": "Inapakia…",
+      "uploaded": "Imepakiwa",
+      "remove": "Ondoa"
+    },
+    "languages": {
+      "heading": "Lugha iliyogunduliwa"
+    },
+    "nextSteps": {
+      "heading": "Kinachofuata",
+      "received": "Tunapokea dai lako",
+      "analyzing": "AI inaandaa uchambuzi",
+      "verifying": "Mhariri wa binadamu anakagua",
+      "ready": "Uamuzi unachapishwa"
+    },
+    "awaitingReview": "Inasubiri ukaguzi — si uamuzi bado",
     "success": "Imetumwa. Fuatilia inavyopitia mchakato.",
     "error": {
       "network": "Hitilafu ya mtandao — tafadhali jaribu tena.",
-      "offline": "Huna mtandao — kutuma dai jipya kunahitaji muunganisho."
+      "offline": "Huna mtandao — kutuma dai jipya kunahitaji muunganisho.",
+      "empty": "Bandika kiungo au andika dai kabla ya kutuma."
     }
   },
   "status": {
