@@ -1,0 +1,3 @@
+# ADR-0013: solo-owner repo. Review happens through the red-team step
+# (ADR-0019) recorded in the PR body, not a second approver.
+* @ericgitangu
