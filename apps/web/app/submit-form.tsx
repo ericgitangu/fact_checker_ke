@@ -10,16 +10,30 @@ type SubmitState =
 
 export function SubmitForm(): React.JSX.Element {
   const [url, setUrl] = useState("");
+  const [quote, setQuote] = useState("");
+  const [timestampSec, setTimestampSec] = useState("");
   const [state, setState] = useState<SubmitState>({ status: "idle" });
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setState({ status: "submitting" });
     try {
+      // `quote`/`timestampSec` only apply to URL submissions (ADR-0002: we
+      // check a user-supplied quote for third-party video, never download
+      // audio). The API (SubmissionInputSchema) re-validates this; omitting
+      // empty values here just avoids sending stray blank fields.
+      const trimmedQuote = quote.trim();
+      const parsedTimestamp = timestampSec.trim() === "" ? undefined : Number(timestampSec);
       const res = await fetch("/api/submissions", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({
+          url,
+          ...(trimmedQuote ? { quote: trimmedQuote } : {}),
+          ...(parsedTimestamp !== undefined && Number.isFinite(parsedTimestamp)
+            ? { timestampSec: parsedTimestamp }
+            : {}),
+        }),
       });
       if (res.status !== 202) {
         const body: unknown = await res.json().catch(() => ({}));
@@ -52,6 +66,40 @@ export function SubmitForm(): React.JSX.Element {
         onChange={(e) => setUrl(e.target.value)}
         className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
       />
+
+      <label htmlFor="quote" className="text-sm font-medium">
+        Exact quote from the video (optional)
+      </label>
+      <p className="text-xs text-zinc-500">
+        For video links, we check the text you quote here rather than downloading the
+        video&rsquo;s audio. Leave blank for articles or text posts.
+      </p>
+      <textarea
+        id="quote"
+        name="quote"
+        rows={2}
+        placeholder="“...”"
+        value={quote}
+        onChange={(e) => setQuote(e.target.value)}
+        className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+      />
+
+      <label htmlFor="timestampSec" className="text-sm font-medium">
+        Timestamp, in seconds (optional)
+      </label>
+      <input
+        id="timestampSec"
+        name="timestampSec"
+        type="number"
+        min={0}
+        max={86_400}
+        step={1}
+        placeholder="e.g. 95"
+        value={timestampSec}
+        onChange={(e) => setTimestampSec(e.target.value)}
+        className="rounded border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
+      />
+
       <button
         type="submit"
         disabled={state.status === "submitting"}
