@@ -1,17 +1,17 @@
+import { getTranslations } from "next-intl/server";
 import { SubmitForm } from "./submit-form";
 
-export default function Home(): React.JSX.Element {
+export default async function Home(): Promise<React.JSX.Element> {
+  const t = await getTranslations("submit");
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center gap-8 px-6 py-16">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">fact_checker_ke</h1>
-        <p className="max-w-xl text-zinc-600 dark:text-zinc-400">
-          Submit a link or paste text. We transcribe, extract claims, run retrieval
-          against known sources, and draft a verdict — always reviewed by a human
-          before it is published.
-        </p>
+    <div className="shell-narrow flex flex-col items-center gap-10 text-center">
+      <div className="flex flex-col items-center gap-3">
+        <h1 style={{ fontFamily: "var(--sans-x)", fontSize: "clamp(2rem, 4.5vw, 3.2rem)" }}>
+          {t("heading")}
+        </h1>
+        <p style={{ maxWidth: "46ch", color: "var(--ink-2)" }}>{t("lede")}</p>
       </div>
       <SubmitForm />
-    </main>
+    </div>
   );
 }
