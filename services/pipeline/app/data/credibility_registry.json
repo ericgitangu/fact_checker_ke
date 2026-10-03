@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "last_reviewed": "2026-10-03",
+  "sources": [
+    {
+      "source": "knbs.or.ke",
+      "tier": "tier1_primary",
+      "notes": "Kenya National Bureau of Statistics - primary statistical releases."
+    },
+    {
+      "source": "kenyalaw.org",
+      "tier": "tier1_primary",
+      "notes": "Kenya Law - court rulings, Acts of Parliament, gazette notices."
+    },
+    {
+      "source": "treasury.go.ke",
+      "tier": "tier1_primary",
+      "notes": "National Treasury - budget statements, fiscal releases."
+    },
+    {
+      "source": "centralbank.go.ke",
+      "tier": "tier1_primary",
+      "notes": "Central Bank of Kenya - monetary policy, rates, FX data."
+    },
+    {
+      "source": "iebc.or.ke",
+      "tier": "tier1_primary",
+      "notes": "Independent Electoral and Boundaries Commission - official results."
+    },
+    {
+      "source": "parliament.go.ke",
+      "tier": "tier1_primary",
+      "notes": "Hansard and official parliamentary records."
+    },
+    {
+      "source": "pesacheck.org",
+      "tier": "tier2_established_media",
+      "notes": "Established East African fact-checking outlet; IFCN signatory."
+    },
+    {
+      "source": "africacheck.org",
+      "tier": "tier2_established_media",
+      "notes": "Established pan-African fact-checking outlet; IFCN signatory."
+    },
+    {
+      "source": "nation.africa",
+      "tier": "tier2_established_media",
+      "notes": "Daily Nation / Nation Media Group - established national outlet."
+    },
+    {
+      "source": "standardmedia.co.ke",
+      "tier": "tier2_established_media",
+      "notes": "The Standard - established national outlet."
+    },
+    {
+      "source": "citizen.digital",
+      "tier": "tier2_established_media",
+      "notes": "Citizen TV / Royal Media Services - established national broadcaster."
+    },
+    {
+      "source": "the-star.co.ke",
+      "tier": "tier3_general",
+      "notes": "The Star - general national outlet, mixed editorial track record."
+    }
+  ]
+}

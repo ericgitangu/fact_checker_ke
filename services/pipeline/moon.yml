@@ -29,7 +29,11 @@ tasks:
       - '@group(tests)'
 
   typecheck:
-    command: 'uv run mypy app/models'
+    # Widened from `mypy app/models` to the whole `app` package: the
+    # verification-pipeline baseline (ADR-0004/0011/0023) added stages,
+    # protocols, clients and stores that must stay mypy --strict clean too,
+    # not just the generated/domain models.
+    command: 'uv run mypy app'
     # ADR-0014: the codegen graph edge. app/models/generated.py is derived
     # from packages/core's zod schemas -- regenerate before typechecking so
     # a stale generated.py never passes typecheck against drifted models.
@@ -37,6 +41,16 @@ tasks:
       - 'core:gen-contracts'
     inputs:
       - '@group(sources)'
+
+  eval:
+    # ADR-0004/0023 eval harness scaffold: claim/opinion classification
+    # precision/recall/F1 on the starter 20-claim (8 en/7 sw/5 sheng) set.
+    # Not part of `moon ci` (it's a reporting tool, not a pass/fail gate --
+    # the 100-claim/30-Sheng threshold gate remains an explicit open AT).
+    command: 'uv run python -m app.eval'
+    inputs:
+      - '@group(sources)'
+      - 'app/eval/fixtures/*.jsonl'
 
   test:
     command: 'uv run pytest'
