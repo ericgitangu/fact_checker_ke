@@ -54,8 +54,69 @@ Source: fact_checker_ke ADR set red-team report, Section D #5-#8 (blocker/high s
 
 | ID | Behaviour | Status |
 |---|---|---|
-| AT-0004-A | A user-supplied quote on a named person gets `attribution: unverified`. No rating is rendered until an editor confirms the quote against the embed at the timestamp. | RED |
-| AT-0004-B | A draft that involves a named person returns evidence and sources only, with `rating: null`, to the submitter. | RED |
-| AT-0004-C | Every `citations[].doc_id` is in the retrieved set, every quoted span substring-matches the archived snapshot, otherwise the draft is rejected. | RED |
-| AT-0004-D | Negation, number, date and entity mismatches block claim-dedup reuse. Reused checks show `valid_as_of`. | RED |
-| AT-0004-E | The 100-claim eval set includes at least 30 Sheng items. Claim/opinion F1 must clear a threshold before launch. At least 10% of dropped items are sampled to editors. | RED |
+| AT-0004-A | A user-supplied quote on a named person gets `attribution: unverified`. No rating is rendered until an editor confirms the quote against the embed at the timestamp. | RED (owned by services/api + editor UI; see note below) |
+| AT-0004-B | A draft that involves a named person returns evidence and sources only, with `rating: null`, to the submitter. | RED (owned by services/api + editor UI; see note below) |
+| AT-0004-C | Every `citations[].doc_id` is in the retrieved set, every quoted span substring-matches the archived snapshot, otherwise the draft is rejected. | GREEN |
+| AT-0004-D | Negation, number, date and entity mismatches block claim-dedup reuse. Reused checks show `valid_as_of`. | GREEN |
+| AT-0004-E | The 100-claim eval set includes at least 30 Sheng items. Claim/opinion F1 must clear a threshold before launch. At least 10% of dropped items are sampled to editors. | SCAFFOLD (GREEN on harness/sampling; 100-claim/30-Sheng threshold gate stays RED/open, see note) |
+
+## Implementation notes (services/pipeline baseline, 2026-10-03)
+
+Implements the pipeline-owned baseline: `POST /hops/analyze` (normalize via
+pass-through for text, claim detection + language-ID + inline EN
+translation in one Haiku-4.5-class call) and `POST /hops/verify` (embed via
+`Embedder` Protocol, dedup gate, retrieve from `CheckStore` + Google Fact
+Check Tools API, draft verdict via Sonnet-5.5-class structured output,
+citation-integrity gate). See `services/pipeline/app/stages/analyze.py`,
+`app/stages/verify.py`, `app/stages/dedup_guard.py`,
+`app/stages/citation_guard.py`.
+
+- **AT-0004-C** (citation integrity): `app/stages/citation_guard.py`
+  enforces doc_id-in-retrieved-set and substring-match in code, never
+  trusting the model. Tests: `tests/test_citation_guard.py`,
+  `scripts/at/at-0004.sh`.
+- **AT-0004-D** (dedup guard): `app/stages/dedup_guard.py` implements a
+  deterministic (regex/keyword, not ML) negation/number/date/entity
+  comparator for en + sw, gating reuse alongside the cosine-similarity
+  threshold (`DEDUP_TAU = 0.92` in `app/stages/verify.py`, not yet tuned
+  against a real eval set — tracked as tech debt). Tests:
+  `tests/test_dedup_guard.py`, `tests/test_verify_hop.py`.
+- **AT-0004-E** (eval harness): `app/eval/__main__.py` (`uv run python -m
+  app.eval`, wired as moon task `pipeline:eval`) runs the 20-claim starter
+  fixture set (`app/eval/fixtures/claims.jsonl`: 8 en / 7 sw / 5 Sheng) and
+  prints per-class precision/recall/F1. This is a scaffold only: the
+  100-claim/>=30-Sheng set and an agreed launch F1 threshold remain an
+  **explicit open AT**, not faked. Sampling of dropped (non-checkable)
+  items to editors at >=10% is implemented in
+  `app/stages/analyze.py:_apply_editor_sampling` and covered by
+  `tests/test_analyze_hop.py`.
+- **AT-0004-A / AT-0004-B** (named-person gating, rating withheld
+  pre-editor-approval): these are **services/api + editor UI** concerns
+  (rendering rules, approval workflow) and are out of scope for this
+  change's file ownership (`services/pipeline/**` only). The pipeline does
+  its part: `app/stages/analyze.py` sets `attribution: "unverified"` for
+  video-URL submissions and never fabricates a transcript (ADR-0004
+  amendment #6); `app/stages/verify.py` computes a rating regardless of
+  `named_person_involved` and documents, at the call site, that the API
+  layer is responsible for withholding it pre-approval (amendment #5).
+  Left RED here — flipped by the wave-2 integrator once services/api
+  implements the rendering/approval rule.
+
+**Deviations / tech debt (explicit, not buried):**
+- `CheckStore` and the Fact Check Tools 24h cache are in-memory only
+  (sqlite `:memory:` / dict-backed) for this baseline — the real Postgres
+  (Neon) read lands at wave-2 integration (`packages/db` out of scope
+  here). Process-lifetime only; acceptable for now since the pipeline
+  worker itself is stateless/scale-to-zero between requests, but flagged.
+- The dedup similarity threshold (`DEDUP_TAU`) and the entity/number/date
+  extraction in `dedup_guard.py` are regex/keyword heuristics, not a
+  trained NER model — deliberately conservative (over-reject, never
+  under-reject) per the module's own docstring.
+- `app/models/hop_requests.py` is explicitly marked TEMPORARY pending
+  wave-2 reconciliation with the real `packages/core` event schemas
+  (ADR-0017).
+- The embedder (`intfloat/multilingual-e5-small` via fastembed, 384-dim)
+  defaults to a deterministic `FakeEmbedder` unless
+  `PIPELINE_USE_REAL_EMBEDDER=1` is set, keeping default test runs
+  network-free; real-embedder behaviour is therefore only exercised when
+  that flag is set (see `app/clients/embedder_factory.py`).

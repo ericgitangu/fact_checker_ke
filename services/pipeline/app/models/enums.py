@@ -21,9 +21,9 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from app.models.generated import ClaimType, Rating
+from app.models.generated import ClaimType, CredibilityTier, Rating
 
-__all__ = ["ClaimType", "PipelineStage", "Rating"]
+__all__ = ["ClaimType", "CredibilityTier", "PipelineStage", "Rating"]
 
 
 class PipelineStage(StrEnum):

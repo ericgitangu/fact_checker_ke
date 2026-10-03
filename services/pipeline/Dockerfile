@@ -12,6 +12,23 @@
 # Build context = services/pipeline (not repo root): the pipeline is a
 # standalone uv project with no dependency on the pnpm workspace, so a
 # narrower context keeps the build fast. See services/pipeline/.dockerignore.
+#
+# IMAGE SIZE FLAG (not hidden, per the verification-pipeline baseline
+# change): this image measured ~478MB after adding fastembed/onnxruntime/
+# numpy/pillow (the Embedder's real backend, ADR-0004 step 3) and the
+# anthropic SDK -- over the 400MB target. onnxruntime + numpy + pillow
+# (fastembed's transitive deps) are the bulk of the add. The fastembed
+# model itself is NOT downloaded at build or first-call in this image (the
+# default Embedder is the in-memory FakeEmbedder; FastEmbedEmbedder is
+# only constructed when PIPELINE_USE_REAL_EMBEDDER=1 is set, see
+# app/clients/embedder_factory.py), so the measured size is the *library*
+# cost alone -- the ONNX model weights (tens of MB more) are a further,
+# separate add the first time a real embed() call runs in a deployed
+# environment with that flag set. Tracked as tech debt, not resolved here:
+# options to revisit are (a) a slimmer ONNX-only install instead of the
+# full `fastembed` extras, or (b) moving embedding to a separate, smaller
+# service/image (the ADR-0009 Rust-service roadmap already points this
+# direction for a different reason: performance, not just image size).
 
 FROM dhi.io/python:3.12-debian12-dev@sha256:86d4db28585ae3de3bc0e4c21e42d3a1404ef20b4b858decd48134836ace7cf3 AS build
 WORKDIR /app
