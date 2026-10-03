@@ -1,23 +1,18 @@
 import type { NextConfig } from "next";
-import withSerwistInit from "@serwist/next";
-
-const withSerwist = withSerwistInit({
-  swSrc: "app/sw.ts",
-  swDest: "public/sw.js",
-  // @serwist/next's plugin only supports webpack, not Turbopack (Next.js
-  // 16's default) — see https://github.com/serwist/serwist/issues/54. The
-  // dev/build scripts in package.json pass `--webpack` explicitly so this
-  // plugin has a bundler it can hook into. Also disabled outside production
-  // so a stale cached service worker doesn't fight hot reload in dev.
-  disable: process.env.NODE_ENV !== "production",
-});
+import { withSerwist } from "@serwist/turbopack";
 
 const nextConfig: NextConfig = {
   // packages/core is consumed as TypeScript source (workspace:*), not a
-  // prebuilt dist — this tells Next's webpack build to transpile it and to
-  // resolve its NodeNext-style `./foo.js` specifiers against the `.ts` files
-  // that actually exist on disk.
+  // prebuilt dist — this tells Next to transpile it and to resolve its
+  // NodeNext-style `./foo.js` specifiers against the `.ts` files that
+  // actually exist on disk.
   transpilePackages: ["@fact-checker-ke/core"],
 };
 
+// @serwist/turbopack (stable since 9.5, see
+// https://serwist.pages.dev/docs/next/turbo) builds the service worker via a
+// Next.js Route Handler (app/serwist/[path]/route.ts) that runs esbuild at
+// build time, instead of hooking into webpack like @serwist/next did. That
+// is what lets `next build`/`next dev` run on Turbopack (Next 16's default)
+// without the `--webpack` flag.
 export default withSerwist(nextConfig);
