@@ -1,4 +1,4 @@
-import type { Check, Submission } from "@fact-checker-ke/core";
+import type { Check, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
 
 /**
  * Result type for repository operations that can fail in an expected way.
@@ -18,4 +18,14 @@ export interface SubmissionRepository {
 
 export interface CheckRepository {
   getById(id: string): Promise<RepoResult<Check>>;
+}
+
+export interface WaitlistRepository {
+  /**
+   * Inserts a signup, idempotent on normalised email. Returns
+   * `{status:"joined"}` on first insert, `{status:"already_joined"}` if
+   * the email already exists — never an error for the duplicate case,
+   * since that's an expected, successful outcome for the caller.
+   */
+  join(input: WaitlistSignupInput): Promise<RepoResult<WaitlistSignupResult>>;
 }
