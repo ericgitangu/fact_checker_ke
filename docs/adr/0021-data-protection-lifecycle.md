@@ -56,8 +56,16 @@ Revisit on any ODPC correspondence, the advocate's answer on cross-border basis,
 ## Acceptance tests
 | ID | Behaviour | Status |
 |---|---|---|
-| AT-0021-1 | An unpublished anonymous submission with no claim found is gone from Postgres 30 days after creation (sweep job, integration test against a seeded `created_at`) | RED |
-| AT-0021-2 | An upload's EXIF GPS tags are absent from the stored file before any detector runs; the row is deleted from GCS within 24h of analysis completion | RED |
-| AT-0021-3 | Log entries for any `/maandamano/*` request have the IP's last octet/segment zeroed at the sink, verified on a live log export | RED |
-| AT-0021-4 | A DSAR export for a known device token returns that token's submissions and drafts but never a published check's evidence file | RED |
-| AT-0021-5 | The privacy notice page states that data is processed in the EU, and this string is covered by a snapshot/contract test so it can't silently regress | RED |
+| AT-0021-1 | An unpublished anonymous submission with no claim found is gone from Postgres 30 days after creation (sweep job, integration test against a seeded `created_at`) | GREEN (anonymous-submission AND named-person-draft sweep both landed — see implementation notes) |
+| AT-0021-2 | An upload's EXIF GPS tags are absent from the stored file before any detector runs; the row is deleted from GCS within 24h of analysis completion | RED (no upload pipeline in services/api to strip EXIF from or delete — ADR-0006/infra territory, explicit stub) |
+| AT-0021-3 | Log entries for any `/maandamano/*` request have the IP's last octet/segment zeroed at the sink, verified on a live log export | RED (log-sink/Terraform concern — infra/** territory, explicit stub) |
+| AT-0021-4 | A DSAR export for a known device token returns that token's submissions and drafts but never a published check's evidence file | RED, partial (comments slice is real; submissions/drafts are NOT keyed by device token anywhere in the schema yet — explicit stub, see implementation notes, not silently faked) |
+| AT-0021-5 | The privacy notice page states that data is processed in the EU, and this string is covered by a snapshot/contract test so it can't silently regress | RED (apps/web territory — no privacy-notice page exists in this wave's ownership) |
+
+## Implementation notes ("People & adjudication" wave, 2026-10-03)
+
+- **Retention table as data** (`retention_policy`, seeded by `db/migrations/0006_seed_retention_policy.sql` with this ADR's own table's rows — `retention_days: null` means indefinite). `services/api/src/lib/retention.ts#runRetentionSweep` reads the two sweepable periods (`anonymous_submission_no_claim`, `named_person_draft`) from this table rather than hardcoding them, so a future period change is a data edit, not a code change.
+- **Invoked from the EXISTING sweeper, not a new cron** (task brief's explicit instruction): `POST /internal/outbox/drain` (`services/api/src/routes/internal.ts`) now also runs `runRetentionSweep` and returns its counts alongside the existing `drained`/`failed`/`idempotencyKeysCleaned` fields.
+- **"No claim found"** is operationalized as "no `checks` row references this submission at all" (a `NOT EXISTS` subquery) — a submission that produced a check (draft or published) is never swept by this path even past 30 days, regardless of status.
+- **Verified empirically against real Neon Postgres** (`services/api/src/__tests__/retention.integration.test.ts`): a submission backdated 31 days with no check is deleted; a fresh one and one with a check survive; a named-person draft backdated 91 days is deleted, a fresh one survives.
+- **Explicit stubs, not faked** (AT-0021-2/3/4/5): see the AT table's per-row notes above. The common thread is that each needs either an upload pipeline, a log-sink/Terraform change, a device-token-keyed submissions schema, or an apps/web page — none of which exist in or belong to this wave's `services/api`/`packages/db`/`packages/core` ownership. `services/api/src/lib/retention.ts#runDsarExport` is written and wired to `dsar_requests` + `audit_log` for the slice that DOES exist (comments, keyed by `authorDeviceHash`), with its submissions/drafts fields explicitly returning `[]` and a code comment pointing at the schema gap, rather than silently claiming a full export.
