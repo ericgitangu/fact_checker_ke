@@ -1,0 +1,330 @@
+{
+  "round": "A",
+  "dataset": "google/fleurs sw_ke test, first 30 by id",
+  "n_clips": 30,
+  "mutual_success_clip_ids": [
+    "fleurs_sw_ke_01660",
+    "fleurs_sw_ke_01661",
+    "fleurs_sw_ke_01662",
+    "fleurs_sw_ke_01663",
+    "fleurs_sw_ke_01664",
+    "fleurs_sw_ke_01665",
+    "fleurs_sw_ke_01666",
+    "fleurs_sw_ke_01667",
+    "fleurs_sw_ke_01668",
+    "fleurs_sw_ke_01669",
+    "fleurs_sw_ke_01671",
+    "fleurs_sw_ke_01672",
+    "fleurs_sw_ke_01674",
+    "fleurs_sw_ke_01675",
+    "fleurs_sw_ke_01676",
+    "fleurs_sw_ke_01677",
+    "fleurs_sw_ke_01678",
+    "fleurs_sw_ke_01679",
+    "fleurs_sw_ke_01680",
+    "fleurs_sw_ke_01681",
+    "fleurs_sw_ke_01683",
+    "fleurs_sw_ke_01684",
+    "fleurs_sw_ke_01685",
+    "fleurs_sw_ke_01686",
+    "fleurs_sw_ke_01687",
+    "fleurs_sw_ke_01688",
+    "fleurs_sw_ke_01689",
+    "fleurs_sw_ke_01690",
+    "fleurs_sw_ke_01691",
+    "fleurs_sw_ke_01692"
+  ],
+  "n_mutual_success": 30,
+  "mutual_success_wer_by_provider": {
+    "gemini-2.5-flash-vertex": 0.184375,
+    "gcp-stt-v2-chirp_2": 0.078125
+  },
+  "providers": [
+    {
+      "provider": "gemini-2.5-flash-vertex",
+      "endpoint": "vertexai generateContent, project=master-crossing-435409-r1, region=us-central1, model=gemini-2.5-flash",
+      "terms_class": "Vertex AI paid tier (Google Cloud terms, no-train) — ADR-0005 compliant",
+      "clips_total": 30,
+      "clips_ok": 30,
+      "wer_full_set": 0.184375,
+      "median_latency_s": 2.8265000000000002,
+      "est_cost_usd_total": 0.006646,
+      "failures": []
+    },
+    {
+      "provider": "gcp-stt-v2-chirp_2",
+      "endpoint": "speech.googleapis.com v2 recognize, region=us-central1, model=chirp_2",
+      "terms_class": "Google Cloud STT v2 (Cloud terms, no-train, paid per-use)",
+      "clips_total": 30,
+      "clips_ok": 30,
+      "wer_full_set": 0.078125,
+      "median_latency_s": 3.1715,
+      "est_cost_usd_total": 0.172,
+      "failures": []
+    },
+    {
+      "provider": "aws-transcribe-sw-ke",
+      "endpoint": "SKIPPED (not run this round)",
+      "terms_class": "n/a — not invoked",
+      "clips_total": 30,
+      "clips_ok": 0,
+      "wer_full_set": null,
+      "median_latency_s": null,
+      "est_cost_usd_total": 0.0,
+      "failures": [
+        {
+          "clip_id": "fleurs_sw_ke_01660",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01661",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01662",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01663",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01664",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01665",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01666",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01667",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01668",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01669",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01671",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01672",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01674",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01675",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01676",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01677",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01678",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01679",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01680",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01681",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01683",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01684",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01685",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01686",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01687",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01688",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01689",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01690",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01691",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01692",
+          "error": "Round A scope cut: AWS Transcribe batch requires a per-clip S3 upload/poll/fetch/cleanup round-trip; skipped to stay inside the 15-minute plumbing budget for this round. Auth itself was verified working (`aws sts get-caller-identity` succeeded)."
+        }
+      ]
+    },
+    {
+      "provider": "whisper-large-v3-local",
+      "endpoint": "SKIPPED (not run this round)",
+      "terms_class": "n/a — not invoked",
+      "clips_total": 30,
+      "clips_ok": 0,
+      "wer_full_set": null,
+      "median_latency_s": null,
+      "est_cost_usd_total": 0.0,
+      "failures": [
+        {
+          "clip_id": "fleurs_sw_ke_01660",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01661",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01662",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01663",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01664",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01665",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01666",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01667",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01668",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01669",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01671",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01672",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01674",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01675",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01676",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01677",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01678",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01679",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01680",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01681",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01683",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01684",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01685",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01686",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01687",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01688",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01689",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01690",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01691",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        },
+        {
+          "clip_id": "fleurs_sw_ke_01692",
+          "error": "Round A scope cut: faster-whisper large-v3 CPU run (plus ~3GB model download) skipped to stay inside the time budget; ADR-0005 already holds a published FLEURS sw_ke Whisper large-v3 anchor (31.0-32.4% WER [V]) for comparison."
+        }
+      ]
+    }
+  ]
+}

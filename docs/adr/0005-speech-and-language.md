@@ -100,3 +100,57 @@ Cost math (ai.google.dev/gemini-api/docs/pricing, fetched 2026-10-03 — Vertex 
 | Newer option noted | Gemini 3.8 Flash exists ($0.75/MTok promo input through 2026-12-31, $1.50 after; audio price not separately listed) — the eval harness tests whichever Flash generation Vertex serves; a model-generation bump re-runs Round A, it does not reopen the provider decision |
 
 ADR-0029's variable-cost line for STT is corrected by this table: ~$0.00225/min (Gemini) not $0.016/min (Chirp assumption) — an ~86% reduction in the modelled STT unit cost.
+
+**Note on this section's own unlock condition, added when the Round A results below landed:** this lock-in states it "stays locked only while it wins or ties Round A WER on our harness." The Round A run immediately below has Gemini at 18.4% WER vs Chirp's 7.8% -- Gemini does not win or tie. Per this section's own rule, the lock is unlocked pending the owner's review; nothing above is edited to reflect that (out of scope for this append), but the condition and the result are now both on the record in the same document.
+
+---
+## WER Round A results (2026-10-03)
+
+Harness: `eval/asr/` (self-contained `uv` project). Run with `uv run python -m asr_eval run` from `eval/asr/`; acceptance checks in `scripts/at/at-0005.sh`. Raw hypotheses, per-clip latency/cost and failure reasons are committed at `eval/asr/results/*.jsonl` + `results/summary.json` (audio itself is gitignored, never committed).
+
+### Dataset and normaliser
+- **google/fleurs, config `sw_ke`, split `test`** (487 rows total) — public read-speech, CC-BY-4.0, reference transcripts shipped by the dataset. Not user content, so eval use is compliant under this ADR's unpaid/paid split regardless; we ran it on paid endpoints anyway (see below).
+- **Selection, corrected after a live bug catch:** FLEURS's `id` field is a **sentence id, not a unique row id** — verified empirically that 175/487 rows in this split share an `id` with another row (same sentence, different speaker recording). A first attempt at "sort by id, take first 30" silently collided clip_ids and overwrote 11 of 30 wav files before any provider read them (caught via a unique-id sanity check on the committed manifest, not assumed away). Fixed selection: first 30 **distinct** `id` values ascending, one row (lowest original dataset index) per id. `eval/asr/results/manifest.json` records the exact clip ids, reference text and durations used.
+- **Normaliser** (`eval/asr/asr_eval/normalize.py`): lowercase, strip punctuation/quotes/brackets, collapse whitespace, NFC-normalise. Applied identically to every reference and every hypothesis before `jiwer.wer`.
+- **Coverage gap, stated explicitly, not hidden:** Round A is clean, studio-quality read speech only — **0 Sheng/code-switched and 0 noisy/crowd clips**. This does NOT satisfy AT-0005-1 (`>=10` of each required). `results/manifest.json`'s `coverage_gap` field records this on every run.
+
+### Provider endpoints and data-terms class
+| Provider | Endpoint | Terms class |
+|---|---|---|
+| Gemini 2.5 Flash | Vertex AI `generateContent`, project `master-crossing-435409-r1`, region `us-central1` | **Vertex AI paid tier**, Google Cloud terms (no-train) — reached via `vertexai=True` in `google-genai`, never the public AI-Studio/unpaid endpoint. ADR-0005-compliant by construction. |
+| GCP Chirp | Speech-to-Text v2 `recognize`, region `us-central1`, model `chirp_2` | Google Cloud STT v2, Cloud terms (no-train), paid per-use. |
+| AWS Transcribe sw-KE | not invoked | n/a — scope cut, see below. |
+| Whisper large-v3 | not invoked | n/a — scope cut, see below. |
+
+**Correction to round-2's provider facts [V-OBSERVED, supersedes the `[V2-SECONDARY]` claim above]:** round 2 said "Google STT v2 Chirp 3 lists sw-KE (Preview)." Live-tested today against `master-crossing-435409-r1`: `chirp_3` returns `400 INVALID_ARGUMENT: model does not exist` in `us-central1`, `europe-west4`, and the `global` endpoint. **`chirp_2`** does accept language code `sw-KE` in `us-central1` (a recognizer was created and deleted there as a live check) and is what Round A actually used. Legacy `chirp` (v1-style) rejects `sw-KE` outright in `us-central1`. Chirp 3/sw-KE may exist for allowlisted projects or other regions, but was not reproducible here — re-check before relying on it.
+
+**Auth note (operational, not a provider fact):** both Google SDK calls had to be pointed at explicit short-lived credentials from `gcloud auth print-access-token` (the active CLI account, `developer.ericgitangu@gmail.com`, authorized on this project) rather than this machine's `gcloud auth application-default` credentials, which are logged into a *different* Google account/quota project (`the.ace.guru@gmail.com` / `pawacloud-assessment`) and got `403 PERMISSION_DENIED` on both `aiplatform.endpoints.predict` and `speech.recognizers.create`. No global ADC config was changed; the fix is scoped to `eval/asr/asr_eval/providers/gemini_vertex.py::_gcloud_cli_credentials()`.
+
+### Results table (live run, 2026-10-03)
+| Provider | clips_ok | WER (full set) | median latency | est. cost | endpoint / terms |
+|---|---|---|---|---|---|
+| **gcp-stt-v2-chirp_2** | 30/30 | **7.8%** | 3.17s | $0.1720 | Cloud STT v2, paid, no-train |
+| gemini-2.5-flash-vertex | 30/30 | 18.4% (range across 3 runs: 12.7–18.4%, LLM sampling is non-deterministic — temperature was not pinned) | 2.83s | $0.0066 | Vertex AI, paid, no-train |
+| aws-transcribe-sw-ke | 0/30 | n/a | n/a | $0 | **skipped** |
+| whisper-large-v3-local | 0/30 | n/a | n/a | $0 | **skipped** |
+
+Mutual-success WER (all 30 clips succeeded for both live providers, so this equals the full-set number for each): Chirp 7.8%, Gemini 18.4%. No cherry-picking: both the full-set and mutual-success numbers are reported, and they're identical here because there were no failures on either provider.
+
+**Total estimated spend across the whole Round A exercise (multiple harness runs while debugging the id-collision bug above): ~$0.55**, all on paid Vertex/Cloud endpoints. Single clean run: $0.1786. Both well under the $2 cap.
+
+**Skips, with reasons (not silent):**
+- **AWS Transcribe sw-KE:** `aws sts get-caller-identity` succeeded non-interactively (auth confirmed working), but the batch API's per-clip S3 upload/poll/fetch/cleanup round-trip exceeded the 15-minute plumbing budget set for this round. Scope cut, not a failure.
+- **faster-whisper large-v3 (local anchor):** skipped to avoid the ~3GB model download plus CPU inference time on 30 clips within this round's time budget. This ADR already holds a published FLEURS sw_ke Whisper large-v3 number (31.0–32.4% WER, `[V]`) as the anchor.
+
+### A finding worth flagging: Gemini silent empty-transcript on sensitive-but-legal content
+Clip `fleurs_sw_ke_01671` (reference: *"...FBI lazima itoe makachero kumi kwa ponografia ya watu wazima"* — Bunge-committee language about FBI anti-pornography investigators, entirely legitimate policy speech) came back from Gemini as `ok: true`, **empty transcript**, 28.4s latency, no error surfaced. GCP Chirp transcribed the same clip correctly. This looks like a silent safety-filter drop on a legal-but-sensitive topic, not a transcription failure in the normal sense — and it is exactly the failure mode ADR-0005's "machine transcription invents or omits claims, which here is a defamation/omission hazard" language is about. **Risk for production:** a provider that silently returns nothing (rather than erroring) on politically sensitive Kenyan speech could cause real claims to vanish from the pipeline with no operator-visible signal. Recorded here as a provider-selection input, not yet mitigated; Round B should specifically include Bunge-style sensitive-topic clips to see if this reproduces.
+
+### Provisional winner, per the gate, with caveats
+**GCP STT v2 Chirp_2 is the provisional Round A winner** (7.8% WER vs Gemini's 18.4%, both far under the 25% disqualification gate). **Caveat, stated loudly: FLEURS is clean, studio-quality, single-sentence read speech.** It contains no Sheng, no code-switching, no crowd noise, and no live/compressed-stream artifacts — exactly the conditions ADR-0005's "no data on Sheng, code-switching or noisy livestream audio [GAP]" called out from day one. This result says nothing about performance on the content this product actually has to transcribe. Gemini's silent-empty-transcript behavior on sensitive content (above) is also a material input the WER number alone doesn't capture, and Gemini's non-deterministic output (temperature unpinned) makes its WER number noisier run-to-run than Chirp's.
+
+**What Round B still requires (unchanged from before, now with a concrete harness to run it through):** >=10 Sheng/code-switched and >=10 noisy/crowd clips (Bunge, Citizen TV, creator TikTok), each with reference transcript + reference translation, scored through this same `eval/asr/` harness. Until Round B runs, the provider decision here is provisional, not locked.
+
+### Acceptance test updates
+- **AT-0005-1 stays RED.** `eval/asr/results/manifest.json`'s `coverage_gap` field explicitly records the Round A/B gap (0 Sheng/code-switched, 0 noisy clips) every run; `scripts/at/at-0005.sh` asserts this field is present rather than silently passing.
+- **AT-0005-2 is NOT flipped to GREEN here.** A winner at 7.8% WER (<=25% gate) exists, but AT-0005-2 as written requires the noisy-subset number specifically, which Round A cannot produce (no noisy clips exist in FLEURS). This section records the clean-set numbers per the task; the row stays RED until Round B supplies a noisy-subset WER for the same provider.
+- AT-0005-3 and AT-0005-4 are unaffected by this round and remain as before.
