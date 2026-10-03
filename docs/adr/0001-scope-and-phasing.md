@@ -29,7 +29,7 @@ Several of these are blocked by external timelines that no amount of engineering
 - **Marketing SPA:** what the app is, the methodology, a link to the GitHub repo, and a waitlist.
 - **PWA, "Check a link":**
   1. The user pastes a URL (YouTube, X, TikTok, Threads, news article) or text.
-  2. The pipeline transcribes it, extracts claims and grounds them with RAG. ~~(for third-party YouTube/TikTok video, no audio is transcribed — the user supplies the quote and timestamp)~~ _(superseded — see "Red-team amendments")_
+  2. The pipeline transcribes it, extracts claims and grounds them with RAG. _(superseded for third-party YouTube/TikTok video: no audio is transcribed — the user supplies the quote and timestamp; see "Red-team amendments")_
   3. It returns a draft analysis with cited sources.
   4. Output is labelled "AI-assisted analysis — not a verdict". The published "verdict" tier needs human review (ADR-0004).
 - **Maandamano page, read-only:** advisories curated by an editor (date, area, status, sources), plus a coarse area-level map with no live user geolocation (ADR-0007).
