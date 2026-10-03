@@ -1,13 +1,21 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import "./waving-flag.css";
 
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
-    // Guard for environments without matchMedia (jsdom tests, Next SSR):
-    // default to motion-on; reduced-motion is honoured where the API exists.
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    // Guarded for jsdom/SSR environments that don't implement
+    // `matchMedia` at all (e.g. jsdom — see apps/site and this package's
+    // vitest.setup.ts for the fuller rationale): without this check,
+    // mounting the component anywhere matchMedia is missing throws
+    // immediately. Skipping just means motion stays enabled (the default
+    // `reduced` state), which is the safe fallback when the OS
+    // preference genuinely can't be read.
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return undefined;
+    }
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = (): void => setReduced(mq.matches);
     update();
@@ -24,11 +32,23 @@ type WavingFlagProps = {
 };
 
 /**
- * A small Kenyan flag on a pole that waves in the wind: the real flag
- * (black / white-fimbriated red / green bands + the Maasai shield over two
- * crossed spears), rippled with an SVG turbulence+displacement cloth filter.
- * Motion is gated on prefers-reduced-motion — reduced renders a still,
- * gently-furled flag rather than a flat bar.
+ * A small Kenyan flag on a pole that FLAPS in the wind — lively and
+ * obvious, not a subtle shimmer — while staying smooth/premium (not
+ * frantic) and readable at superscript size. Two motion layers, combined:
+ *
+ * 1. An SVG turbulence+displacement filter rippling the cloth's surface
+ *    texture (fast-animated `feTurbulence` baseFrequency + a
+ *    `feDisplacementMap`).
+ * 2. A CSS transform (rotate+skewX) sway on the cloth group, anchored at
+ *    the pole/hoist edge (see waving-flag.css) — this is what makes the
+ *    free edge visibly flap, which is what actually reads as "flailing in
+ *    the wind" rather than a gentle ripple. Transform/opacity only (GPU-
+ *    friendly, no layout thrash).
+ *
+ * The real flag is: black / white-fimbriated red / green bands + the
+ * Maasai shield over two crossed spears. Motion is gated on
+ * prefers-reduced-motion — reduced renders a still, gently-furled flag
+ * (both layers' animation stop) rather than a flat bar.
  */
 export function WavingFlag({ className, title = "Kenya" }: WavingFlagProps): React.JSX.Element {
   const reduced = usePrefersReducedMotion();
@@ -41,6 +61,15 @@ export function WavingFlag({ className, title = "Kenya" }: WavingFlagProps): Rea
     <svg
       className={className}
       viewBox="0 0 54 34"
+      // The sway transform (rotate+skewX, anchored at the hoist edge) can
+      // momentarily swing the free edge a couple of units past the
+      // nominal viewBox at the extremes of the loop. SVG roots default to
+      // `overflow: hidden`, which would clip that -- explicit
+      // overflow="visible" lets the small bleed render instead (standard
+      // technique for this kind of edge-anchored sway), rather than
+      // clipping the flap and reading as the still/subtle version we're
+      // explicitly trying to move away from.
+      overflow="visible"
       role="img"
       aria-label={title}
       xmlns="http://www.w3.org/2000/svg"
@@ -57,7 +86,7 @@ export function WavingFlag({ className, title = "Kenya" }: WavingFlagProps): Rea
           <stop offset="0.7" stopColor="#fff" stopOpacity="0" />
           <stop offset="1" stopColor="#000" stopOpacity="0.12" />
         </linearGradient>
-        <filter id={wave} x="-35%" y="-40%" width="180%" height="190%">
+        <filter id={wave} x="-20%" y="-30%" width="145%" height="165%">
           <feTurbulence
             type="fractalNoise"
             baseFrequency="0.02 0.06"
@@ -68,8 +97,8 @@ export function WavingFlag({ className, title = "Kenya" }: WavingFlagProps): Rea
             {!reduced && (
               <animate
                 attributeName="baseFrequency"
-                dur="2.8s"
-                values="0.02 0.055;0.035 0.09;0.015 0.05;0.03 0.08;0.02 0.055"
+                dur="3s"
+                values="0.02 0.06;0.034 0.09;0.016 0.045;0.02 0.06"
                 repeatCount="indefinite"
               />
             )}
@@ -77,7 +106,7 @@ export function WavingFlag({ className, title = "Kenya" }: WavingFlagProps): Rea
           <feDisplacementMap
             in="SourceGraphic"
             in2="noise"
-            scale="4.6"
+            scale="4.2"
             xChannelSelector="R"
             yChannelSelector="G"
           />
@@ -88,36 +117,14 @@ export function WavingFlag({ className, title = "Kenya" }: WavingFlagProps): Rea
       <circle cx="1.6" cy="2.4" r="1.6" fill="#c8a24a" />
       <rect x="0.8" y="2.4" width="1.6" height="31" rx="0.8" fill={`url(#${pole})`} />
 
-      {/*
-       * Cloth: an outer group flaps (skewX + rotate anchored at the pole/hoist
-       * so the free edge whips in the wind) while the inner filtered group
-       * ripples. Both animations are omitted under reduced motion.
-       */}
-      <g>
-        {!reduced && (
-          <animateTransform
-            attributeName="transform"
-            type="skewX"
-            values="0;8;-6;7;0"
-            keyTimes="0;0.3;0.6;0.85;1"
-            dur="2.2s"
-            repeatCount="indefinite"
-            additive="sum"
-            calcMode="spline"
-            keySplines="0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1;0.4 0 0.6 1"
-          />
-        )}
-        {!reduced && (
-          <animateTransform
-            attributeName="transform"
-            type="rotate"
-            values="0 2 17;2 2 17;-1.5 2 17;1.5 2 17;0 2 17"
-            dur="3.3s"
-            repeatCount="indefinite"
-            additive="sum"
-          />
-        )}
-        <g filter={`url(#${wave})`}>
+      {/* Cloth: the turbulence+displacement filter ripples the surface
+          texture; the fck-flag-cloth-sway class (skipped under reduced
+          motion) swings the whole group from the pole/hoist edge so the
+          free edge visibly flaps -- see waving-flag.css. */}
+      <g
+        className={`fck-flag-cloth ${reduced ? "fck-flag-cloth-still" : "fck-flag-cloth-sway"}`}
+        filter={`url(#${wave})`}
+      >
         {/* Bands: black / white / red / white / green (official order) */}
         <rect x="3" y="2" width="50" height="8.5" fill="#101010" />
         <rect x="3" y="10.5" width="50" height="2" fill="#f6f6f4" />
@@ -142,7 +149,6 @@ export function WavingFlag({ className, title = "Kenya" }: WavingFlagProps): Rea
 
         {/* Cloth sheen / light */}
         <rect x="3" y="2" width="50" height="30.5" fill={`url(#${sheen})`} />
-        </g>
       </g>
     </svg>
   );
