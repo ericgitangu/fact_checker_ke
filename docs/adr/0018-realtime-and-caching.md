@@ -51,14 +51,28 @@ Revisit if pub/sub metering turns out to be expensive (then switch to poll-only 
 ## Acceptance tests
 | ID | Behaviour | Status |
 |---|---|---|
-| AT-0018-1 | Subscribing *after* completion immediately yields the terminal event, then the stream closes | RED |
-| AT-0018-2 | Reconnecting with `Last-Event-ID` replays only the newer events, with no duplicates | RED |
-| AT-0018-3 | The stream closes at 90s when nothing arrives, with heartbeats at 15s intervals | RED |
-| AT-0018-4 | A third concurrent stream from one IP gets 429 | RED |
-| AT-0018-5 | Draft and submission responses carry `no-store`. Published checks carry `s-maxage` and a strong ETag | RED |
-| AT-0018-6 | `check.corrected` invalidates the ISR tag. The next request shows the corrected rating (e2e) | RED |
-| AT-0018-7 | With Redis down, SSE still delivers the current state from Postgres and the client falls back to polling (degraded, not broken) | RED |
-| AT-0018-8 | Stream/connection limits are keyed on device or session token, not bare IP. IP is only a coarse ceiling, at 50 or more. | RED |
+| AT-0018-1 | Subscribing *after* completion immediately yields the terminal event, then the stream closes | GREEN |
+| AT-0018-2 | Reconnecting with `Last-Event-ID` replays only the newer events, with no duplicates | GREEN |
+| AT-0018-3 | The stream closes at 90s when nothing arrives, with heartbeats at 15s intervals | GREEN |
+| AT-0018-4 | A third concurrent stream from one IP gets 429 | GREEN (keyed on device token per the red-team amendment below, not bare IP — see AT-0018-8) |
+| AT-0018-5 | Draft and submission responses carry `no-store`. Published checks carry `s-maxage` and a strong ETag | GREEN |
+| AT-0018-6 | `check.corrected` invalidates the ISR tag. The next request shows the corrected rating (e2e) | RED (apps/web's ISR tag-revalidation consumer — out of this wave's ownership; see implementation notes) |
+| AT-0018-7 | With Redis down, SSE still delivers the current state from Postgres and the client falls back to polling (degraded, not broken) | GREEN |
+| AT-0018-8 | Stream/connection limits are keyed on device or session token, not bare IP. IP is only a coarse ceiling, at 50 or more. | GREEN |
+
+## Implementation notes (persistence/API wave, 2026-10-03)
+
+**SSE (`services/api/src/routes/sse.ts`):** current state from Postgres first; `Last-Event-ID` resume replays `submission_events` via a correlated SQL subquery (`WHERE occurred_at > (SELECT occurred_at FROM submission_events WHERE event_id = $1)`), **not** a round-tripped JS `Date` — an earlier version compared against the anchor's own `occurredAt` pulled back out as a millisecond-precision `Date`, which (verified empirically against real Postgres, not just inferred) re-included the anchor event itself because Postgres's `timestamptz` stores microsecond precision the JS `Date` silently truncated. Heartbeats are SSE comment lines (`: heartbeat`) on a configurable interval (15s default, tunable per-instance via `sseHeartbeatMs`/`sseMaxDurationMs` so tests don't wait 90s for real). Closes on a terminal state or the duration cap, whichever comes first.
+
+**Pub/sub (`services/api/src/lib/pubsub.ts`):** `IORedisPubSub` (ioredis, TCP) is the real implementation; `createPubSub` probes a live TCP connect with a 3s timeout and falls back to `InMemoryPubSub` (an in-process `EventEmitter`) on failure, logging the fallback loudly. **[UNVERIFIED-LIVE]:** `IORedisPubSub` has not been exercised against a live Upstash TCP endpoint from this sandbox (no network path to Upstash here) — it *was* exercised against a local `redis:7-alpine` container via `docker run` (not the repo's own `compose.yaml`, which another concurrent worktree's containers were already holding the default ports for), which speaks the same TCP SUBSCRIBE/PUBLISH protocol. Real Upstash TCP verification is deferred to the deploy-rail smoke.
+
+**Concurrency guards (`services/api/src/lib/concurrency-guard.ts`):** `RedisConcurrencyGuard` (INCR+EXPIRE, Upstash REST) for the real path, `InMemoryConcurrencyGuard` for dev/test. Keyed on `X-Device-Token`, never bare IP — a coarse separate IP-keyed guard (limit 50) exists only as the red-team-amendment ceiling, not the primary control.
+
+**Caching (`services/api/src/lib/cache-headers.ts`):** `GET /v1/submissions/:id` and `GET /v1/checks/:id` both compute an ETag and handle `If-None-Match` → 304, even though submissions are `no-store` — `no-store` forbids a *shared* cache from storing the body, not the client's own conditional-GET revalidation, so the fallback-polling path (point 4 in the Decision) still gets a cheap 304.
+
+**Deviations / tech debt:**
+- **AT-0018-6 (ISR tag revalidation) is explicitly out of scope and left RED.** It requires a signed BFF revalidate endpoint in `apps/web`, which this wave's file ownership excludes ("Do NOT touch apps/**"). The API-side half of correction safety (a version-bump-capable ETag) has a documented placeholder in `routes/checks.ts` — `publishedCheckEtag` currently derives its version from `publishedAt` because ADR-0008's correction workflow (the thing that would write a dedicated `corrected_at`/version column) doesn't exist yet either.
+- The in-memory pub/sub fallback is single-instance only (no fan-out across multiple Cloud Run instances) — acceptable per the task brief's explicit fallback design, not silently papered over.
 
 ## Red-team amendments (2026-10-03)
 

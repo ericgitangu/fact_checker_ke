@@ -7,3 +7,5 @@ export * from "./schemas/demonstration.js";
 export * from "./claim-review/builder.js";
 export * from "./client/api-client.js";
 export * from "./schemas/waitlist.js";
+export * from "./schemas/events.js";
+export * from "./schemas/device-token.js";
