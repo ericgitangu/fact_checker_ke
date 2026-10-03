@@ -1,8 +1,10 @@
 import type { Check, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
 import { createDb, schema, type Database } from "@fact-checker-ke/db";
 import { eq, sql } from "drizzle-orm";
+import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import type {
   CheckRepository,
+  DeviceTokenRepository,
   RepoResult,
   SubmissionRepository,
   WaitlistRepository,
@@ -17,6 +19,8 @@ export function createPostgresRepositories(connectionString: string): {
   submissions: SubmissionRepository;
   checks: CheckRepository;
   waitlist: WaitlistRepository;
+  deviceTokens: DeviceTokenRepository;
+  db: Database;
   close: () => Promise<void>;
 } {
   const { db, close } = createDb(connectionString);
@@ -24,6 +28,8 @@ export function createPostgresRepositories(connectionString: string): {
     submissions: new PostgresSubmissionRepository(db),
     checks: new PostgresCheckRepository(db),
     waitlist: new PostgresWaitlistRepository(db),
+    deviceTokens: new PostgresDeviceTokenRepository(db),
+    db,
     close,
   };
 }
@@ -63,6 +69,7 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
       submittedBy: row.submittedBy,
       status: row.status,
       createdAt: toIsoString(row.createdAt),
+      updatedAt: toIsoString(row.updatedAt),
     };
   }
 
@@ -86,6 +93,7 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
         submittedBy: row.submittedBy,
         status: row.status,
         createdAt: toIsoString(row.createdAt),
+        updatedAt: toIsoString(row.updatedAt),
       },
     };
   }
@@ -170,6 +178,30 @@ export class PostgresWaitlistRepository implements WaitlistRepository {
       return { ok: true, value: { status: "already_joined" } };
     }
     return { ok: true, value: { status: "joined" } };
+  }
+}
+
+export class PostgresDeviceTokenRepository implements DeviceTokenRepository {
+  constructor(private readonly db: Database) {}
+
+  async issue(): Promise<{ token: string; createdAt: string }> {
+    const { token, tokenHash } = generateDeviceToken();
+    const [row] = await this.db.insert(schema.deviceTokens).values({ tokenHash }).returning();
+    if (!row) throw new Error("Insert into device_tokens returned no row");
+    return { token, createdAt: toIsoString(row.createdAt) };
+  }
+
+  async touch(token: string): Promise<RepoResult<{ tokenHash: string }>> {
+    const tokenHash = hashDeviceToken(token);
+    const [row] = await this.db
+      .update(schema.deviceTokens)
+      .set({ lastSeenAt: new Date() })
+      .where(eq(schema.deviceTokens.tokenHash, tokenHash))
+      .returning();
+    if (!row) {
+      return { ok: false, error: { kind: "not_found", message: "device token not recognised" } };
+    }
+    return { ok: true, value: { tokenHash: row.tokenHash } };
   }
 }
 

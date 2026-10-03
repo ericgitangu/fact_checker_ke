@@ -39,8 +39,20 @@ Revisit if MAU for the optional-accounts feature approaches Firebase's or Clerk'
 ## Acceptance tests
 | ID | Behaviour | Status |
 |---|---|---|
-| AT-0020-1 | Two distinct devices behind the same CGNAT IP each get their own quota standing; neither is throttled by the other's usage | RED |
-| AT-0020-2 | An SSE capability token minted for submission A is rejected (403) on a request for submission B's stream | RED |
-| AT-0020-3 | A role grant to `editor` or `admin` is rejected unless the target account has a verified TOTP enrollment | RED |
-| AT-0020-4 | Every publish, correction and kill-switch flip produces exactly one `audit_log` row in the same transaction as the action; a rolled-back action produces zero rows | RED |
-| AT-0020-5 | A device token rotated/lost by the client starts a fresh quota identity (no silent quota inheritance via IP) | RED |
+| AT-0020-1 | Two distinct devices behind the same CGNAT IP each get their own quota standing; neither is throttled by the other's usage | GREEN |
+| AT-0020-2 | An SSE capability token minted for submission A is rejected (403) on a request for submission B's stream | GREEN |
+| AT-0020-3 | A role grant to `editor` or `admin` is rejected unless the target account has a verified TOTP enrollment | RED (editor/admin RBAC + Better Auth are explicitly a later wave — see implementation notes) |
+| AT-0020-4 | Every publish, correction and kill-switch flip produces exactly one `audit_log` row in the same transaction as the action; a rolled-back action produces zero rows | RED (same reason as AT-0020-3 — no publish/correction/kill-switch actions exist yet to audit) |
+| AT-0020-5 | A device token rotated/lost by the client starts a fresh quota identity (no silent quota inheritance via IP) | GREEN |
+
+## Implementation notes (anonymous-token slice, 2026-10-03)
+
+This wave implements **only** §1 ("Anonymous submit/read, no account required") and the SSE capability-token half of §2 — explicitly the "anonymous-token slice" the task brief scoped. §3 (optional registered accounts), §4 (Better Auth editor/admin RBAC + mandatory TOTP), and §5 (immutable audit log) are **not implemented** and their acceptance tests are left RED on purpose, not silently skipped: there is no editor/admin surface yet for a role grant or a publish/correction/kill-switch action to happen against.
+
+- **`POST /v1/device`** (`services/api/src/routes/device.ts`) issues a 256-bit opaque token (`crypto.randomBytes(32)`, base64url); only its SHA-256 hash is persisted (`device_tokens.token_hash`). The raw token is returned exactly once.
+- **Quota key = device token, never IP** (`services/api/src/lib/device-quota.ts`, `concurrency-guard.ts`): both the per-device SSE stream-concurrency guard (ADR-0018 §5) and the new per-device daily submission-quota guard (`POST /v1/submissions` now 400s with `device_token_required` if `X-Device-Token` is missing) are keyed this way. The daily limit (20/device) is a placeholder — ADR-0011's own review trigger says the real threshold should come from week-1 production data, which doesn't exist yet.
+- **SSE capability token** (`services/api/src/lib/device-token.ts`): an HS256 JWT (`jose`), `sub` = submission id, default 90s TTL, minted once at submission-creation time and returned verbatim as `eventsToken` in the `POST /v1/submissions` 202 body (and replayed verbatim, not re-signed, on an idempotent retry). `GET /v1/submissions/:id/events` verifies both the signature and that `sub` matches the requested submission id — AT-0020-2's cross-submission rejection is a 403, not a 401, so a client can tell "wrong scope" from "bad/expired token."
+
+**Deviations / tech debt:**
+- No account linkage, Better Auth, MFA, or audit log in this wave — by design, not an oversight. The `users`/`accounts`/`sessions` schema reservation mentioned in the ADR's §3 is also not added yet (nothing in this wave's scope needed it); adding it is additive whenever Phase 2 starts.
+- The capability-token secret (`CAPABILITY_TOKEN_SECRET`) is a single static HMAC secret for the whole API, not the per-submission-scoped signing the ADR's wording ("minted from the device token at submission time") might suggest — it's scoped by `sub` claim validation, not by using a derived key, which is simpler and equally safe for an HS256 JWT whose only claim that matters is `sub`.
