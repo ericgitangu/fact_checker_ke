@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { CheckSchema } from "../schemas/check.js";
 
 const validCheck = {
-  id: "11111111-1111-1111-1111-111111111111",
-  submissionId: "22222222-2222-2222-2222-222222222222",
+  id: "11111111-1111-4111-8111-111111111111",
+  submissionId: "22222222-2222-4222-8222-222222222222",
   summary: "A claim about tax rates was checked against KRA data.",
   rating: "MostlyTrue" as const,
   claims: [],
