@@ -1,6 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { SunIcon, MoonIcon, ExternalLinkIcon, ShieldCheckIcon } from "./icons";
+import {
+  SunIcon,
+  MoonIcon,
+  ExternalLinkIcon,
+  ShieldCheckIcon,
+  RadarIcon,
+  PenLineIcon,
+  ScissorsIcon,
+  ScaleIcon,
+  GaugeIcon,
+  MegaphoneIcon,
+  EyeIcon,
+} from "./icons";
 
 describe("icons", () => {
   it.each([
@@ -8,6 +20,13 @@ describe("icons", () => {
     ["MoonIcon", MoonIcon],
     ["ExternalLinkIcon", ExternalLinkIcon],
     ["ShieldCheckIcon", ShieldCheckIcon],
+    ["RadarIcon", RadarIcon],
+    ["PenLineIcon", PenLineIcon],
+    ["ScissorsIcon", ScissorsIcon],
+    ["ScaleIcon", ScaleIcon],
+    ["GaugeIcon", GaugeIcon],
+    ["MegaphoneIcon", MegaphoneIcon],
+    ["EyeIcon", EyeIcon],
   ] as const)("%s renders a decorative (aria-hidden) svg with currentColor stroke", (_name, Icon) => {
     const { container } = render(<Icon />);
     const svg = container.querySelector("svg");

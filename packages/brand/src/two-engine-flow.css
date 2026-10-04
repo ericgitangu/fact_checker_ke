@@ -1,0 +1,233 @@
+/*
+ * Self-contained layout/decoration for <TwoEngineFlow>. Typography and link
+ * colour are deliberately left to the host page's own global `h1,h2,h3`/`p`
+ * rules (both apps already style those identically — see globals.css /
+ * index.css) so headings render in each app's real Bricolage Grotesque
+ * (apps/web's is bound to a next/font CSS variable this package can't see).
+ * Only the decorative chrome below — icon tiles, rail line, borders — is
+ * hardcoded here, same independence contract as wordmark.css. The hex
+ * values are the AA-fixed "On the record" palette (apps/web/globals.css's
+ * --true/--ink etc.); apps/site's palette is the same design, a shade off
+ * in a couple of tokens (tracked separately, not this component's drift).
+ */
+
+.fck-flow {
+  --fck-flow-paper-2: #f2f1ea;
+  --fck-flow-ink: #15181b;
+  --fck-flow-ink-2: #585f66;
+  --fck-flow-rule: #e4e3dc;
+  --fck-flow-rule-strong: #d2d0c6;
+  --fck-flow-brand: #0d7c47;
+  --fck-flow-brand-tint: #e7f2ec;
+
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.fck-flow-dark {
+  --fck-flow-paper-2: #151b18;
+  --fck-flow-ink: #f1f3ef;
+  --fck-flow-ink-2: #b7c0ba;
+  --fck-flow-rule: #263029;
+  --fck-flow-rule-strong: #35433b;
+  --fck-flow-brand: #30cf84;
+  --fck-flow-brand-tint: rgba(48, 207, 132, 0.14);
+}
+
+/* ---------- shared node chrome ---------- */
+
+.fck-flow-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--fck-flow-paper-2);
+  border: 1px solid var(--fck-flow-rule-strong);
+  color: var(--fck-flow-brand);
+}
+
+.fck-flow-node h3 {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.fck-flow-node p {
+  font-size: 0.9rem;
+  color: var(--fck-flow-ink-2);
+  max-width: 34ch;
+}
+
+/* ---------- entries (the two engines; parallel, so a <ul>) ---------- */
+
+.fck-flow-entries {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fck-flow-entry {
+  position: relative;
+  padding: 16px;
+  border: 1px solid var(--fck-flow-rule);
+  border-radius: 12px;
+}
+
+.fck-flow-entry-primary {
+  border-color: var(--fck-flow-brand);
+  background: var(--fck-flow-brand-tint);
+}
+
+.fck-flow-entry-primary .fck-flow-icon {
+  background: var(--fck-flow-brand);
+  border-color: var(--fck-flow-brand);
+  color: var(--fck-flow-paper-2, #fff);
+}
+
+.fck-flow-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fck-flow-ink-2);
+  margin: 10px 0 2px;
+}
+
+.fck-flow-entry-primary .fck-flow-tag {
+  color: var(--fck-flow-brand);
+}
+
+/* ---------- the merge connector (decorative, aria-hidden) ---------- */
+
+.fck-flow-merge {
+  display: block;
+  width: 100%;
+  height: 32px;
+  overflow: visible;
+  margin: -8px 0;
+}
+
+.fck-flow-merge-path {
+  fill: none;
+  stroke: var(--fck-flow-rule-strong);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 130;
+  stroke-dashoffset: 130;
+  transition: stroke-dashoffset 0.5s ease 0.1s;
+}
+
+.fck-flow-visible .fck-flow-merge-path {
+  stroke-dashoffset: 0;
+}
+
+/* ---------- steps (the shared pipeline; a real sequence, so an <ol>) --- */
+
+.fck-flow-steps {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* The rail: a vertical line behind the icon column, drawn top-down once
+   the flow scrolls into view. transform-origin top + scaleY is the
+   "growing line" — cheaper and smoother than animating height/stroke. */
+.fck-flow-steps::before {
+  content: "";
+  position: absolute;
+  left: 19px;
+  top: 20px;
+  bottom: 20px;
+  width: 2px;
+  background: var(--fck-flow-rule-strong);
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s;
+}
+
+.fck-flow-visible .fck-flow-steps::before {
+  transform: scaleY(1);
+}
+
+.fck-flow-step {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.fck-flow-step .fck-flow-icon {
+  background: var(--fck-flow-paper-2);
+}
+
+/* ---------- one orchestrated reveal, staggered per node ---------- */
+
+.fck-flow-entry,
+.fck-flow-step {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.42s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.fck-flow-visible .fck-flow-entry,
+.fck-flow-visible .fck-flow-step {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.fck-flow-visible .fck-flow-entry-primary {
+  transition-delay: 0.05s;
+}
+.fck-flow-visible .fck-flow-entry-secondary {
+  transition-delay: 0.14s;
+}
+.fck-flow-visible .fck-flow-step:nth-of-type(1) {
+  transition-delay: 0.3s;
+}
+.fck-flow-visible .fck-flow-step:nth-of-type(2) {
+  transition-delay: 0.4s;
+}
+.fck-flow-visible .fck-flow-step:nth-of-type(3) {
+  transition-delay: 0.5s;
+}
+.fck-flow-visible .fck-flow-step:nth-of-type(4) {
+  transition-delay: 0.6s;
+}
+.fck-flow-visible .fck-flow-step:nth-of-type(5) {
+  transition-delay: 0.7s;
+}
+
+@media (max-width: 640px) {
+  .fck-flow-entries {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Belt-and-braces (same pattern as waving-flag.css): force the finished,
+   static state under reduced motion even if JS runs before stylesheet
+   application, or doesn't run at all. */
+@media (prefers-reduced-motion: reduce) {
+  .fck-flow-entry,
+  .fck-flow-step,
+  .fck-flow-merge-path,
+  .fck-flow-steps::before {
+    transition: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
