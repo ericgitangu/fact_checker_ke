@@ -2,131 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-
-    <!-- Resolves the theme before first paint (localStorage choice, else
-         prefers-color-scheme) so dark-mode visitors never see a light
-         flash. Mirrors src/use-theme.ts, which takes over afterwards. -->
-    <script>
-      (function () {
-        try {
-          var stored = localStorage.getItem("fck-theme");
-          var theme =
-            stored === "light" || stored === "dark"
-              ? stored
-              : window.matchMedia("(prefers-color-scheme: dark)").matches
-                ? "dark"
-                : "light";
-          document.documentElement.setAttribute("data-theme", theme);
-        } catch (e) {
-          /* storage blocked — default light styles apply */
-        }
-      })();
-    </script>
-
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="canonical" href="https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>fact_checker_ke — Kenya's claims, checked against the evidence</title>
-    <meta
-      name="description"
-      content="Independent, open-source fact-checking for Kenya. Claims from creators, politicians and viral posts — checked in English, Swahili and Sheng, with cited sources and human review."
-    />
-    <meta name="robots" content="index, follow" />
-    <meta name="author" content="fact_checker_ke" />
-
-    <!-- Light/dark status-bar colour, matched to --paper in both themes. -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fafaf7" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c100e" />
-
-    <!-- Open Graph -->
-    <meta property="og:title" content="fact_checker_ke — Kenya's claims, checked against the evidence" />
-    <meta
-      property="og:description"
-      content="Kenya's loudest claims, checked against the evidence — cited sources, human-reviewed verdicts, in English, Swahili and Sheng."
-    />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="fact_checker_ke" />
-    <meta property="og:locale" content="en_KE" />
-    <meta property="og:url" content="https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/" />
-    <meta
-      property="og:image"
-      content="https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/og-image.png"
-    />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:type" content="image/png" />
-    <meta
-      property="og:image:alt"
-      content="fact_checker_ke — Kenya's claims, checked against the evidence"
-    />
-    <!-- Square fallback: Telegram, Discord and some messengers prefer or
-         require a near-1:1 image for link-preview thumbnails. -->
-    <meta
-      property="og:image"
-      content="https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/og-image-square.png"
-    />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="1200" />
-    <meta property="og:image:type" content="image/png" />
-    <meta
-      property="og:image:alt"
-      content="fact_checker_ke — Kenya's claims, checked against the evidence"
-    />
-
-    <!-- Twitter / X -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="fact_checker_ke — Kenya's claims, checked against the evidence" />
-    <meta
-      name="twitter:description"
-      content="Kenya's loudest claims, checked against the evidence — cited sources, human-reviewed verdicts, in English, Swahili and Sheng."
-    />
-    <meta
-      name="twitter:image"
-      content="https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/og-image.png"
-    />
-    <meta
-      name="twitter:image:alt"
-      content="fact_checker_ke — Kenya's claims, checked against the evidence"
-    />
-
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Expanded:wght@700;800&family=Bricolage+Grotesque:wght@400;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap"
-      rel="stylesheet"
-    />
-
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Organization",
-            "@id": "https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/#organization",
-            "name": "fact_checker_ke",
-            "url": "https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/",
-            "logo": "https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/og-image-square.png",
-            "sameAs": ["https://github.com/ericgitangu"],
-            "description": "Independent, open-source fact-checking for Kenya, verifying claims from creators, politicians and viral posts in English, Swahili and Sheng."
-          },
-          {
-            "@type": "WebSite",
-            "@id": "https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/#website",
-            "url": "https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/",
-            "name": "fact_checker_ke",
-            "inLanguage": "en-KE",
-            "publisher": { "@id": "https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/#organization" }
-          }
-        ]
-      }
-    </script>
+    <!-- apps/site is retired to a redirect stub: the marketing site was
+         folded into the single frontend at
+         https://fact-checker-ke-web.vercel.app (ADR-0010/0015 amendments).
+         The authoritative redirect is the 308 in vercel.json; this document
+         is only served if that rule is ever absent. -->
+    <title>fact_checker_ke — moved</title>
+    <meta name="robots" content="noindex, follow" />
+    <link rel="canonical" href="https://fact-checker-ke-web.vercel.app/" />
+    <!-- Static fallback: forward even with JavaScript disabled. The bundled
+         script (src/main.tsx -> src/redirect.ts) does the path/query/hash-
+         preserving redirect; this meta refresh is the no-JS floor. -->
+    <meta http-equiv="refresh" content="0; url=https://fact-checker-ke-web.vercel.app/" />
   </head>
   <body>
-    <div id="root"></div>
+    <p>
+      fact_checker_ke has moved to
+      <a href="https://fact-checker-ke-web.vercel.app/">fact-checker-ke-web.vercel.app</a>.
+    </p>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

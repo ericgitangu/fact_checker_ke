@@ -10,12 +10,11 @@ vi.mock("next-intl/server", async () => {
   return mod.createNextIntlServerMock("en");
 });
 
-// next/navigation's useRouter is used by SubmitForm and LocaleSwitcher;
-// outside the Next App Router runtime it throws ("invariant expected app
-// router to be mounted"), so it's stubbed here the same way Next's own
-// app-router test harness would provide it -- SubmitForm's actual
-// navigation call (`router.push` on submit success) is exercised by this
-// app's other submit-flow tests, not by this a11y pass.
+// next/navigation's useRouter is used by the LocaleSwitcher in the header
+// chrome (and, on /submit, by SubmitForm); outside the Next App Router
+// runtime it throws ("invariant expected app router to be mounted"), so
+// it's stubbed here the same way Next's own app-router test harness would
+// provide it.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
@@ -23,8 +22,11 @@ vi.mock("next/navigation", () => ({
 const { default: Home } = await import("./page");
 const { AppShellHarness } = await import("../test/app-shell-harness");
 
-describe("Home / submit-form page a11y (AT-0028-2)", () => {
-  it("renders the real home+submit-form page (incl. header/footer chrome) with zero WCAG 2.2 AA violations", async () => {
+// `/` is the consolidated marketing landing (ADR-0010/0015 amendments); the
+// smart-input submit screen moved to `/submit`. This pass covers the
+// landing + the shared header/footer chrome (incl. the new ThemeToggle).
+describe("Home (landing) page a11y (AT-0028-2)", () => {
+  it("renders the real landing page (incl. header/footer chrome) with zero WCAG 2.2 AA violations", async () => {
     const homeJsx = await Home();
     const page = await AppShellHarness({ children: homeJsx });
     const { container } = render(<IntlProviderHarness>{page}</IntlProviderHarness>);

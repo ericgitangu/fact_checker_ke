@@ -57,3 +57,58 @@ Source: fact_checker_ke ADR set red-team report, Section D #15 (README/hygiene w
 
 - Brought `apps/web` (the Next.js 16 / Turbopack / Serwist PWA half of this ADR's client strategy) up to the "On the record" design-system quality bar already shipped in `apps/site`: ported CSS custom properties (paper/ink neutrals, verdict colours, night band, `--status-*` for Maandamano) and component patterns (`checkcard`, verdict stamp, buttons, nav/footer) into `apps/web/app/globals.css` plus a small shared primitives layer under `apps/web/components/`. Archivo + Newsreader replace the scaffold's Geist fonts via `next/font/google` in `apps/web/app/layout.tsx`; `next/font/google` does not expose "Archivo Expanded" as its own importable family, so `--sans-x` falls back to `--sans` at the same weight (documented inline in `globals.css` and `layout.tsx` rather than silently rendering nothing).
 - Wired the full submit → SSE status → published-check flow described in this ADR's scope (device token seam, idempotency key, status pipeline UI, draft-vs-published `/checks/[id]` rendering per AT-0004-B) and a dev-only `/editor` screen gated behind an explicit `// TODO(auth)` seam pending ADR-0020 (Better Auth) — see `docs/adr/0028-client-ux-baseline.md`'s implementation notes for the i18n/accessibility/offline half of this same wave, and the final report (orchestrating session) for the complete file list, verification output, and stubbed-seam inventory (SSE CORS/proxy decision, editor endpoints that don't exist in services/api yet, device-token enforcement).
+
+## Consolidation amendment (2026-10-04): one frontend, not two
+
+The two-web-surface split in the Option 2 decision above —
+
+```
+apps/web        Next.js PWA (launch surface)
+apps/site       marketing SPA (GitHub CTA, waitlist)
+```
+
+— is **superseded**: `apps/site` is folded into `apps/web`, so there is now a
+**single frontend**. The marketing surface (hero, value prop, the sample
+fact-check, the six-verdict scale, the two-engine flow, and the waitlist)
+lives in `apps/web` as the landing at `/`; the smart-input submit screen moved
+to `/submit`. `apps/site` is retired to a redirect-only stub (see ADR-0015
+amendment).
+
+**Why.** Two independent frontends (Vite SPA + Next App Router) re-implemented
+the same "On the record" design language and the same waitlist/brand
+components in two bundlers, and drifted repeatedly (fonts, the display
+typeface, the wordmark, the verdict scale — each had to be re-synced). The
+shared `@fact-checker-ke/brand` package already carries the common set pieces
+(`VerdictScale`, `TwoEngineFlow`, `ConfidenceGauge`, `Reveal`/`Stagger`), so
+the landing reuses them with zero duplicated design. One frontend = one place
+to change copy, brand, i18n and SEO.
+
+**What this keeps.** The rest of Option 2 is unchanged: shared contracts in
+`packages/core`, the Expo mobile path talking to the API directly (no BFF),
+and native share-extension intake remain the plan. This amendment is only
+about collapsing the two *web* surfaces into one.
+
+**What moved into `apps/web`.**
+- Landing `/` — hero + value prop + sample fact-check card (the typed-claim +
+  stamped verdict moment), the live "what we're checking now" feed preview
+  (the proof), `VerdictScale`, `TwoEngineFlow`, the maandamano street band,
+  the editorial principles, and the waitlist. All copy is EN+SW
+  (`landing` namespace in `packages/i18n`).
+- `/submit` — the smart-input submit screen (was `/`).
+- Waitlist — `components/waitlist-form.tsx` posts same-origin to the BFF
+  `app/api/waitlist/route.ts`, which validates with `packages/core`'s
+  `WaitlistSignupInputSchema` (stamping `source:"web"`) and forwards to
+  `services/api`'s `POST /v1/waitlist` (ADR-0015 web posting model). No
+  `services/` or `packages/core` code was changed.
+- The light/dark theme toggle (brand `useTheme`) that previously lived only in
+  `apps/site` now sits in the shared header on every page, with a pre-paint
+  inline script in `app/layout.tsx` to avoid a theme flash; `globals.css`
+  gained the explicit `[data-theme="dark"]` token block it never had.
+- OG/SEO/PWA — `apps/site`'s Open Graph tags, title/description, social
+  images, sitemap and robots were ported to Next's Metadata API
+  (`app/layout.tsx`, `app/sitemap.ts`, `app/robots.ts`, `public/og-image*.png`).
+
+## Review trigger (this amendment)
+Revisit if a marketing-only concern (independent release cadence, a separate
+CMS, or a commercial-use boundary) ever makes a standalone marketing project
+worth its drift cost again.

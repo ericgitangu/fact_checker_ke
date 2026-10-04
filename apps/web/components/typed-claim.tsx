@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+"use client";
+
+import { useEffect, useState } from "react";
 
 type TypedClaimProps = {
   text: string;
@@ -11,28 +13,34 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * The hero's signature moment: the sample claim types itself out, caret and
- * all, then hands off to the verdict stamp (see `.stamp-ready` in index.css).
- * This is the one orchestrated, non-interactive motion sequence on the page
- * (the brief's explicit ask for a "keystroke/typing moment") — it runs once
- * on mount, never loops, and is skipped entirely under
- * `prefers-reduced-motion`, where the full claim renders immediately.
+ * The landing hero's signature moment: the sample claim types itself out,
+ * caret and all, then hands off to the verdict stamp (see `.landing-stamp`
+ * / `.stamp-ready` in globals.css). Ported from the retired apps/site. Runs
+ * once on mount, never loops, and is skipped entirely under
+ * `prefers-reduced-motion`, where the full claim renders immediately and
+ * `onDone` fires right away so the stamp still appears.
  *
  * Accessibility: screen readers get the complete claim text immediately via
  * a visually-hidden node; the animated, character-by-character reveal is
  * `aria-hidden` so assistive tech never has to "wait" on the animation.
  */
 export function TypedClaim({ text, onDone }: TypedClaimProps): React.JSX.Element {
-  const reduced = useRef(prefersReducedMotion());
-  const [shown, setShown] = useState(reduced.current ? text.length : 0);
-  const doneRef = useRef(false);
+  // Lazy initialisers so the reduced-motion probe runs once at mount and the
+  // value is held in state (not a ref read during render — react-hooks/refs).
+  const [reduced] = useState(prefersReducedMotion);
+  const [shown, setShown] = useState(() => (reduced ? text.length : 0));
 
   useEffect(() => {
-    if (reduced.current) {
-      if (!doneRef.current) {
-        doneRef.current = true;
+    let done = false;
+    const finish = (): void => {
+      if (!done) {
+        done = true;
         onDone?.();
       }
+    };
+
+    if (reduced) {
+      finish();
       return undefined;
     }
 
@@ -44,15 +52,12 @@ export function TypedClaim({ text, onDone }: TypedClaimProps): React.JSX.Element
       setShown(Math.min(frame, text.length));
       if (frame >= text.length) {
         window.clearInterval(id);
-        if (!doneRef.current) {
-          doneRef.current = true;
-          onDone?.();
-        }
+        finish();
       }
     }, TICK_MS);
 
     return () => window.clearInterval(id);
-    // `text` is static for this hero instance; intentionally run once.
+    // `text`/`reduced` are fixed for this hero instance; run once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

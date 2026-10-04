@@ -4,6 +4,7 @@ import { ADVOCATE_SIGNOFF_COMPLETE } from "@fact-checker-ke/core";
 import { Wordmark } from "@fact-checker-ke/brand";
 import { LocaleSwitcher } from "./locale-switcher";
 import { PrimaryNav } from "./primary-nav";
+import { ThemeToggle } from "./theme-toggle";
 
 export async function AppHeader(): Promise<React.JSX.Element> {
   const t = await getTranslations("common");
@@ -19,20 +20,28 @@ export async function AppHeader(): Promise<React.JSX.Element> {
           mark. `t("appName")` still drives the Link's aria-label, so the
           accessible name stays translation-aware even though the visible
           brand name itself is untranslated (identical in every locale's
-          message catalog). apps/web doesn't yet have a dark/light toggle
-          (apps/site does, via its own useTheme), so variant is pinned to
-          "light" rather than regressing to no theme at all; wiring up
-          web-side dark mode is a separate, larger change tracked as
-          follow-up, not bundled into this brand-parity fix. */}
+          message catalog). The Wordmark is rendered variant="light"
+          deliberately: in dark mode globals.css flips just its text colour
+          (:root[data-theme="dark"] .wordmark .fck-wordmark-text) while the
+          gradient FC·KE mark and the flag read correctly on both grounds —
+          so the one lockup follows the theme without needing a client
+          boundary here. The light/dark toggle itself is <ThemeToggle/>
+          below (brand's useTheme), added when apps/web became the sole
+          frontend (ADR-0010/0015 amendments). */}
       <Link className="wordmark" href="/" aria-label={`${t("appName")} home`}>
         <Wordmark size="md" variant="light" />
       </Link>
       <PrimaryNav menuLabel={t("nav.menu")}>
+        <Link href="/submit">{t("nav.submit")}</Link>
         <Link href="/feed">{t("nav.feed")}</Link>
         <Link href="/methodology">{t("nav.methodology")}</Link>
         <Link href="/maandamano">{t("nav.tracker")}</Link>
         <Link href="/editor">{t("nav.editor")}</Link>
         <LocaleSwitcher />
+        {/* Light/dark toggle, carried over from the retired apps/site so the
+            sole frontend keeps it — on every page via this shared header
+            (ADR-0010/0015 amendments). */}
+        <ThemeToggle />
       </PrimaryNav>
     </header>
   );

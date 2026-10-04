@@ -32,8 +32,8 @@ A user pastes a URL (news article, X/Threads post, a YouTube/TikTok video) or ra
 ```mermaid
 flowchart TB
   subgraph CLIENT["Client tier"]
-    PWA["Next.js PWA\napps/web"]
-    SITE["Marketing SPA\napps/site"]
+    PWA["Next.js PWA + landing\napps/web"]
+    SITE["Redirect stub\napps/site → apps/web"]
     MOBILE["Expo app\nplanned, Phase 1"]
   end
 
@@ -129,8 +129,8 @@ The transactional outbox, idempotency keys and the two QStash hops are specified
 
 | Project | Tech | Purpose |
 |---|---|---|
-| `apps/web` | Next.js (App Router) | PWA — submit form, `/checks/[id]`, `/maandamano`, BFF route handlers |
-| `apps/site` | Vite + React | Marketing SPA — hero, methodology, waitlist |
+| `apps/web` | Next.js (App Router) | **The single frontend** — marketing landing (`/`), submit (`/submit`), feed, `/checks/[id]`, `/maandamano`, `/methodology`, waitlist, BFF route handlers. Marketing + app unified ([ADR-0010](docs/adr/0010-client-strategy.md)) |
+| `apps/site` | Vite + React | **Retired to a redirect-only stub** — all paths 308-redirect to `apps/web` (its `vercel.json`). The marketing SPA (hero, methodology, waitlist) was folded into `apps/web`; the Vercel project and git history are intentionally kept ([ADR-0015](docs/adr/0015-deployment-topology.md)) |
 | `apps/mobile` | Expo (planned, Phase 1) | Native share-sheet intake; talks to the API directly, no BFF ([ADR-0010](docs/adr/0010-client-strategy.md), [ADR-0015](docs/adr/0015-deployment-topology.md)) |
 | `packages/core` | TypeScript, zod | Schemas, inferred types, ClaimReview builder, typed API client — the one source of request/response shapes for web and mobile |
 | `packages/db` | Drizzle ORM | Typed Postgres schema and query layer |

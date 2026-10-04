@@ -23,10 +23,12 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -
 source "$SCRIPT_DIR/vercel-common.sh"
 
 readonly PROJECT="fact-checker-ke-site"
-# Smoke paths: the static SPA shell only -- apps/site has one route. The
-# waitlist form itself is exercised in the browser, not by this curl-level
-# smoke; this check only proves the static bundle served correctly and
-# contains the expected markup.
+# apps/site is a retired redirect-only stub (ADR-0010/0015 amendments,
+# 2026-10-04): the marketing site was folded into apps/web. Every path now
+# 308-redirects to the web app, so the smoke proves the redirect fires (308,
+# not 200) and that it points at the web app -- NOT that a static SPA or a
+# waitlist bundle rendered (there is none any more).
+readonly REDIRECT_TARGET="https://fact-checker-ke-web.vercel.app"
 readonly SMOKE_PATHS=(/)
 
 main() {
@@ -53,38 +55,29 @@ main() {
     echo "==> ${PROJECT}: staged at ${deploy_url}"
   fi
 
-  echo "==> ${PROJECT}: smoke testing staged deployment"
+  echo "==> ${PROJECT}: smoke testing staged deployment (expecting 308 redirects)"
   local failed=0
   for path in "${SMOKE_PATHS[@]}"; do
-    vercel-common::smoke_path "$deploy_url" "$path" 200 || failed=1
+    # 308 Permanent Redirect, NOT 200 -- the stub serves no page of its own.
+    # smoke_path uses `vercel curl ... -o /dev/null -w %{http_code}` with no
+    # -L, so it reports the redirect status itself rather than following it.
+    vercel-common::smoke_path "$deploy_url" "$path" 308 || failed=1
   done
 
-  # Content check: the waitlist form markup must be present. apps/site is an
-  # unhydrated Vite SPA (no SSR) -- the served index.html is just
-  # <div id="root"></div> plus a <script src> tag, so the literal page
-  # source never contains "waitlist"; the form only exists once React
-  # mounts client-side from the bundled JS. The real evidence that the
-  # waitlist feature shipped is in that JS bundle, so fetch index.html,
-  # extract its script src, and grep the bundle instead of the shell.
+  # Target check: the redirect must point at the web app, not just be *a*
+  # 308. Fetch headers for `/` and confirm the Location header carries the
+  # web app origin.
   if [[ "$failed" -eq 0 ]]; then
-    local body_file bundle_file bundle_path
-    body_file="$(mktemp)"
-    bundle_file="$(mktemp)"
-    vercel-common::vercel curl / --deployment "$deploy_url" --scope "$VERCEL_SCOPE" -o "$body_file" >/dev/null 2>&1 || true
-    bundle_path="$(grep -o '/assets/[^"]*\.js' "$body_file" | head -n1 || true)"
-    if [[ -z "$bundle_path" ]]; then
-      echo "==> ${PROJECT}: smoke FAILED -- index.html has no /assets/*.js script reference" >&2
-      failed=1
+    local headers_file
+    headers_file="$(mktemp)"
+    vercel-common::vercel curl / --deployment "$deploy_url" --scope "$VERCEL_SCOPE" -D "$headers_file" -o /dev/null >/dev/null 2>&1 || true
+    if grep -i '^location:' "$headers_file" | grep -q "$REDIRECT_TARGET"; then
+      echo "vercel-common: smoke OK ${deploy_url}/ redirects to ${REDIRECT_TARGET}"
     else
-      vercel-common::vercel curl "$bundle_path" --deployment "$deploy_url" --scope "$VERCEL_SCOPE" -o "$bundle_file" >/dev/null 2>&1 || true
-      if ! grep -q "waitlist" "$bundle_file"; then
-        echo "==> ${PROJECT}: smoke FAILED -- bundle ${bundle_path} has no 'waitlist' reference" >&2
-        failed=1
-      else
-        echo "vercel-common: smoke OK ${deploy_url}${bundle_path} contains waitlist markup"
-      fi
+      echo "==> ${PROJECT}: smoke FAILED -- '/' Location does not point at ${REDIRECT_TARGET}" >&2
+      failed=1
     fi
-    rm -f "$body_file" "$bundle_file"
+    rm -f "$headers_file"
   fi
 
   if [[ "$failed" -ne 0 ]]; then
