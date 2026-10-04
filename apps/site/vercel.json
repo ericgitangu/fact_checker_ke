@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "buildCommand": "pnpm --filter @fact-checker-ke/core run build && pnpm run build",
+  "buildCommand": "pnpm --filter @fact-checker-ke/core run build && pnpm --filter @fact-checker-ke/brand run build && pnpm run build",
   "installCommand": "pnpm install --frozen-lockfile"
 }
