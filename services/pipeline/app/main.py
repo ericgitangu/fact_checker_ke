@@ -38,7 +38,14 @@ from app.stages.stubs import run_draft, run_extract, run_normalize, run_retrieve
 from app.stages.synthetic_media_triage import TriageError, run_synthetic_media_triage
 from app.stages.verify import run_verify_hop
 from app.stores.check_store_memory import InMemoryCheckStore
+from app.stores.engine_breaker import (
+    EngineCostBreaker,
+    InMemoryEngineCostBreaker,
+    PostgresEngineCostBreaker,
+)
 from app.stores.fetch_dedup_memory import InMemoryFetchDedupStore
+from app.stores.fetch_dedup_postgres import PostgresFetchDedupStore
+from app.stores.outbox_postgres import emit_fetch_submission_received
 
 logger = logging.getLogger("fact_checker_ke.pipeline")
 
@@ -85,8 +92,49 @@ _abuse_scan = FakeAbuseScan()
 # makes zero outbound fetch-source calls (AT-0032-1) — see
 # app/clients/fetch_source_factory.py.
 _fetch_sources = make_fetch_sources()
-_fetch_dedup_store = InMemoryFetchDedupStore()
 _fetch_scoring_config = FetchScoringConfig.from_env()
+
+# ADR-0032 fetch-enactment slice (migration 0013): when a database is
+# configured, the fetch engine's dedup state, outbox emission, and spend
+# breaker are all REAL and Postgres-backed — closing the TECH-DEBT gaps
+# both app/stores/fetch_dedup_memory.py's and the old fetch_hop.py module
+# docstring flagged. With no database configured (local dev / most unit
+# tests), every one of the three falls back to its process-lifetime
+# in-memory/no-op equivalent — same "real vendor if credentials are
+# present, deterministic fake otherwise" pattern as every other module-
+# level singleton above. One connection, opened once at process start
+# (same lifetime as every other singleton here) — a dropped connection
+# mid-process is a known limitation of this slice (tracked as tech
+# debt: a real high-traffic deployment should use a pool, e.g.
+# `psycopg_pool`, and reconnect-on-error, neither of which this pass
+# implements).
+_fetch_db_conn = None
+try:
+    from app.db import database_url as _fetch_database_url
+
+    if _fetch_database_url():
+        import psycopg as _psycopg
+
+        _fetch_db_conn = _psycopg.connect(_fetch_database_url())  # type: ignore[arg-type]
+except Exception:
+    logger.exception("could not open the fetch engine's Postgres connection — falling back to in-memory stores")
+    _fetch_db_conn = None
+
+_fetch_dedup_store = (
+    PostgresFetchDedupStore(_fetch_db_conn) if _fetch_db_conn is not None else InMemoryFetchDedupStore()
+)
+_fetch_cost_breaker: EngineCostBreaker = (
+    PostgresEngineCostBreaker(_fetch_db_conn) if _fetch_db_conn is not None else InMemoryEngineCostBreaker()
+)
+
+
+def _fetch_emit_submission(claim_text: str, org_id: str, submission_id: str) -> str:
+    """The real-outbox emission strategy (AT-0017-C) — wired only when a
+    database is configured; see app/stores/outbox_postgres.py."""
+    assert _fetch_db_conn is not None
+    return emit_fetch_submission_received(
+        _fetch_db_conn, org_id=org_id, text=claim_text, submission_id=submission_id
+    )
 
 
 @app.get("/healthz")
@@ -139,6 +187,10 @@ class FetchHopResponse(BaseModel):
     attached_observation_only: int
     capped_by_max_emissions: int
     emitted_submission_ids: list[str]
+    # AT-0032-5 observability: whether this run's emissions were
+    # throttled (80%) or it never polled at all (100%, hard-stopped).
+    skipped_soft_stopped: int
+    hard_stopped: bool
 
 
 def _fetch_hop_response(result: FetchHopResult) -> FetchHopResponse:
@@ -149,16 +201,21 @@ def _fetch_hop_response(result: FetchHopResult) -> FetchHopResponse:
         attached_observation_only=result.attached_observation_only,
         capped_by_max_emissions=result.capped_by_max_emissions,
         emitted_submission_ids=[e.submission_id for e in result.emitted],
+        skipped_soft_stopped=result.skipped_soft_stopped,
+        hard_stopped=result.hard_stopped,
     )
 
 
 @app.post("/hops/fetch")
 async def hop_fetch(payload: FetchHopRequest) -> FetchHopResponse:
-    # ADR-0032 §4 kill-switch (AT-0032-6, partial — see app/stages/
-    # fetch_hop.py's module docstring for what else AT-0032-6 covers and
-    # is deferred): flipping this off stops autonomous ingestion at the
-    # hop boundary. Default "true" so dev/test runs exercise the engine
-    # without needing to set anything.
+    # ADR-0032 §4 / AT-0032-6 kill-switch, ingestion side: flipping this
+    # off stops autonomous ingestion at the hop boundary within one
+    # propagation cycle (read fresh on every request — no caching).
+    # Default "true" so dev/test runs exercise the engine without
+    # needing to set anything. The PUBLISH side of AT-0032-6 (halting
+    # autonomous publishing of already-ingested fetched items) is
+    # services/api territory — see services/api/src/lib/
+    # fetch-kill-switch.ts + publish-enactment.ts.
     if os.environ.get("FETCH_ENGINE_ENABLED", "true").lower() == "false":
         return FetchHopResponse(
             candidates_observed=0,
@@ -167,6 +224,8 @@ async def hop_fetch(payload: FetchHopRequest) -> FetchHopResponse:
             attached_observation_only=0,
             capped_by_max_emissions=0,
             emitted_submission_ids=[],
+            skipped_soft_stopped=0,
+            hard_stopped=False,
         )
     result = await run_fetch_hop(
         sources=_fetch_sources,
@@ -176,6 +235,8 @@ async def hop_fetch(payload: FetchHopRequest) -> FetchHopResponse:
         org_id=payload.org_id,
         idempotency_store=_hop_idempotency_store,
         limit_per_source=payload.limit_per_source,
+        cost_breaker=_fetch_cost_breaker,
+        emit_submission=_fetch_emit_submission if _fetch_db_conn is not None else None,
     )
     return _fetch_hop_response(result)
 

@@ -36,6 +36,8 @@ def test_hop_fetch_kill_switch_short_circuits(monkeypatch) -> None:
         "attached_observation_only": 0,
         "capped_by_max_emissions": 0,
         "emitted_submission_ids": [],
+        "skipped_soft_stopped": 0,
+        "hard_stopped": False,
     }
 
 
