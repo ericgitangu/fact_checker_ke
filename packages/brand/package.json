@@ -12,7 +12,7 @@
     "lint": "eslint src --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.json --outDir dist && cp src/wordmark.css dist/wordmark.css && cp src/waving-flag.css dist/waving-flag.css && cp src/two-engine-flow.css dist/two-engine-flow.css"
+    "build": "tsc -p tsconfig.json --outDir dist && cp src/wordmark.css dist/wordmark.css && cp src/waving-flag.css dist/waving-flag.css && cp src/two-engine-flow.css dist/two-engine-flow.css && cp src/reveal.css dist/reveal.css && cp src/verdict-scale.css dist/verdict-scale.css && cp src/confidence-gauge.css dist/confidence-gauge.css"
   },
   "peerDependencies": {
     "react": "^19.2.8",

@@ -537,41 +537,12 @@ a:hover {
 
 /* Confidence weight — the published weight (ADR-0031) that sits alongside
    the verdict stamp, never replacing it: the rating is about the claim,
-   the weight is how sure the evidence makes us. */
-.confidence-weight {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.78rem;
-}
-
-.confidence-weight-label {
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-.confidence-weight-bar {
-  display: inline-block;
-  width: 72px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--rule);
-  overflow: hidden;
-}
-
-.confidence-weight-fill {
-  display: block;
-  height: 100%;
-  background: var(--brand-grad-b);
-  border-radius: inherit;
-}
-
-.confidence-weight-value {
-  font-weight: 700;
-  color: var(--ink-2);
-  font-variant-numeric: tabular-nums;
+   the weight is how sure the evidence makes us. Rendered by the shared
+   <ConfidenceGauge> (packages/brand); this only places it at the right end
+   of the verdict row. The gauge carries its own non-verdict accent colour
+   (the brand green→azure), so it never reads as a rating. */
+.checkcard-gauge {
+  margin-left: auto;
 }
 
 /* The standing caveat (ADR-0033 §A) — always present under the published
@@ -613,70 +584,12 @@ a:hover {
   color: var(--ink-2);
 }
 
-.scale-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
-  background: var(--rule);
-  border: 1px solid var(--rule);
-  border-radius: 14px;
-  overflow: hidden;
-}
-
-.scale-list li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 12px;
-  row-gap: 4px;
-  align-items: baseline;
-  padding: 22px 24px;
-  background: var(--paper);
-}
-
-.scale-list .dot {
-  grid-row: 1 / 3;
-  align-self: start;
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  margin-top: 6px;
-}
-
-.scale-list strong {
-  color: var(--ink);
-  font-weight: 700;
-  font-size: 1.05rem;
-}
-
-.scale-list span:last-child {
-  grid-column: 2;
-  font-size: 0.94rem;
-  color: var(--ink-2);
-  line-height: 1.45;
-}
-
-.v-true .dot {
-  background: var(--true);
-}
-.v-mostly .dot {
-  background: var(--mostly);
-}
-.v-misleading .dot {
-  background: var(--misleading);
-}
-.v-false .dot {
-  background: var(--false);
-}
-.v-unproven .dot {
-  background: var(--unproven);
-}
-.v-nc .dot {
-  background: var(--notcheckable);
-}
+/* The six-verdict scale itself is now the shared <VerdictScale>
+   (packages/brand) — the bespoke stamped-seal set piece that replaced the
+   old flat coloured-dot rows. The `.scale` section frame + `.scale-intro`
+   above stay here (apps/site chrome); the seals, their earned colours and
+   the stamp-in motion all live in the component so apps/site and apps/web
+   render the identical scale. */
 
 /* ---------- pipeline (a genuine sequence) ---------- */
 .pipeline {
@@ -1048,7 +961,6 @@ a:hover {
     grid-template-columns: 1fr;
     gap: 40px;
   }
-  .scale-list,
   .principles-list {
     grid-template-columns: 1fr;
   }

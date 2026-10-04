@@ -1,0 +1,237 @@
+/*
+ * <VerdictScale> — the signature set piece's chrome. Self-contained, same
+ * independence contract as two-engine-flow.css: the six earned verdict hues
+ * are the AA-fixed "On the record" values (apps/web globals.css /
+ * apps/site index.css), carried here per-variant so the scale renders
+ * identically in either app. Light + dark both tuned for AA at these exact
+ * text sizes (the seal glyph and verdict name sit on the verdict's own
+ * pale tint; the ink values already clear 4.5:1 there — the same pairs the
+ * apps' verdict stamps use).
+ *
+ * The seal is the motif: a glyph in a double-ruled ink tile (inset second
+ * ring + dot-grain texture echo the full verdict stamp), the verdict's
+ * colour on its own tint. The six stamp in, in sequence, on reveal.
+ */
+
+.fck-scale {
+  /* neutrals */
+  --fck-scale-paper: #ffffff;
+  --fck-scale-ink: #15181b;
+  --fck-scale-ink-2: #585f66;
+  --fck-scale-rule: #e4e3dc;
+  --fck-scale-rule-strong: #d2d0c6;
+
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.fck-scale-dark {
+  --fck-scale-paper: #141a17;
+  --fck-scale-ink: #f1f3ef;
+  --fck-scale-ink-2: #b7c0ba;
+  --fck-scale-rule: #263029;
+  --fck-scale-rule-strong: #35433b;
+}
+
+/* ---- the six earned hues (colour + pale tint it sits on) ---- */
+.fck-scale-true {
+  --v: #0d7c47;
+  --v-tint: #e7f2ec;
+}
+.fck-scale-mostly {
+  --v: #577811;
+  --v-tint: #f1f5e3;
+}
+.fck-scale-misleading {
+  --v: #9c5e00;
+  --v-tint: #f8eedd;
+}
+.fck-scale-false {
+  --v: #c8102e;
+  --v-tint: #fbe6ea;
+}
+.fck-scale-unproven {
+  --v: #666c7a;
+  --v-tint: #eceef0;
+}
+.fck-scale-notcheckable {
+  --v: #7860a1;
+  --v-tint: #efecf5;
+}
+
+.fck-scale-dark .fck-scale-true {
+  --v: #30cf84;
+  --v-tint: rgba(48, 207, 132, 0.15);
+}
+.fck-scale-dark .fck-scale-mostly {
+  --v: #a9d53f;
+  --v-tint: rgba(169, 213, 63, 0.15);
+}
+.fck-scale-dark .fck-scale-misleading {
+  --v: #f0a93f;
+  --v-tint: rgba(240, 169, 63, 0.15);
+}
+.fck-scale-dark .fck-scale-false {
+  --v: #ff6b7f;
+  --v-tint: rgba(255, 107, 127, 0.15);
+}
+.fck-scale-dark .fck-scale-unproven {
+  --v: #9aa6ae;
+  --v-tint: rgba(154, 166, 174, 0.15);
+}
+.fck-scale-dark .fck-scale-notcheckable {
+  --v: #c4a9f5;
+  --v-tint: rgba(196, 169, 245, 0.15);
+}
+
+/* ---- the seal card ---- */
+.fck-scale-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+  background: var(--fck-scale-paper);
+  border: 1px solid var(--fck-scale-rule);
+  border-radius: 14px;
+  /* a thin coloured spine down the left edge — the verdict's colour, the
+     one place it touches the card frame, so the row reads as "filed under"
+     this verdict without flooding it. */
+  box-shadow: inset 3px 0 0 0 var(--v);
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.fck-scale-item:hover,
+.fck-scale-item:focus-within {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--v) 45%, var(--fck-scale-rule));
+  box-shadow:
+    inset 3px 0 0 0 var(--v),
+    0 10px 28px -20px color-mix(in srgb, var(--v) 70%, transparent);
+}
+
+/* the seal: glyph in a double-ruled ink tile */
+.fck-scale-seal {
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  color: var(--v);
+  background: var(--v-tint);
+  border: 1.5px solid color-mix(in srgb, var(--v) 55%, transparent);
+  /* the inset second ring, cut from the tint — the stamp's double line */
+  box-shadow:
+    inset 0 0 0 2.5px var(--v-tint),
+    inset 0 0 0 3.5px color-mix(in srgb, var(--v) 28%, transparent);
+  transition: transform 0.2s cubic-bezier(0.22, 1.1, 0.36, 1);
+}
+
+/* dot-grain ink texture, same device as the verdict stamp */
+.fck-scale-seal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: radial-gradient(currentColor 0.6px, transparent 0.6px);
+  background-size: 3.5px 3.5px;
+  opacity: 0.14;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.fck-scale-dark .fck-scale-seal::before {
+  mix-blend-mode: screen;
+  opacity: 0.18;
+}
+
+.fck-scale-item:hover .fck-scale-seal,
+.fck-scale-item:focus-within .fck-scale-seal {
+  transform: rotate(-3deg) scale(1.04);
+}
+
+.fck-scale-glyph {
+  position: relative;
+}
+
+.fck-scale-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fck-scale-name {
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  color: var(--v);
+}
+
+.fck-scale-desc {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--fck-scale-ink-2);
+}
+
+/* ---- the orchestrated reveal: six seals stamp in, in sequence ---- */
+.fck-scale-item {
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+}
+
+.fck-scale.is-revealed .fck-scale-item {
+  animation: fck-scale-stamp 0.5s cubic-bezier(0.22, 1.1, 0.36, 1) both;
+  animation-delay: calc(var(--fck-scale-i, 0) * 0.09s);
+}
+
+@keyframes fck-scale-stamp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(0) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (min-width: 560px) {
+  .fck-scale {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 16px;
+  }
+}
+
+@media (min-width: 960px) {
+  .fck-scale {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Belt-and-braces reduced motion (same pattern as two-engine-flow.css):
+   force the finished, static state regardless of JS timing. */
+@media (prefers-reduced-motion: reduce) {
+  .fck-scale-item,
+  .fck-scale-seal {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

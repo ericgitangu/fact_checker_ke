@@ -12,6 +12,12 @@ import {
   GaugeIcon,
   MegaphoneIcon,
   EyeIcon,
+  VerdictTrueIcon,
+  VerdictMostlyTrueIcon,
+  VerdictMisleadingIcon,
+  VerdictFalseIcon,
+  VerdictUnprovenIcon,
+  VerdictNotCheckableIcon,
 } from "./icons";
 
 describe("icons", () => {
@@ -27,6 +33,12 @@ describe("icons", () => {
     ["GaugeIcon", GaugeIcon],
     ["MegaphoneIcon", MegaphoneIcon],
     ["EyeIcon", EyeIcon],
+    ["VerdictTrueIcon", VerdictTrueIcon],
+    ["VerdictMostlyTrueIcon", VerdictMostlyTrueIcon],
+    ["VerdictMisleadingIcon", VerdictMisleadingIcon],
+    ["VerdictFalseIcon", VerdictFalseIcon],
+    ["VerdictUnprovenIcon", VerdictUnprovenIcon],
+    ["VerdictNotCheckableIcon", VerdictNotCheckableIcon],
   ] as const)("%s renders a decorative (aria-hidden) svg with currentColor stroke", (_name, Icon) => {
     const { container } = render(<Icon />);
     const svg = container.querySelector("svg");

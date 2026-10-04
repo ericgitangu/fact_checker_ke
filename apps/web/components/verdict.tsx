@@ -1,5 +1,27 @@
 import type { Rating } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
+import {
+  VerdictTrueIcon,
+  VerdictMostlyTrueIcon,
+  VerdictMisleadingIcon,
+  VerdictFalseIcon,
+  VerdictUnprovenIcon,
+  VerdictNotCheckableIcon,
+} from "@fact-checker-ke/brand";
+
+/**
+ * The bespoke verdict glyphs (packages/brand), one per rating — the same
+ * icon system as the <VerdictScale> set piece, so a feed-row chip and the
+ * scale on the methodology page speak the identical visual language.
+ */
+const RATING_ICON: Record<Rating, React.ComponentType<{ size?: number; className?: string }>> = {
+  True: VerdictTrueIcon,
+  MostlyTrue: VerdictMostlyTrueIcon,
+  Misleading: VerdictMisleadingIcon,
+  False: VerdictFalseIcon,
+  Unproven: VerdictUnprovenIcon,
+  NotCheckable: VerdictNotCheckableIcon,
+};
 
 /**
  * The verdict stamp is the ONE saturated-colour object on any page (see
@@ -35,12 +57,13 @@ export async function VerdictStamp({ rating }: { rating: Rating }): Promise<Reac
   );
 }
 
-/** Compact variant for list views (e.g. a future checks index, search results). */
+/** Compact variant for list views (e.g. the feed, a future checks index). */
 export async function VerdictChip({ rating }: { rating: Rating }): Promise<React.JSX.Element> {
   const t = await getTranslations("check");
+  const Icon = RATING_ICON[rating];
   return (
     <span className={`verdict-chip v-${rating}`}>
-      <span aria-hidden="true">●</span>
+      <Icon size={15} className="verdict-chip-icon" />
       {t(RATING_KEYS[rating])}
     </span>
   );

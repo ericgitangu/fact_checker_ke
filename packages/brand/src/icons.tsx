@@ -142,3 +142,86 @@ export function EyeIcon({ size = 18, className, ...rest }: IconProps): React.JSX
     </svg>
   );
 }
+
+/*
+ * ---- Verdict glyphs (see verdict-scale.tsx) -------------------------------
+ *
+ * A DELIBERATE icon system, not six interchangeable lucide defaults. The
+ * four graded evidentiary verdicts (True / Mostly true / False / Unproven)
+ * share a ring family — they all sit on the same "what does the evidence
+ * support?" axis, so they read as one scale. The two off-axis verdicts
+ * break the ring on purpose: Misleading is a *refracted line* (the facts
+ * are real, the framing bends them), and Not checkable is a *speech mark*
+ * (it's an opinion or prediction — not on the true↔false axis at all).
+ * Authored here in the same 24x24 round-cap stroke language as the set
+ * above, geometry hand-tuned rather than copied, so the scale is ours.
+ *
+ * Each takes a stroke-drawing `drawn` escape hatch: the path lengths are
+ * fixed via CSS (verdict-scale.css) so the mark can "ink in" on reveal;
+ * the component only toggles a class, the icons stay presentational.
+ */
+
+/** True — sealed ring + confident check. The full, closed ring = the top of the scale. */
+export function VerdictTrueIcon({ size = 22, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m7.75 12.5 2.75 2.75L16.5 9" />
+    </svg>
+  );
+}
+
+/** Mostly true — same check, but the ring is left open at the top: affirmed, with a gap. */
+export function VerdictMostlyTrueIcon({ size = 22, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <path d="M14.5 3.5a9 9 0 1 1-5 0" />
+      <path d="m7.75 12.5 2.75 2.75L16.5 9" />
+    </svg>
+  );
+}
+
+/** Misleading — a straight ray that kinks at a boundary: real facts, bent framing. */
+export function VerdictMisleadingIcon({ size = 22, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <path d="M3 7h18" strokeDasharray="2.5 3" />
+      <path d="M5 4.5 11 11l-2 7.5" />
+      <path d="m9 18.5 5-3.25" />
+    </svg>
+  );
+}
+
+/** False — ring + decisive cross. */
+export function VerdictFalseIcon({ size = 22, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9 9 6 6" />
+      <path d="m15 9-6 6" />
+    </svg>
+  );
+}
+
+/** Unproven — ring + question: the evidence isn't in yet. */
+export function VerdictUnprovenIcon({ size = 22, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.4 9.4a2.6 2.6 0 0 1 4.7 1.5c0 1.7-2.5 2.2-2.5 3.6" />
+      <path d="M12 17.2h.01" />
+    </svg>
+  );
+}
+
+/** Not checkable — a speech mark, off the true↔false axis: opinion, prediction, belief. */
+export function VerdictNotCheckableIcon({ size = 22, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" />
+      <path d="M8.5 10.5h.01" />
+      <path d="M12 10.5h.01" />
+      <path d="M15.5 10.5h.01" />
+    </svg>
+  );
+}

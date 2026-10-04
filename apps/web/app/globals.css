@@ -607,6 +607,28 @@ a:hover {
   background: var(--status-slate-tint);
 }
 
+.ingest-badge-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: -1px;
+}
+
+/* The shared <ConfidenceGauge> (packages/brand) sits at the right end of a
+   feed card's head row — the bespoke replacement for the old plain
+   "Confidence weight: 88%" line. It carries its own non-verdict accent
+   (brand green→azure), never a rating hue. Pushed right so the verdict
+   chip + ingest badge read first, the "how sure" weight second. */
+.feedcard-gauge {
+  margin-left: auto;
+}
+
+/* The bespoke verdict glyph inside the compact chip (verdict.tsx) — same
+   icon system as the <VerdictScale> seals, inheriting the chip's earned
+   verdict colour via currentColor. */
+.verdict-chip-icon {
+  flex: none;
+}
+
 /* Per-item collapsed caveat note (legal-caveat.tsx's `FeedItemCaveatNote`)
    -- deliberately the SAME quiet footnote register as `.legal-caveat-body`
    (small type, muted ink) but with no top rule of its own: it is the tail

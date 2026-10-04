@@ -8,6 +8,10 @@ import {
   ShieldCheckIcon,
   SunIcon,
   TwoEngineFlow,
+  VerdictScale,
+  ConfidenceGauge,
+  Reveal,
+  Stagger,
   useTheme,
 } from "@fact-checker-ke/brand";
 import { ADVOCATE_SIGNOFF_COMPLETE, STANDING_CAVEAT_SHORT } from "@fact-checker-ke/core";
@@ -61,7 +65,7 @@ function App(): React.JSX.Element {
 
       <main id="top">
         <section className="hero">
-          <div className="hero-copy">
+          <Stagger className="hero-copy" motion="rise" step={0.09} threshold={0.01}>
             <h1>
               Kenya&rsquo;s loudest claims,
               <br />
@@ -81,8 +85,9 @@ function App(): React.JSX.Element {
                 Read the methodology
               </a>
             </div>
-          </div>
+          </Stagger>
 
+          <Reveal className="hero-card-reveal" motion="press" delay={0.25} threshold={0.01}>
           <figure className="checkcard" aria-label="Sample fact-check">
             <figcaption className="checkcard-tag">Sample fact-check</figcaption>
             <p className="checkcard-claim">
@@ -91,18 +96,13 @@ function App(): React.JSX.Element {
             <p className="checkcard-source-claim">viral on TikTok &mdash; 1.2M views</p>
             <div className="verdict verdict-misleading">
               <span className={`verdict-stamp${claimTyped ? " stamp-ready" : ""}`}>Misleading</span>
-              <span className="confidence-weight">
-                <span className="confidence-weight-label">Confidence</span>
-                <span className="confidence-weight-bar" aria-hidden="true">
-                  <span
-                    className="confidence-weight-fill"
-                    style={{ width: `${Math.round(SAMPLE_CONFIDENCE * 100)}%` }}
-                  />
-                </span>
-                <span className="confidence-weight-value">
-                  {Math.round(SAMPLE_CONFIDENCE * 100)}%
-                </span>
-              </span>
+              <ConfidenceGauge
+                value={SAMPLE_CONFIDENCE}
+                label="Confidence"
+                variant={theme}
+                size="sm"
+                className="checkcard-gauge"
+              />
             </div>
             <p className="checkcard-rationale">
               KNBS puts the 2024 unemployment rate near 5.6%. The 2% figure
@@ -128,48 +128,18 @@ function App(): React.JSX.Element {
               AI assessment, for research purposes; you decide.
             </p>
           </figure>
+          </Reveal>
         </section>
 
         <section className="scale" aria-labelledby="scale-h">
-          <div className="scale-intro">
+          <Reveal className="scale-intro" motion="rise">
             <h2 id="scale-h">Six verdicts. No opinions.</h2>
             <p>
               Every claim lands on one of six ratings, each tied to what the evidence
               actually supports &mdash; never to who said it.
             </p>
-          </div>
-          <ul className="scale-list">
-            <li className="v-true">
-              <span className="dot" aria-hidden="true" />
-              <strong>True</strong>
-              <span>Backed by credible evidence, with no material caveat.</span>
-            </li>
-            <li className="v-mostly">
-              <span className="dot" aria-hidden="true" />
-              <strong>Mostly true</strong>
-              <span>Accurate in the main, but missing context changes the picture.</span>
-            </li>
-            <li className="v-misleading">
-              <span className="dot" aria-hidden="true" />
-              <strong>Misleading</strong>
-              <span>Technically sourced, but framed to imply something the data doesn&rsquo;t.</span>
-            </li>
-            <li className="v-false">
-              <span className="dot" aria-hidden="true" />
-              <strong>False</strong>
-              <span>Contradicted by the credible evidence we can find.</span>
-            </li>
-            <li className="v-unproven">
-              <span className="dot" aria-hidden="true" />
-              <strong>Unproven</strong>
-              <span>No reliable evidence either way, yet.</span>
-            </li>
-            <li className="v-nc">
-              <span className="dot" aria-hidden="true" />
-              <strong>Not checkable</strong>
-              <span>An opinion, a prediction, or a matter of belief &mdash; not a fact.</span>
-            </li>
-          </ul>
+          </Reveal>
+          <VerdictScale variant={theme} ariaLabel="The six-verdict rating scale" />
         </section>
 
         <section className="pipeline" aria-labelledby="pipeline-h">

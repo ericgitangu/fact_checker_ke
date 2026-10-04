@@ -19,8 +19,21 @@ export {
   GaugeIcon,
   MegaphoneIcon,
   EyeIcon,
+  VerdictTrueIcon,
+  VerdictMostlyTrueIcon,
+  VerdictMisleadingIcon,
+  VerdictFalseIcon,
+  VerdictUnprovenIcon,
+  VerdictNotCheckableIcon,
 } from "./icons";
 export { useTheme } from "./use-theme";
 export type { Theme } from "./use-theme";
 export { TwoEngineFlow } from "./two-engine-flow";
 export type { TwoEngineFlowVariant } from "./two-engine-flow";
+export { useReveal } from "./use-reveal";
+export type { UseRevealOptions, UseRevealResult } from "./use-reveal";
+export { Reveal, Stagger } from "./reveal";
+export { VerdictScale } from "./verdict-scale";
+export type { VerdictScaleVariant } from "./verdict-scale";
+export { ConfidenceGauge } from "./confidence-gauge";
+export type { ConfidenceGaugeVariant, ConfidenceGaugeSize } from "./confidence-gauge";

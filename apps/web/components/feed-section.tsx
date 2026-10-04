@@ -1,6 +1,7 @@
 import type { FeedItem } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
+import { Reveal } from "@fact-checker-ke/brand";
 import { FeedItemCard } from "./feed-item-card";
 import { LegalCaveat } from "./legal-caveat";
 
@@ -51,8 +52,12 @@ export async function FeedSection({
       ) : (
         <ul className="feed-list">
           {await Promise.all(
-            items.map(async (item: FeedItem) => (
-              <li key={item.id}>{await FeedItemCard({ item })}</li>
+            items.map(async (item: FeedItem, i: number) => (
+              <li key={item.id}>
+                <Reveal motion="rise" delay={Math.min(i, 4) * 0.06}>
+                  {await FeedItemCard({ item })}
+                </Reveal>
+              </li>
             )),
           )}
         </ul>

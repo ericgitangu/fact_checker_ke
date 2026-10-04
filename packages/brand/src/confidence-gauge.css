@@ -1,0 +1,120 @@
+/*
+ * <ConfidenceGauge> chrome. Self-contained palette (same independence
+ * contract as two-engine-flow.css): the AA-fixed "On the record" neutrals
+ * plus the brand mark's green→azure accent gradient — never a verdict hue,
+ * because a confidence weight is not a rating. Light + dark variants carry
+ * their own values rather than relying on a host token so the component
+ * renders identically dropped into either app.
+ */
+
+.fck-gauge {
+  --fck-gauge-track: #e4e3dc;
+  --fck-gauge-ink: #15181b;
+  --fck-gauge-ink-2: #696e74;
+  --fck-gauge-grad-a: #17a862;
+  --fck-gauge-grad-b: #2458d6;
+
+  display: inline-grid;
+  grid-template-rows: auto auto;
+  justify-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.fck-gauge-dark {
+  --fck-gauge-track: #263029;
+  --fck-gauge-ink: #f1f3ef;
+  --fck-gauge-ink-2: #b7c0ba;
+  --fck-gauge-grad-a: #30cf84;
+  --fck-gauge-grad-b: #6aa3ff;
+}
+
+.fck-gauge-sm {
+  --fck-gauge-w: 64px;
+}
+.fck-gauge-md {
+  --fck-gauge-w: 92px;
+}
+
+.fck-gauge-svg {
+  grid-row: 1;
+  grid-column: 1;
+  width: var(--fck-gauge-w);
+  height: auto;
+  overflow: visible;
+}
+
+.fck-gauge-track {
+  fill: none;
+  stroke: var(--fck-gauge-track);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.fck-gauge-fill {
+  fill: none;
+  stroke-width: 7;
+  stroke-linecap: round;
+  /* The sweep: the dash runway is set inline (= arc length); the offset
+     transitions from full (empty) to its value once `.is-revealed` lands. */
+  transition: stroke-dashoffset 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s;
+}
+
+.fck-gauge-tick {
+  fill: var(--fck-gauge-grad-b);
+  stroke: #fff;
+  stroke-width: 1.5;
+  transition:
+    cx 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s,
+    cy 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s;
+}
+
+.fck-gauge-dark .fck-gauge-tick {
+  stroke: #0c100e;
+}
+
+/* The numeric readout nests inside the arc's open centre. */
+.fck-gauge-readout {
+  grid-row: 1;
+  grid-column: 1;
+  align-self: end;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  color: var(--fck-gauge-ink);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  transform: translateY(2px);
+}
+
+.fck-gauge-md .fck-gauge-value {
+  font-size: 1.5rem;
+}
+.fck-gauge-sm .fck-gauge-value {
+  font-size: 1.05rem;
+}
+
+.fck-gauge-unit {
+  font-size: 0.7em;
+  color: var(--fck-gauge-ink-2);
+  font-weight: 700;
+}
+
+.fck-gauge-label {
+  grid-row: 2;
+  grid-column: 1;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fck-gauge-ink-2);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fck-gauge-fill,
+  .fck-gauge-tick {
+    transition: none !important;
+  }
+}

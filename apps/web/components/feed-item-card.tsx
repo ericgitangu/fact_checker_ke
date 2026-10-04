@@ -1,5 +1,6 @@
 import type { FeedItem } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
+import { ConfidenceGauge, RadarIcon, PenLineIcon } from "@fact-checker-ke/brand";
 import { VerdictChip } from "./verdict";
 import { FeedItemCaveatNote } from "./legal-caveat";
 
@@ -37,18 +38,23 @@ export async function FeedItemCard({ item }: { item: FeedItem }): Promise<React.
     <article className="feedcard" aria-label={item.claim}>
       <div className="feedcard-head">
         <span className={`ingest-badge ingest-badge-${item.ingestSource}`}>
+          <span className="ingest-badge-icon" aria-hidden="true">
+            {item.ingestSource === "fetch" ? <RadarIcon size={13} /> : <PenLineIcon size={13} />}
+          </span>
           {t(`source.${item.ingestSource}`)}
         </span>
         {await VerdictChip({ rating: item.rating })}
+        {item.calibratedConfidence !== null && (
+          <ConfidenceGauge
+            value={item.calibratedConfidence}
+            label={tCheck("guidance.confidenceLabel")}
+            size="sm"
+            className="feedcard-gauge"
+          />
+        )}
       </div>
 
       <p className="feedcard-claim">{item.claim}</p>
-
-      {item.calibratedConfidence !== null && (
-        <p className="checkcard-confidence">
-          {tCheck("guidance.confidenceLabel")}: {Math.round(item.calibratedConfidence * 100)}%
-        </p>
-      )}
 
       <p className="checkcard-rationale">{tCheck("guidance.claimAttributedNote")}</p>
 
