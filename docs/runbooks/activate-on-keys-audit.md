@@ -1,5 +1,26 @@
 # Activate-on-keys audit: will dropping real keys actually activate the client?
 
+**Revision note (go-live-plumbing PR):** the table below and the two gap
+sections after it are the ORIGINAL audit, left intact (per CLAUDE.md's
+"edit additively" rule — nothing here was deleted). Two things it
+documents as blocking are now CLOSED by that PR; read each row's text as
+historical ("no secret container exists") alongside this note:
+
+- **Secret containers + Cloud Run wiring for `ANTHROPIC_API_KEY`,
+  `YOUTUBE_API_KEY`, `GOOGLE_FACTCHECK_API_KEY` now exist** —
+  `infra/terraform/envs/prod/secrets.tf`'s `secret_anthropic_api_key`,
+  `secret_youtube_api_key`, `secret_google_factcheck_api_key` modules +
+  matching `pipeline_service.secret_env` entries in `cloud_run.tf`. Two
+  more the same PR's brief named are wired the same way:
+  `REVERSE_IMAGE_API_KEY` (pipeline) and `REVALIDATE_SECRET` (api). A
+  container for `X_API_BEARER_TOKEN` was also created, but deliberately
+  left un-wired in `secret_env` — the "X / Twitter API v2" row below is
+  still accurate: no code reads any X-related env var yet.
+  `TRIAGE_FEED_URLS` is still unwired (that row below is still fully
+  accurate, unchanged by this PR — it wasn't in this task's named scope).
+- **The "Gap: publish-enactment is not wired into any live route"
+  section below is now CLOSED** — see that section's own update note.
+
 Companion to [`go-live.md`](./go-live.md) step 3. ADR-0032 names the
 "activate on owner's keys" pattern explicitly: each fetch-engine client
 is a real implementation behind a Protocol, selected by a factory that
@@ -24,6 +45,25 @@ unattended." Any other row names the exact gap.
 | **STT (GCP STT v2 `chirp_2` provisional per ADR-0005, or any other provider)** | n/a — **no env var exists** | `services/pipeline/app/protocols/transcriber.py`'s own docstring: "Only a fake implementation exists in this skeleton (no real STT vendor call, no API keys)." `services/pipeline/app/fakes/fake_transcriber.py` is the only `Transcriber` implementation found. No `make_transcriber()`-style factory exists (unlike every other client above). | N/A | N/A | **No — code gap, not a key/config gap.** Same class of gap as X. | A real `Transcriber` implementation (GCP STT v2 client, selected by env var the way every other client here is) must be written. ADR-0005's Round-B eval (≥10 Sheng/code-switched, ≥10 noisy clips) is also still outstanding (AT-0005-1/-2 both RED) — the provider choice itself is only provisional pending that data. Out of scope for this docs/infra-audit task. |
 
 ## Gap: publish-enactment is not wired into any live route
+
+**CLOSED as of the go-live-plumbing PR — re-verified empirically, not
+assumed.** `grep -rln "enactPublishDecision" services/api/src --include="*.ts" | grep -v __tests__`
+now returns `app.ts`, `lib/submission-orchestrator.ts`, and
+`lib/publish-enactment.ts` itself. `submission-orchestrator.ts` calls
+`services/pipeline`'s `/hops/analyze` then `/hops/verify` over real HTTP
+and feeds the verify hop's publish decision into `enactPublishDecision`,
+which is wired into the live `POST /internal/hops/orchestrate` route.
+`services/api/src/__tests__/submission-orchestration-e2e.integration.test.ts`
+proves this end-to-end (real relay, real route, a real spawned pipeline
+process, fakes-only). **This means the risk this section originally
+described is live, not latent** — go-live.md's step 2 freeze is doing
+real work, confirmed by `services/api/src/__tests__/
+safe-launch-seed.integration.test.ts` (a fresh-migrated DB reads both
+kill-switches frozen) and by this same e2e suite, which now explicitly
+unfreezes both switches in its own setup specifically because
+`db/migrations/0014_safe_launch_shadow_mode_seed.sql` changed the shared
+integration DB's default. The original finding is preserved below
+unedited, for history:
 
 Not a per-client activation gap, but the single most important finding
 of this audit, repeated here for visibility (full detail in
@@ -53,6 +93,14 @@ of this audit, repeated here for visibility (full detail in
   operationally.
 
 ## Why no Terraform file was changed by this task
+
+**Superseded by the go-live-plumbing PR** — that follow-up task's brief
+explicitly asked for exactly the secret containers + `secret_env`/CORS
+wiring this section declined to add, so they were added there (see the
+revision note at the top of this doc). The reasoning below is kept
+unedited as the record of why THIS session, under a narrower brief, made
+the opposite call — read it as "why not yet, at the time," not as a
+standing objection.
 
 The task brief allowed touching `infra/terraform` only for "a concrete,
 safe, no-cost readiness gap (e.g. a documented variable default)," with
@@ -89,11 +137,14 @@ intentionally stops short of making that call unilaterally.
 
 ## Summary: what blocks "drop keys and it just works"
 
-| # | Gap | Blocks | Severity |
-|---|---|---|---|
-| 1 | No Secret Manager container + `secret_env` wiring for `ANTHROPIC_API_KEY`, `YOUTUBE_API_KEY`, `GOOGLE_FACTCHECK_API_KEY` | Every fetch/verify LLM call, YouTube ingestion, FactCheck-Tools retrieval | Blocking |
-| 2 | No wiring (not even a plain env var) for `TRIAGE_FEED_URLS` | Triage-feed ingestion (free, highest-signal source per ADR-0032) | Blocking (but trivial to close) |
-| 3 | `enactPublishDecision` not called from any production route | All real auto-publish, regardless of kill-switch state | Blocking |
-| 4 | No real X client exists | X as a fetch source | Not blocking go-live (X was never required for this go-live) |
-| 5 | No real STT (`Transcriber`) implementation exists | Audio-derived claims from the compliant STT subset | Not blocking go-live for text-derivable claims; blocks audio coverage specifically |
-| 6 | No `ADVOCATE_SIGNOFF_COMPLETE`-style flag in code | Automated enforcement of ADR-0033's publish gate — currently a process-only control | Not a code blocker, but a real process gate that must be honoured manually |
+**Updated status column added by the go-live-plumbing PR — the `Gap`/
+`Blocks`/`Severity` columns are the original, unedited audit.**
+
+| # | Gap | Blocks | Severity | Status |
+|---|---|---|---|---|
+| 1 | No Secret Manager container + `secret_env` wiring for `ANTHROPIC_API_KEY`, `YOUTUBE_API_KEY`, `GOOGLE_FACTCHECK_API_KEY` | Every fetch/verify LLM call, YouTube ingestion, FactCheck-Tools retrieval | Blocking | **CLOSED** — plus `REVERSE_IMAGE_API_KEY`/`REVALIDATE_SECRET`, see revision note at top |
+| 2 | No wiring (not even a plain env var) for `TRIAGE_FEED_URLS` | Triage-feed ingestion (free, highest-signal source per ADR-0032) | Blocking (but trivial to close) | **Still open** — not in this PR's named scope |
+| 3 | `enactPublishDecision` not called from any production route | All real auto-publish, regardless of kill-switch state | Blocking | **CLOSED** — see the gap section above |
+| 4 | No real X client exists | X as a fetch source | Not blocking go-live (X was never required for this go-live) | Still open (a Secret Manager container was created ahead of time per this PR's brief; not wired, see §3.1 of go-live.md) |
+| 5 | No real STT (`Transcriber`) implementation exists | Audio-derived claims from the compliant STT subset | Not blocking go-live for text-derivable claims; blocks audio coverage specifically | Still open, unchanged |
+| 6 | No `ADVOCATE_SIGNOFF_COMPLETE`-style flag in code | Automated enforcement of ADR-0033's publish gate — currently a process-only control | Not a code blocker, but a real process gate that must be honoured manually | Still open, unchanged |

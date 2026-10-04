@@ -1,3 +1,4 @@
 # False positives — gcloud command examples in ADR docs (no real secrets).
 # Fingerprint format: <file>:<rule>:<startline>
 docs/adr/0016-deploy-rail-iac.md:generic-api-key:179
+docs/runbooks/go-live.md:generic-api-key:466
