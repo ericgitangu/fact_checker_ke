@@ -85,6 +85,12 @@ WORKDIR /app
 COPY --from=build --chown=1000:1000 /repo/out/dist ./dist
 COPY --from=build --chown=1000:1000 /repo/out/node_modules ./node_modules
 COPY --from=build --chown=1000:1000 /repo/out/package.json ./package.json
+# Drizzle migration SQL (repo-root db/migrations, not a workspace package,
+# so it comes from the full-repo skeleton stage). Carried here so this one
+# image doubles as the migrate job (CMD override + MIGRATIONS_DIR=/app/db/
+# migrations — see the fact-checker-ke-migrate Cloud Run Job). ~tens of KB;
+# the api server process never reads them.
+COPY --from=skeleton --chown=1000:1000 /repo/db/migrations ./db/migrations
 USER 1000
 # Cloud Run injects PORT (default 8080 locally); server.ts reads
 # process.env.PORT itself, so no shell/entrypoint indirection is needed.

@@ -112,6 +112,19 @@ module "migrate_job" {
   region                = var.region
   image                 = var.migrate_image
   service_account_email = google_service_account.migrate_runtime.email
+
+  # migrate_image is the same artifact as api_image (pass $API_DIGEST for
+  # both). The api image's default CMD starts the Fastify server; this job
+  # overrides it to run the Drizzle migrator entrypoint instead (compiled
+  # from packages/db/src/migrate.ts into the db package's dist, present in
+  # the image's node_modules). MIGRATIONS_DIR points at the SQL files the
+  # Dockerfile COPY'd to /app/db/migrations.
+  command = ["node"]
+  args    = ["node_modules/@fact-checker-ke/db/dist/migrate.js"]
+  plain_env = {
+    MIGRATIONS_DIR = "/app/db/migrations"
+  }
+
   secret_env = {
     DATABASE_URL_DIRECT = {
       secret = module.secret_database_url_direct.secret_id

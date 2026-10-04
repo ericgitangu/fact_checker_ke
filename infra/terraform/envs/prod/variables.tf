@@ -1,6 +1,6 @@
 variable "project_id" {
   type    = string
-  default = "master-crossing-435409-r1"
+  default = "fact-checker-ke"
 }
 
 variable "region" {
