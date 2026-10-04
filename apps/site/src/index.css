@@ -413,6 +413,10 @@ a:hover {
 
 .verdict {
   margin: 22px 0 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
 }
 
 /* A verdict reads as something stamped onto the public record, not a UI
@@ -531,18 +535,62 @@ a:hover {
   color: var(--ink-2);
 }
 
-.checkcard-review {
-  margin-top: 18px;
-  font-size: 0.86rem;
-  color: var(--true);
-  font-weight: 500;
-  display: flex;
+/* Confidence weight — the published weight (ADR-0031) that sits alongside
+   the verdict stamp, never replacing it: the rating is about the claim,
+   the weight is how sure the evidence makes us. */
+.confidence-weight {
+  display: inline-flex;
   align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.confidence-weight-label {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.confidence-weight-bar {
+  display: inline-block;
+  width: 72px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--rule);
+  overflow: hidden;
+}
+
+.confidence-weight-fill {
+  display: block;
+  height: 100%;
+  background: var(--brand-grad-b);
+  border-radius: inherit;
+}
+
+.confidence-weight-value {
+  font-weight: 700;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The standing caveat (ADR-0033 §A) — always present under the published
+   output, distinct from the editorial "we cite everything" principle:
+   this is the per-assessment disclosure, not a site-wide claim. */
+.checkcard-caveat {
+  margin-top: 18px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+  display: flex;
+  align-items: flex-start;
   gap: 7px;
 }
 
-.checkcard-review svg {
+.checkcard-caveat svg {
   flex: none;
+  margin-top: 2px;
+  color: var(--true);
 }
 
 /* ---------- verdict scale ---------- */
@@ -881,6 +929,105 @@ a:hover {
 }
 
 .footer-meta a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- legal pages (/terms, /privacy — ADR-0033) ---------- */
+.legal-page {
+  width: min(100% - var(--gutter) * 2, 72ch);
+  margin-inline: auto;
+  padding: clamp(24px, 5vw, 56px) 0 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.legal-page h1 {
+  font-size: clamp(1.8rem, 3.6vw, 2.5rem);
+  margin-top: 10px;
+}
+
+.legal-draft-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border: 1px solid var(--misleading);
+  border-radius: 999px;
+  color: var(--stamp-misleading);
+  background: var(--misleading-tint);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.legal-intro {
+  color: var(--ink-2);
+  font-size: 1.02rem;
+  line-height: 1.5;
+}
+
+.legal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule);
+}
+
+.legal-section h2 {
+  font-size: 1.15rem;
+  color: var(--ink);
+}
+
+.legal-section p {
+  font-size: 0.94rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.legal-retention-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.legal-retention-table th,
+.legal-retention-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-2);
+}
+
+.legal-retention-table th {
+  color: var(--ink);
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.legal-advocate-marker {
+  font-size: 0.86rem;
+  font-style: italic;
+  color: var(--stamp-misleading);
+  background: var(--misleading-tint);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border-left: 3px solid var(--misleading);
+}
+
+.legal-back {
+  margin-top: 8px;
+}
+
+.legal-back a {
+  color: var(--ink-2);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.legal-back a:hover {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;
