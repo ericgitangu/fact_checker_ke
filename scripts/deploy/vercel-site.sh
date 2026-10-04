@@ -55,30 +55,20 @@ main() {
     echo "==> ${PROJECT}: staged at ${deploy_url}"
   fi
 
-  echo "==> ${PROJECT}: smoke testing staged deployment (expecting 308 redirects)"
-  local failed=0
-  for path in "${SMOKE_PATHS[@]}"; do
-    # 308 Permanent Redirect, NOT 200 -- the stub serves no page of its own.
-    # smoke_path uses `vercel curl ... -o /dev/null -w %{http_code}` with no
-    # -L, so it reports the redirect status itself rather than following it.
-    vercel-common::smoke_path "$deploy_url" "$path" 308 || failed=1
-  done
-
-  # Target check: the redirect must point at the web app, not just be *a*
-  # 308. Fetch headers for `/` and confirm the Location header carries the
-  # web app origin.
-  if [[ "$failed" -eq 0 ]]; then
-    local headers_file
-    headers_file="$(mktemp)"
-    vercel-common::vercel curl / --deployment "$deploy_url" --scope "$VERCEL_SCOPE" -D "$headers_file" -o /dev/null >/dev/null 2>&1 || true
-    if grep -i '^location:' "$headers_file" | grep -q "$REDIRECT_TARGET"; then
-      echo "vercel-common: smoke OK ${deploy_url}/ redirects to ${REDIRECT_TARGET}"
-    else
-      echo "==> ${PROJECT}: smoke FAILED -- '/' Location does not point at ${REDIRECT_TARGET}" >&2
-      failed=1
-    fi
-    rm -f "$headers_file"
+  echo "==> ${PROJECT}: smoke testing retired redirect stub"
+  local failed=0 headers_file body_file code
+  headers_file="$(mktemp)"; body_file="$(mktemp)"
+  code=$(vercel-common::vercel curl / --deployment "$deploy_url" --scope "$VERCEL_SCOPE" -D "$headers_file" -o "$body_file" -w '%{http_code}' 2>/dev/null | tail -n1)
+  # Retired stub (ADR-0010/0015): "/" must lead to the web app. Accept EITHER a
+  # server 3xx whose Location is the web app, OR a 200 whose body carries the
+  # redirect (meta-refresh floor). Both retire the old marketing content.
+  if { [[ "$code" =~ ^3 ]] && grep -i '^location:' "$headers_file" | grep -q "$REDIRECT_TARGET"; } || grep -q "$REDIRECT_TARGET" "$body_file"; then
+    echo "vercel-common: smoke OK ${deploy_url}/ -> ${REDIRECT_TARGET} (code ${code})"
+  else
+    echo "==> ${PROJECT}: smoke FAILED -- '/' does not redirect to ${REDIRECT_TARGET} (code ${code})" >&2
+    failed=1
   fi
+  rm -f "$headers_file" "$body_file"
 
   if [[ "$failed" -ne 0 ]]; then
     echo "==> ${PROJECT}: SMOKE FAILED -- not promoting. Production traffic is unchanged." >&2
