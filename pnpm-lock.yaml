@@ -26,12 +26,6 @@ importers:
 
   apps/site:
     dependencies:
-      '@fact-checker-ke/brand':
-        specifier: workspace:*
-        version: link:../../packages/brand
-      '@fact-checker-ke/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       react:
         specifier: ^19.2.8
         version: 19.2.8

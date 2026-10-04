@@ -10,7 +10,8 @@
       "language": "Lugha",
       "terms": "Masharti",
       "privacy": "Faragha",
-      "menu": "Menyu"
+      "menu": "Menyu",
+      "submit": "Tuma"
     },
     "footer": {
       "tagline": "Mradi huru, wa chanzo-wazi wa kuhakiki habari nchini Kenya.",
@@ -286,6 +287,82 @@
           "title": "Kukagua",
           "body": "Mtu hukagua sampuli inayopungua baadaye, na anaweza kuisahihisha."
         }
+      }
+    }
+  },
+  "landing": {
+    "hero": {
+      "titleLine1": "Madai makubwa zaidi ya Kenya,",
+      "titleLine2": "yanahakikiwa dhidi ya ushahidi.",
+      "lede": "fact_checker_ke huhakiki madai tunayoyaona yakisambaa na madai unayotuma — kwa Kiingereza, Kiswahili, na Sheng. AI hupima kila moja dhidi ya ushahidi na kutaja kila chanzo; sampuli inayopungua hukaguliwa na mtu baada ya kuchapishwa. Tunakadiria madai, si watu.",
+      "ctaPrimary": "Tuma dai",
+      "ctaSecondary": "Soma mbinu yetu",
+      "ctaWaitlist": "Jiunge na orodha ya kusubiri"
+    },
+    "sample": {
+      "tag": "Mfano wa uhakiki",
+      "claim": "“Ukosefu wa ajira Kenya ulishuka hadi 2% mwaka jana.”",
+      "sourceClaim": "ilisambaa TikTok — mionekano milioni 1.2",
+      "verdict": "Inapotosha",
+      "confidenceLabel": "Uhakika",
+      "rationale": "KNBS inakadiria kiwango cha ukosefu wa ajira cha 2024 karibu 5.6%. Takwimu ya 2% inahesabu fasili kali zaidi pekee na kuwaacha wafanyakazi waliokata tamaa ambao wameacha kutafuta.",
+      "sourcesLabel": "Vyanzo",
+      "sourcesValue": "knbs.or.ke, worldbank.org",
+      "checkedInLabel": "Imehakikiwa kwa",
+      "caveat": "Tunakadiria madai, si watu — hii ni tathmini ya AI, kwa madhumuni ya utafiti; wewe unaamua."
+    },
+    "scale": {
+      "heading": "Hukumu sita. Hakuna maoni.",
+      "body": "Kila dai hupokea mojawapo ya viwango sita, kila kimoja kikihusishwa na kile ushahidi unaounga mkono kweli — kamwe si nani aliyesema."
+    },
+    "pipeline": {
+      "heading": "Injini mbili, njia moja",
+      "body": "Madai mengi tunayohakiki, tunayatafuta sisi wenyewe — mengine, wewe unatuletea. Kwa njia yoyote, njia ile ile huyahakiki."
+    },
+    "street": {
+      "heading": "Mitaa inaposonga, uvumi husonga haraka zaidi.",
+      "body": "Wakati wa maandamano, fact_checker_ke hufuatilia arifa zilizothibitishwa katika kiwango cha wadi — kufungwa kwa barabara, arifa za usalama, na madai yanayosambaa kuyahusu. Tunaonyesha kinachoendelea na wapi, kamwe si nani yuko wapi.",
+      "note": "Usalama wa waandamanaji huja kabla ya ushirikiano. Maeneo hubaki ya jumla, na chochote kinachoweza kuwaweka watu hatarini huzuiliwa au kuondolewa.",
+      "cta": "Fungua kifuatiliaji cha Maandamano"
+    },
+    "principles": {
+      "heading": "Jinsi tunavyodumisha uaminifu",
+      "independent": {
+        "title": "Huru na chanzo-wazi.",
+        "body": "Msimbo uko wazi kwa umma, na ufadhili pia utakuwa."
+      },
+      "cite": {
+        "title": "Tunataja kila kitu.",
+        "body": "Hakuna hukumu inayochapishwa bila vyanzo inavyotegemea."
+      },
+      "audit": {
+        "title": "Watu hukagua AI.",
+        "body": "Sampuli inayopungua ya tathmini zilizochapishwa hukaguliwa na kusahihishwa baadaye — si kuzuiwa kabla ya kila dai kutoka."
+      },
+      "reply": {
+        "title": "Haki ya kujibu.",
+        "body": "Watu waliotajwa hupata njia ya kusahihisha na nafasi ya kujibu; alama katika kiwango cha dai kamwe haisomwi kama mashtaka dhidi ya mtu."
+      },
+      "link": "Soma mbinu kamili"
+    },
+    "waitlist": {
+      "heading": "Kuwepo itakapozinduliwa.",
+      "body": "Tunajenga hadharani. Acha barua pepe yako na tutakuambia siku itakapoanza kufanya kazi — hakuna barua nyingine.",
+      "emailLabel": "Anwani ya barua pepe",
+      "placeholder": "wewe@mfano.com",
+      "join": "Jiunge",
+      "joining": "Inajiunga…",
+      "joined": "Uko kwenye orodha",
+      "status": {
+        "joined": "Uko kwenye orodha ya kusubiri — asante!",
+        "alreadyJoined": "Tayari uko kwenye orodha ya kusubiri.",
+        "invalid": "Weka anwani sahihi ya barua pepe.",
+        "rateLimited": "Majaribio mengi mno — tafadhali jaribu tena baada ya sekunde {seconds}.",
+        "rateLimitedGeneric": "Majaribio mengi mno — tafadhali jaribu tena baada ya muda mfupi.",
+        "serverError": "Orodha ya kusubiri haipatikani kwa muda — tafadhali jaribu tena hivi karibuni.",
+        "unexpected": "Jambo lisilotarajiwa limetokea upande wetu — hatukuweza kukuongeza. Tafadhali jaribu tena baadaye.",
+        "misconfigured": "Orodha ya kusubiri haipatikani kwa sasa. Tafadhali angalia tena hivi karibuni.",
+        "networkError": "Hatukuweza kufikia seva — angalia muunganisho wako na ujaribu tena."
       }
     }
   }

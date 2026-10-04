@@ -1,15 +1,21 @@
 @import "tailwindcss";
 
 /*
- * fact_checker_ke — web app (PWA)
- * Same "On the record" design system as apps/site (see
- * apps/site/src/index.css for the full rationale). Ported here rather than
- * shared as a package because apps/site is Vite+plain CSS and apps/web is
- * Next.js+Tailwind v4 — duplicating the token values is cheaper than a
- * cross-bundler CSS package for six custom properties' worth of drift risk.
- * If these ever diverge, apps/site/src/index.css is the source of truth.
+ * fact_checker_ke — the single frontend (PWA + marketing landing)
+ * The "On the record" design system. This file is now the SOLE source of
+ * truth for the token values: apps/site (the old marketing SPA that carried
+ * the original apps/site/src/index.css) was folded into apps/web and retired
+ * to a redirect stub (ADR-0010/0015 amendments, 2026-10-04), so there is no
+ * second CSS surface to drift against any more. The shared set pieces
+ * (VerdictScale, TwoEngineFlow, ConfidenceGauge, Reveal) live in
+ * @fact-checker-ke/brand and carry their own CSS.
  *
- * Extensions for apps/web only (not in apps/site):
+ * Surfaces & dark mode: `--surface` is the raised card/control colour, and a
+ * full `:root[data-theme="dark"]` block (further down) re-tunes every token
+ * for the manual light/dark toggle (<ThemeToggle>, brand useTheme) carried
+ * over from the retired apps/site.
+ *
+ * Other apps/web-specific extensions:
  * - `--status-*` tokens: Maandamano demonstration-status chips. These are
  *   DELIBERATELY NOT the verdict colours (--true/--false/etc.) — ADR-0007
  *   frames the tracker as "what's happening, not a verdict", and reusing
@@ -22,6 +28,10 @@
   /* surfaces */
   --paper: #fafaf7;
   --paper-2: #f2f1ea;
+  /* Raised card/control surface. Light = pure white; dark mode re-tunes it
+     (see :root[data-theme="dark"]) so every `background: var(--surface)`
+     card flips with the theme instead of staying white-on-black. */
+  --surface: #ffffff;
   --ink: #15181b;
   --ink-2: #585f66;
   /*
@@ -102,6 +112,77 @@
   color-scheme: light;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* ---------- dark theme ----------
+ * apps/web is now the SOLE frontend (the marketing SPA apps/site was folded
+ * in — see ADR-0010/0015 amendments, 2026-10-04), so the light/dark toggle
+ * that previously lived only in apps/site has to live here. The toggle
+ * (<ThemeToggle>, components/theme-toggle.tsx) uses brand's useTheme, which
+ * sets `<html data-theme="light|dark">` and persists the choice to
+ * localStorage; an inline pre-paint script in app/layout.tsx sets the same
+ * attribute before first paint so there's no flash.
+ *
+ * Values mirror apps/site/src/index.css's dark block (the established "same
+ * record read at night" treatment), re-tuned here for apps/web's token set:
+ * the verdict hues brighten for AA on near-black, and each `-tint` becomes a
+ * translucent wash of its own hue so the verdict stamp/chip stay legible
+ * over the dark surface (apps/site verified these pairings at AA).
+ */
+:root[data-theme="dark"] {
+  --paper: #0c100e;
+  --paper-2: #151b18;
+  --surface: #141a17;
+  --ink: #f1f3ef;
+  --ink-2: #b7c0ba;
+  --ink-3: #828f88;
+  --rule: #263029;
+  --rule-strong: #35433b;
+
+  --true: #30cf84;
+  --true-tint: rgba(48, 207, 132, 0.14);
+  --mostly: #a9d53f;
+  --mostly-tint: rgba(169, 213, 63, 0.14);
+  --misleading: #f0a93f;
+  --misleading-tint: rgba(240, 169, 63, 0.14);
+  --false: #ff6b7f;
+  --false-tint: rgba(255, 107, 127, 0.14);
+  --unproven: #9aa6ae;
+  --unproven-tint: rgba(154, 166, 174, 0.14);
+  --notcheckable: #c4a9f5;
+  --notcheckable-tint: rgba(196, 169, 245, 0.16);
+
+  /* night band is already a deliberate dark panel in both themes — the
+     maandamano "live street" look is theme-independent, so these keep
+     their light-theme values. */
+
+  /* maandamano status chips — brightened for AA on the dark surface,
+     still deliberately NOT the verdict colours (globals.css header). */
+  --status-neutral: #b7c0ba;
+  --status-neutral-tint: rgba(183, 192, 186, 0.14);
+  --status-amber: #f0b44b;
+  --status-amber-tint: rgba(240, 180, 75, 0.16);
+  --status-slate: #9db0a6;
+  --status-slate-tint: rgba(157, 176, 166, 0.14);
+
+  color-scheme: dark;
+}
+
+/* The brand <Wordmark> hardcodes its text colour per variant (independent
+   of any host token, by design — see packages/brand/src/wordmark.css). The
+   header renders it variant="light" (dark ink, for the light page); in dark
+   mode that ink would vanish, so flip just the text colour to the dark-ink
+   value here. The gradient FC·KE mark and the flag read correctly on both
+   grounds and are left untouched. */
+:root[data-theme="dark"] .wordmark .fck-wordmark-text {
+  color: #f1f3ef;
+}
+
+/* --true brightens in dark to clear AA on near-black, which would then fail
+   AA *for* white button text — so the primary button flips to dark
+   ink-on-bright-green, matching apps/site's dark override. */
+:root[data-theme="dark"] .btn-primary {
+  color: #06130c;
 }
 
 @theme inline {
@@ -231,7 +312,7 @@ a:hover {
   height: 42px;
   border: 1px solid var(--rule-strong);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   cursor: pointer;
 }
@@ -255,7 +336,7 @@ a:hover {
     gap: 4px;
     min-width: 200px;
     padding: 10px;
-    background: #fff;
+    background: var(--surface);
     border: 1px solid var(--rule-strong);
     border-radius: 12px;
     box-shadow: 0 18px 40px -24px rgba(21, 24, 27, 0.55);
@@ -291,7 +372,7 @@ a:hover {
   font: inherit;
   font-size: 0.85rem;
   color: var(--ink-2);
-  background: #fff;
+  background: var(--surface);
 }
 
 .locale-switch:hover {
@@ -399,7 +480,7 @@ a:hover {
   padding: 12px 14px;
   border: 1px solid var(--rule-strong);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -440,7 +521,7 @@ a:hover {
 /* ---------- the fact-check card ---------- */
 .checkcard {
   margin: 0;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 14px;
   padding: 26px 26px 22px;
@@ -618,7 +699,7 @@ a:hover {
    full-size `.checkcard` stamp stays reserved for the check's own page. */
 .feedcard {
   margin: 0;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 12px;
   padding: 20px 22px 18px;
@@ -1164,7 +1245,7 @@ a:hover {
 
 .advisory-card {
   position: relative;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 12px;
   padding: 20px 22px;
@@ -1313,7 +1394,7 @@ a:hover {
 }
 
 .draft-row {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 12px;
   padding: 18px 20px;
@@ -1379,7 +1460,7 @@ a:hover {
   padding: 20px 22px;
   border: 1.5px solid var(--rule-strong);
   border-radius: 16px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -1425,7 +1506,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 14px;
   padding: 18px 20px;
@@ -1495,7 +1576,7 @@ a:hover {
   padding: 14px 16px;
   border: 1px solid var(--rule-strong);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -1569,7 +1650,7 @@ a:hover {
   padding: 12px 16px;
   border: 1px solid var(--rule);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .media-progress-track {
@@ -1793,5 +1874,298 @@ a:hover {
   }
   .feedcard {
     padding: 16px 16px 14px;
+  }
+}
+
+/* ======================================================================
+ * LANDING (/) — the consolidated marketing landing folded in from the
+ * retired apps/site (ADR-0010/0015 amendments, 2026-10-04). Reuses the
+ * established "On the record" tokens and the shared brand set pieces
+ * (<VerdictScale>, <TwoEngineFlow>, <ConfidenceGauge>, <Reveal>/<Stagger>)
+ * so there is ZERO duplicated design language — only the page-level
+ * layout chrome lives here. Mobile-audited at 375px (no horizontal
+ * overflow): every grid collapses to one column and the sample card may
+ * shrink (min-width:0) rather than forcing the page wide.
+ * ==================================================================== */
+.landing-stack {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(56px, 9vw, 104px);
+}
+
+/* ---------- hero ---------- */
+.landing-hero {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: clamp(32px, 6vw, 72px);
+  align-items: center;
+}
+
+.landing-hero-copy {
+  min-width: 0;
+}
+
+.landing-hero h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(2.3rem, 5.4vw, 4.4rem);
+  line-height: 0.99;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+
+.landing-hero-lede {
+  margin-top: 26px;
+  max-width: 46ch;
+  font-size: clamp(1.05rem, 1.5vw, 1.25rem);
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.landing-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 34px;
+}
+
+/* The sample fact-check card — the one bold object, same stamped language
+   as the real check page. Reuses .checkcard + .verdict + .v-<Rating>. */
+.landing-sample {
+  min-width: 0;
+}
+
+.checkcard-source-claim {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: var(--ink-3);
+  font-style: italic;
+  font-family: var(--serif);
+}
+
+.checkcard .verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.checkcard-gauge {
+  margin-left: auto;
+}
+
+/* The standing caveat line under the sample verdict (ADR-0033 register:
+   quieter than the rationale, a disclosure not a headline). */
+.checkcard-caveat {
+  margin-top: 18px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.checkcard-caveat svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--true);
+}
+
+/* The typing caret for <TypedClaim> (the hero's one keystroke moment). */
+.type-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  background: var(--brand);
+  vertical-align: text-bottom;
+  animation: caret-blink 0.9s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The sample verdict stamp waits for the typed claim to finish, then
+   presses on (see TypedClaim onDone -> .stamp-ready). Starts hidden so the
+   reveal is deliberate rather than painting on first frame. */
+.landing-stamp {
+  opacity: 0;
+}
+
+.landing-stamp.stamp-ready {
+  animation: stamp-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* ---------- generic landing section ---------- */
+.landing-section-intro {
+  max-width: 52ch;
+  margin-bottom: 36px;
+}
+
+.landing-section-intro h2 {
+  font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+}
+
+.landing-section-intro p {
+  margin-top: 14px;
+  color: var(--ink-2);
+}
+
+/* ---------- principles ---------- */
+.landing-principles-list {
+  list-style: none;
+  margin: 0 0 28px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px 44px;
+}
+
+.landing-principles-list li {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+  padding-left: 18px;
+  border-left: 2px solid var(--rule-strong);
+}
+
+.landing-principles-list strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.landing-link {
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration-color: var(--brand);
+}
+
+/* ---------- street band CTA ---------- */
+.street-note {
+  margin-top: 16px;
+  font-size: 0.95rem;
+  color: var(--night-ink-2);
+  padding-left: 16px;
+  border-left: 2px solid var(--false);
+}
+
+.landing-street-cta {
+  display: inline-block;
+  margin-top: 22px;
+  color: var(--night-ink);
+  font-weight: 600;
+  text-decoration-color: var(--night-rule);
+}
+
+.landing-street-cta:hover {
+  text-decoration-color: var(--true);
+}
+
+/* ---------- waitlist ---------- */
+.waitlist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 26px;
+  max-width: 520px;
+}
+
+.waitlist input {
+  flex: 1 1 240px;
+  min-width: 0;
+  padding: 13px 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 1rem;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.waitlist input::placeholder {
+  color: var(--ink-3);
+}
+
+.waitlist input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+
+.waitlist button {
+  padding: 13px 26px;
+  border-radius: 10px;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+:root[data-theme="dark"] .waitlist button {
+  color: #06130c;
+}
+
+.waitlist button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.waitlist-status {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  font-size: 0.92rem;
+  color: var(--ink-2);
+  min-height: 1.2em;
+}
+
+/* ---------- theme toggle (header) ---------- */
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: var(--brand);
+  color: var(--ink);
+}
+
+/* ---------- landing responsive (375px-audited) ---------- */
+@media (max-width: 860px) {
+  .landing-hero {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+  .landing-principles-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-stamp {
+    animation: none;
+    opacity: 1;
+  }
+  .type-caret {
+    animation: none;
+    display: none;
   }
 }

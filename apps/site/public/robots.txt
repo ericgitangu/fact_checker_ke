@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://fact-checker-ke-site-eric-gitangus-projects.vercel.app/sitemap.xml
