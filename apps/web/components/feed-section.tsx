@@ -2,6 +2,7 @@ import type { FeedItem } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { FeedItemCard } from "./feed-item-card";
+import { LegalCaveat } from "./legal-caveat";
 
 /**
  * ADR-0032's visible payoff: the "what we're checking now" feed section,
@@ -12,6 +13,13 @@ import { FeedItemCard } from "./feed-item-card";
  * `items.length === 0` on a REAL (non-mock) response renders the
  * deliberately honest empty state the task brief asked for, never fake
  * rows to fill the space.
+ *
+ * Legal caveat, collapsed: each `FeedItemCard` row carries only the short
+ * `FeedItemCaveatNote`, not the full ADR-0033 standing disclosure — that
+ * would repeat the same draft-badge/full-body/Terms-link block under
+ * every row in the list. The FULL disclosure renders exactly ONCE here,
+ * after the list, covering every item above it (`disclosureIntro` says
+ * so explicitly) — still fully visible, just not N times over.
  */
 export async function FeedSection({
   items,
@@ -54,6 +62,13 @@ export async function FeedSection({
         <p className="feed-section-footer">
           <Link href="/feed">{t("viewAll")}</Link>
         </p>
+      )}
+
+      {items.length > 0 && (
+        <div className="feed-section-disclosure">
+          <p className="feed-disclosure-intro">{t("disclosureIntro")}</p>
+          {await LegalCaveat({})}
+        </div>
       )}
     </section>
   );

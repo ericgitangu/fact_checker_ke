@@ -205,7 +205,8 @@
     },
     "mockNotice": "Demo data — the live feed isn't reachable right now, so these are example assessments, not real published checks.",
     "loadOlder": "Load older checks",
-    "viewCheck": "Read the full assessment"
+    "viewCheck": "Read the full assessment",
+    "disclosureIntro": "The disclosure below applies to every assessment above."
   },
   "editorial": {
     "heading": "Editor review",
