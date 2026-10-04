@@ -6,8 +6,8 @@ import { MenuIcon, XIcon } from "@fact-checker-ke/brand";
 /**
  * Primary header navigation with a responsive mobile disclosure.
  *
- * The desktop nav (Feed / Methodology / Maandamano / Editor + the locale
- * switcher) is ~350px wide and was overflowing the 375px viewport, pushing
+ * The desktop nav (Submit / Feed / Methodology / Maandamano + the locale
+ * switcher) was overflowing the 375px viewport, pushing
  * every page into horizontal scroll (diagnosed at /methodology:
  * scrollWidth 568 vs clientWidth 375). On mobile it now collapses behind a
  * hamburger disclosure; on >=640px it renders as the inline row it always
