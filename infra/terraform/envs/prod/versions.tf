@@ -17,7 +17,7 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "fact-checker-ke-tfstate"
+    bucket = "fact-checker-ke-tfstate-97215510311"
     prefix = "envs/prod"
   }
 }

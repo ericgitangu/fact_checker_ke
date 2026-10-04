@@ -108,13 +108,26 @@ resource "google_logging_metric" "dlq_non_empty" {
     jsonPayload.dlq_depth:*
   EOT
 
+  # GCP logs-based metrics that EXTRACT a numeric value from the log body
+  # must be DISTRIBUTION/DELTA with bucket_options; a GAUGE/INT64 + a
+  # value_extractor is rejected ("A value extractor can only be specified
+  # for a DISTRIBUTION value type" — verified at apply 2026-10-05).
+  # Exponential buckets 1..2^64 cover any DLQ depth.
   metric_descriptor {
-    metric_kind = "GAUGE"
-    value_type  = "INT64"
+    metric_kind = "DELTA"
+    value_type  = "DISTRIBUTION"
     unit        = "1"
   }
 
   value_extractor = "EXTRACT(jsonPayload.dlq_depth)"
+
+  bucket_options {
+    exponential_buckets {
+      num_finite_buckets = 64
+      growth_factor      = 2
+      scale              = 1
+    }
+  }
 }
 
 resource "google_monitoring_alert_policy" "dlq_non_empty" {
@@ -138,8 +151,12 @@ resource "google_monitoring_alert_policy" "dlq_non_empty" {
       duration        = "3600s"
 
       aggregations {
-        alignment_period   = "3600s"
-        per_series_aligner = "ALIGN_MIN" # must stay > 0 for the whole window, not just spike once
+        alignment_period = "3600s"
+        # DLQ depth is a DISTRIBUTION metric, so ALIGN_MIN (scalar-only)
+        # is invalid; ALIGN_PERCENTILE_05 > 0 means ~95% of the window's
+        # readings were non-empty — the "sustained, not a single spike"
+        # intent, translated to a distribution reducer.
+        per_series_aligner = "ALIGN_PERCENTILE_05"
       }
     }
   }
@@ -163,13 +180,24 @@ resource "google_logging_metric" "outbox_lag" {
     jsonPayload.outbox_lag_secs:*
   EOT
 
+  # Distribution/DELTA + bucket_options for the same reason as the DLQ
+  # metric above (value_extractor requires DISTRIBUTION). Exponential
+  # buckets 1s..2^64s span sub-second to multi-day lag.
   metric_descriptor {
-    metric_kind = "GAUGE"
-    value_type  = "DOUBLE"
+    metric_kind = "DELTA"
+    value_type  = "DISTRIBUTION"
     unit        = "s"
   }
 
   value_extractor = "EXTRACT(jsonPayload.outbox_lag_secs)"
+
+  bucket_options {
+    exponential_buckets {
+      num_finite_buckets = 64
+      growth_factor      = 2
+      scale              = 1
+    }
+  }
 }
 
 resource "google_monitoring_alert_policy" "outbox_lag" {
@@ -188,8 +216,11 @@ resource "google_monitoring_alert_policy" "outbox_lag" {
       duration        = "0s"
 
       aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_MAX"
+        alignment_period = "300s"
+        # outbox lag is a DISTRIBUTION metric, so ALIGN_MAX (scalar-only)
+        # is invalid; ALIGN_PERCENTILE_99 ≈ the worst reading in the
+        # window — the faithful translation of "max lag > 900s".
+        per_series_aligner = "ALIGN_PERCENTILE_99"
       }
     }
   }
