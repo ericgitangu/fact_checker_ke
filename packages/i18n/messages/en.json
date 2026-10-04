@@ -6,7 +6,9 @@
       "methodology": "Methodology",
       "tracker": "Maandamano",
       "editor": "Editor",
-      "language": "Language"
+      "language": "Language",
+      "terms": "Terms",
+      "privacy": "Privacy"
     },
     "footer": {
       "tagline": "An independent, open-source fact-checking project for Kenya.",
@@ -54,6 +56,38 @@
     "notFound": {
       "title": "Check not found",
       "body": "We couldn't find a check with that id."
+    }
+  },
+  "legal": {
+    "caveat": {
+      "heading": "AI-assisted assessment · pilot · not a verdict on any person.",
+      "draftNotice": "Draft caveat — pending advocate review, not a finished legal shield",
+      "readMore": "Read our Terms & Privacy Policy",
+      "tierCNotice": "Open question, not a verdict: named person has a right of reply."
+    },
+    "advocateMarker": "⚠ Pending legal review — not yet resolved",
+    "pages": {
+      "draftBadge": "DRAFT — pending advocate review, not legally binding",
+      "terms": {
+        "title": "Terms & Conditions",
+        "intro": "This page describes a starter draft of our Terms & Conditions, written for an eventual Kenyan advocate's review — it is not yet legally binding."
+      },
+      "privacy": {
+        "title": "Privacy Policy",
+        "intro": "This page describes a starter draft of our Privacy Policy, written for an eventual Kenyan advocate's review — it is not yet legally binding.",
+        "retentionHeading": "What we collect, per data class",
+        "dataClassColumn": "Data class",
+        "retentionColumn": "Retention",
+        "indefinite": "Indefinite",
+        "daysSuffix": "days",
+        "consent": {
+          "enableLabel": "Yes, use my submissions and signals to help improve and train your models",
+          "severabilityNote": "Optional and separate from submitting a claim — leaving this off does not stop you from using fact_checker_ke.",
+          "statusOn": "Saved: you've opted in on this device. You can change this at any time.",
+          "statusOff": "Saved: you have not opted in. Nothing of yours is used for training.",
+          "specialCategoryNote": "Protest-related or other special-category content is excluded from training by default, regardless of this choice."
+        }
+      }
     }
   },
   "submit": {

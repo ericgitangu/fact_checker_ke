@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
-import { describe, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
-import { render } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import type { Check } from "@fact-checker-ke/core";
+import { STANDING_CAVEAT_SHORT } from "@fact-checker-ke/core";
 import { componentAxeOptions, expectNoAxeViolations } from "../test/axe-config";
 
 vi.mock("next-intl/server", async () => {
   const mod = await import("../test/mock-next-intl-server");
   return mod.createNextIntlServerMock("en");
+});
+
+afterEach(() => {
+  cleanup();
 });
 
 // Imported AFTER the mock so CheckCard/VerdictStamp pick up the mocked
@@ -75,5 +80,24 @@ describe("CheckCard a11y (AT-0028-2, check-detail surface)", () => {
     const { container } = render(jsx);
     const results = await axe(container, componentAxeOptions);
     expectNoAxeViolations(results);
+  });
+});
+
+/**
+ * ADR-0033 AT-0033-1: the standing legal caveat renders on every
+ * PUBLISHED check (any risk tier, fetch- or submission-sourced), and
+ * never on a draft (which has nothing published yet to caveat).
+ */
+describe("CheckCard legal caveat gating (ADR-0033 AT-0033-1)", () => {
+  it("renders the standing caveat on a published check", async () => {
+    const jsx = await CheckCard({ check: publishedCheck });
+    const { getByText } = render(jsx);
+    expect(getByText(STANDING_CAVEAT_SHORT.heading)).toBeTruthy();
+  });
+
+  it("does NOT render the standing caveat on a draft (awaiting-editor) check", async () => {
+    const jsx = await CheckCard({ check: draftCheck });
+    const { queryByText } = render(jsx);
+    expect(queryByText(STANDING_CAVEAT_SHORT.heading)).toBeNull();
   });
 });

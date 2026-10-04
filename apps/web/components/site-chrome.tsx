@@ -43,6 +43,8 @@ export async function AppFooter(): Promise<React.JSX.Element> {
       <div style={{ display: "flex", gap: 24 }}>
         <span>{t("footer.languages")}</span>
         <span>{t("footer.builtIn")}</span>
+        <Link href="/terms">{t("nav.terms")}</Link>
+        <Link href="/privacy">{t("nav.privacy")}</Link>
       </div>
     </footer>
   );

@@ -1,5 +1,6 @@
 import type { Check } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
+import { LegalCaveat } from "./legal-caveat";
 import { AwaitingEditorNotice, VerdictStamp } from "./verdict";
 
 /**
@@ -11,6 +12,20 @@ import { AwaitingEditorNotice, VerdictStamp } from "./verdict";
 export async function CheckCard({ check }: { check: Check }): Promise<React.JSX.Element> {
   const t = await getTranslations("check");
 
+  // Awaited explicitly, same reasoning as the `LegalCaveat` await below:
+  // `VerdictStamp`/`AwaitingEditorNotice` are async Server Components, and
+  // embedding an async component as a bare JSX tag only resolves under
+  // Next's real RSC renderer -- plain ReactDOM (as used by
+  // @testing-library/react's `render()` in this app's component tests)
+  // throws "Only Server Components can be async at the moment" and the
+  // whole tree suspends empty. Pre-resolving here keeps CheckCard's own
+  // JSX unchanged in shape while making it render correctly under both
+  // Next's RSC runtime (production) and a plain-ReactDOM test render.
+  const verdictOrAwaitingNotice =
+    check.isDraft || !check.rating
+      ? await AwaitingEditorNotice()
+      : await VerdictStamp({ rating: check.rating });
+
   return (
     <article className="checkcard" aria-label="Fact-check">
       {check.isDraft ? (
@@ -21,7 +36,7 @@ export async function CheckCard({ check }: { check: Check }): Promise<React.JSX.
 
       <h1 className="checkcard-claim">{check.summary}</h1>
 
-      {check.isDraft || !check.rating ? <AwaitingEditorNotice /> : <VerdictStamp rating={check.rating} />}
+      {verdictOrAwaitingNotice}
 
       <section aria-labelledby="claims-h">
         <h2 id="claims-h" className="sr-only">
@@ -98,6 +113,21 @@ export async function CheckCard({ check }: { check: Check }): Promise<React.JSX.
           <strong>{t("guidance.whatWouldChangeThisHeading")}:</strong> {check.whatWouldChangeThis}
         </p>
       )}
+
+      {/* ADR-0033 AT-0033-1: the standing legal caveat renders on every
+          PUBLISHED check, every risk tier (fetch- or submission-sourced) —
+          never on a draft, which already carries its own
+          AwaitingEditorNotice and has nothing published to caveat yet.
+          Awaited explicitly (unlike VerdictStamp/AwaitingEditorNotice
+          above, a pre-existing pattern this change does not touch) so the
+          caveat also renders correctly under a plain ReactDOM test render
+          (@testing-library/react), not only Next's real RSC renderer —
+          confirmed empirically: embedding an async Server Component as a
+          bare JSX tag fails under plain ReactDOM with "Only Server
+          Components can be async at the moment" / an unresolved `act`
+          suspension, verified against this exact codebase via a scratch
+          test before this fix. */}
+      {!check.isDraft && (await LegalCaveat({ riskTier: check.riskTier }))}
     </article>
   );
 }

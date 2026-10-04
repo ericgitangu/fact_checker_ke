@@ -6,7 +6,9 @@
       "methodology": "Mbinu",
       "tracker": "Maandamano",
       "editor": "Mhariri",
-      "language": "Lugha"
+      "language": "Lugha",
+      "terms": "Masharti",
+      "privacy": "Faragha"
     },
     "footer": {
       "tagline": "Mradi huru, wa chanzo-wazi wa kuhakiki habari nchini Kenya.",
@@ -54,6 +56,38 @@
     "notFound": {
       "title": "Hakiki haipatikani",
       "body": "Hatukuweza kupata hakiki yenye kitambulisho hicho."
+    }
+  },
+  "legal": {
+    "caveat": {
+      "heading": "Uchambuzi wa AI · jaribio · si uamuzi kuhusu mtu yeyote.",
+      "draftNotice": "Rasimu ya onyo la kisheria — inasubiri ukaguzi wa wakili, si ulinzi kamili wa kisheria",
+      "readMore": "Soma Masharti na Sera yetu ya Faragha",
+      "tierCNotice": "Swali la wazi, si uamuzi: mtu aliyetajwa ana haki ya kujibu."
+    },
+    "advocateMarker": "⚠ Inasubiri ukaguzi wa kisheria — bado haijatatuliwa",
+    "pages": {
+      "draftBadge": "RASIMU — inasubiri ukaguzi wa wakili, haijafunga kisheria bado",
+      "terms": {
+        "title": "Masharti na Hali",
+        "intro": "Ukurasa huu unaelezea rasimu ya awali ya Masharti na Hali yetu, iliyoandikwa kwa ukaguzi wa wakili wa Kenya — bado haijafunga kisheria."
+      },
+      "privacy": {
+        "title": "Sera ya Faragha",
+        "intro": "Ukurasa huu unaelezea rasimu ya awali ya Sera yetu ya Faragha, iliyoandikwa kwa ukaguzi wa wakili wa Kenya — bado haijafunga kisheria.",
+        "retentionHeading": "Tunakusanya nini, kwa kila aina ya data",
+        "dataClassColumn": "Aina ya data",
+        "retentionColumn": "Muda wa kuhifadhi",
+        "indefinite": "Bila kikomo",
+        "daysSuffix": "siku",
+        "consent": {
+          "enableLabel": "Ndiyo, tumia maombi yangu na ishara zangu kusaidia kuboresha na kufundisha mifano yenu",
+          "severabilityNote": "Ni hiari na ni tofauti na kutuma dai — kutoweka chaguo hili hakukuzuii kutumia fact_checker_ke.",
+          "statusOn": "Imehifadhiwa: umekubali kwenye kifaa hiki. Unaweza kubadilisha hii wakati wowote.",
+          "statusOff": "Imehifadhiwa: hujakubali. Hakuna data yako inayotumika kwa mafunzo.",
+          "specialCategoryNote": "Maudhui yanayohusiana na maandamano au aina nyingine maalum ya data yametengwa kutoka kwa mafunzo kwa default, bila kujali chaguo hili."
+        }
+      }
     }
   },
   "submit": {

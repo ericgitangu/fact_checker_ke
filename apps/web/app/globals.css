@@ -429,6 +429,58 @@ a:hover {
   color: var(--ink);
 }
 
+/* ---------- ADR-0033 standing legal caveat ---------- */
+/* Deliberately quieter than .checkcard-meta (smaller type, muted ink,
+   top rule) -- a footnote-register notice, not another claim on the
+   reader's attention, so it reads as a disclosure rather than a
+   competing headline. */
+.legal-caveat {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.legal-caveat-heading {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 4px;
+}
+
+.legal-caveat-body {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.legal-caveat-body a {
+  color: var(--ink-2);
+}
+
+/* The "this is a draft, not a finished legal shield" marker -- amber, the
+   same status-tint scale as the Maandamano chips (globals.css header
+   comment), never the verdict colours, and never --rule-strong/--ink
+   (which would read as settled/final rather than open). */
+.legal-draft-badge,
+.legal-advocate-marker {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--status-amber);
+  background: var(--status-amber-tint);
+  border-radius: 6px;
+  padding: 3px 8px;
+  margin: 4px 0;
+}
+
+.legal-advocate-marker {
+  display: block;
+  margin: 8px 0 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 .lang-chip {
   display: inline-block;
   padding: 2px 10px;
