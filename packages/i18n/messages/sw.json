@@ -190,6 +190,10 @@
       "title": "Haiwezekani kuthibitisha hali ya sasa",
       "body": "Hatuonyeshi kamwe taarifa iliyohifadhiwa kama ya sasa. Unganisha tena ili kuona hali ya hivi karibuni."
     },
+    "empty": {
+      "title": "Hakuna maandamano yanayofuatiliwa kwa sasa",
+      "body": "Hakuna taarifa za maandamano zilizothibitishwa kwa sasa. Taarifa zitakapothibitishwa, zitaonekana hapa kwa kata na kaunti ndogo."
+    },
     "staleWarning": "Haijathibitishwa tena kwa zaidi ya saa 2 — hali inaweza kuwa si ya hivi karibuni."
   },
   "feed": {
@@ -212,7 +216,10 @@
   },
   "editorial": {
     "heading": "Ukaguzi wa mhariri",
-    "devBanner": "Toleo la majaribio pekee: uthibitisho halisi wa kikao utakuja na ADR-0020 (Better Auth). Unaona hii ukijifanya mhariri aliyeingia.",
+    "signInRequired": {
+      "title": "Kuingia kunahitajika",
+      "body": "Eneo la mhariri ni la ndani, linalohitaji uthibitisho wa kuingia. Hakuna ufikiaji wa umma wa mhariri, na kuingia halisi kwa mhariri bado hakupatikani."
+    },
     "drafts": {
       "empty": "Hakuna rasimu zinazosubiri ukaguzi.",
       "heading": "Rasimu zinazosubiri"

@@ -3,10 +3,10 @@ import { EditorClient } from "../../../../../../lib/editor-client";
 
 /**
  * BFF proxy for the NOT-YET-IMPLEMENTED `POST /v1/editor/checks/:id/publish`.
- * See app/api/editor/drafts/route.ts for the same mock-fallback pattern —
- * here a failure (expected, route doesn't exist yet) still returns 200
- * with `_mock: true` so the dev-only editor UI can demonstrate the
- * approve flow end-to-end against fixture data.
+ * Publishing is the highest-stakes editor action, so this route must NEVER
+ * fake a success: an unreachable/unimplemented backend returns an honest
+ * 501, not `{ ok: true }`. The real path forwards to the backend once
+ * /v1/editor/checks/:id/publish exists (ADR-0020).
  */
 export async function POST(
   _request: Request,
@@ -18,8 +18,11 @@ export async function POST(
 
   try {
     await client.publish(id);
-    return NextResponse.json({ ok: true, _mock: false });
+    return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ ok: true, _mock: true });
+    return NextResponse.json(
+      { error: "editor_backend_unavailable", detail: "Editor publish is not available yet (ADR-0020)." },
+      { status: 501 },
+    );
   }
 }
