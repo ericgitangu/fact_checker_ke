@@ -129,6 +129,51 @@ describe.skipIf(!connectionString)("ADR-0031 flywheel capture (AT-0031-4, integr
     expect(agreeRows[0]!.source).toBe("user_agree");
   });
 
+  it("data-lifecycle hardening: two signals from the same actor on the same check collapse to one row, latest value wins", async () => {
+    const [submission] = await db
+      .insert(schema.submissions)
+      .values({ url: null, text: `flywheel-dedup-${randomUUID()}` })
+      .returning();
+    const [check] = await db
+      .insert(schema.checks)
+      .values({
+        submissionId: submission!.id,
+        summary: "A published check that gets conflicting signals from one actor.",
+        rating: "Unproven",
+        isDraft: false,
+        publishedAt: new Date(),
+      })
+      .returning();
+    const actorHash = "d".repeat(64);
+
+    const first = await captureUserSignal(db, {
+      checkId: check!.id,
+      deviceTokenHash: actorHash,
+      signal: "agree",
+      reason: "Looks right to me.",
+    });
+    expect(first.ok).toBe(true);
+
+    const second = await captureUserSignal(db, {
+      checkId: check!.id,
+      deviceTokenHash: actorHash,
+      signal: "dispute",
+      reason: "Changed my mind after rereading the source.",
+    });
+    expect(second.ok).toBe(true);
+
+    const rows = await db
+      .select()
+      .from(schema.trainingEvalLabels)
+      .where(eq(schema.trainingEvalLabels.checkId, check!.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.source).toBe("user_dispute");
+    expect(rows[0]!.actorRef).toBe(actorHash);
+    const label = rows[0]!.label as { signal: string; reason: string | null };
+    expect(label.signal).toBe("dispute");
+    expect(label.reason).toBe("Changed my mind after rereading the source.");
+  });
+
   it("captureUserSignal returns not_found for a nonexistent check", async () => {
     const result = await captureUserSignal(db, {
       checkId: randomUUID(),

@@ -141,6 +141,17 @@ export const submissions = pgTable(
     url: text("url"),
     text: text("text"),
     submittedBy: text("submitted_by"),
+    // ADR-0021 AT-0021-4 (data-lifecycle hardening pass): the hashed
+    // (sha256, same `hashDeviceToken` as `comments.authorDeviceHash`)
+    // ADR-0020 device token that created this submission. Nullable —
+    // historical rows predate this column, and some future ingestion
+    // path (e.g. an editor-entered tip) may legitimately have none —
+    // but every row written via POST /v1/submissions after this change
+    // sets it, which is what makes a DSAR export by device token
+    // actually able to find a caller's own submissions/drafts (closes
+    // the schema gap `runDsarExport`'s docblock in retention.ts used to
+    // flag as a stub).
+    deviceTokenHash: text("device_token_hash"),
     // ADR-0002/0004 amendment #6: user-supplied quote + timestamp for
     // third-party video URLs (we never download the audio).
     quote: text("quote"),
@@ -157,6 +168,7 @@ export const submissions = pgTable(
   },
   (table) => [
     index("submissions_org_id_idx").on(table.orgId),
+    index("submissions_device_token_hash_idx").on(table.deviceTokenHash),
     check(
       "submissions_url_or_text",
       sql`(${table.url} is not null and ${table.text} is null) or (${table.url} is null and ${table.text} is not null)`,
@@ -715,6 +727,14 @@ export const trainingEvalLabels = pgTable(
   (table) => [
     index("training_eval_labels_check_id_idx").on(table.checkId),
     index("training_eval_labels_source_idx").on(table.source),
+    // ADR-0031 review finding: one actor (device hash or editor id) can
+    // otherwise flood the labeled dataset with duplicate signals on the
+    // same check by resubmitting (double-tap, buggy client retry, or a
+    // deliberate attempt to weight the flywheel). This UNIQUE constraint
+    // is what `captureUserSignal`'s upsert (services/api/src/lib/
+    // flywheel.ts) relies on via `onConflictDoUpdate` — last-signal-wins
+    // per (check, actor) pair rather than accumulating N rows.
+    uniqueIndex("training_eval_labels_check_actor_idx").on(table.checkId, table.actorRef),
   ],
 );
 
@@ -738,3 +758,53 @@ export const policyFlags = pgTable("policy_flags", {
     .references(() => users.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * ADR-0030 "creator-funnel conflict-of-interest firewall" (AT-0030-1):
+ * append-only audit record of every founder-channel (YouTube/TikTok)
+ * post that references a published check. The row shape matches
+ * docs/architecture/creator-funnel-firewall.md's "rule 3" table exactly:
+ * `{ check_id, published_at, funnel_post_url, posted_at, ai_disclosed }`
+ * (`published_at` is derived from `checks.publishedAt` at write time —
+ * recorded here too, denormalized, so the audit record is self-contained
+ * even if a check's `publishedAt` could ever change, and so AT-0030-1's
+ * "published_at earlier than posted_at" check can run against this
+ * table alone without a join).
+ *
+ * This is a firewall/audit record, not a feature: nothing reads this
+ * table to drive editorial decisions (ADR-0030 rule 2 — the editor
+ * queue/priority code path takes no funnel-sourced parameter, enforced
+ * by the simple fact that no such code exists, not by this table).
+ * `revenueCents` is nullable and unused by any code path in this pass
+ * (AT-0030-4, the funding-transparency page line item, is apps/web
+ * territory out of scope here) — present now so a future web change
+ * doesn't need another migration just to add a revenue column to an
+ * append-only audit table.
+ */
+export const funnelAuditLog = pgTable(
+  "funnel_audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    checkId: uuid("check_id")
+      .notNull()
+      .references(() => checks.id, { onDelete: "restrict" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+    funnelPostUrl: text("funnel_post_url").notNull(),
+    postedAt: timestamp("posted_at", { withTimezone: true }).notNull(),
+    platform: text("platform").notNull(),
+    aiDisclosed: boolean("ai_disclosed").notNull(),
+    revenueCents: integer("revenue_cents"),
+    recordedBy: uuid("recorded_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("funnel_audit_log_check_id_idx").on(table.checkId),
+    // AT-0030-1's invariant, enforced at the database level (belt-and-
+    // suspenders alongside the application-layer check in
+    // services/api/src/lib/flywheel.ts#recordFunnelPost): a row can
+    // never claim a post predates the check's own publication.
+    check("funnel_audit_log_posted_after_published", sql`${table.postedAt} >= ${table.publishedAt}`),
+  ],
+);

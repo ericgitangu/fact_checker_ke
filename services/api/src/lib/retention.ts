@@ -6,7 +6,28 @@ import { writeAuditLog } from "./audit.js";
 export interface RetentionSweepResult {
   anonymousSubmissionsDeleted: number;
   namedPersonDraftsDeleted: number;
+  totpUsedCodesPruned: number;
 }
+
+/**
+ * ADR-0020 review finding (data-lifecycle hardening pass): `totp_used_codes`
+ * is the replay-prevention store keyed on `(user_id, counter)` — it exists
+ * solely so a captured/observed TOTP code can't be replayed within its
+ * valid window, and grows unbounded with no pruning anywhere in the
+ * codebase before this change.
+ *
+ * Cutoff justification: `services/api/src/lib/auth/totp.ts` (RFC 6238)
+ * uses a 30s step with a ±1 step drift window (`verifyTotpCode`/
+ * `matchTotpCounter`), so a counter is only replay-relevant for at most
+ * ~90 seconds after it was issued — once that window closes, the
+ * authenticator app itself has moved on to a new code and the old one
+ * can never validate again regardless of whether this row still exists.
+ * 1 day is a wide, conservative safety margin over that ~90s window
+ * (covers clock skew, long-running requests, and any future widening of
+ * the drift window) while still bounding table growth to roughly one
+ * day's worth of logins per user instead of forever.
+ */
+const TOTP_USED_CODE_PRUNE_CUTOFF_DAYS = 1;
 
 async function retentionDays(db: Database, dataClass: string): Promise<number | null> {
   const [row] = await db.select().from(schema.retentionPolicy).where(eq(schema.retentionPolicy.dataClass, dataClass)).limit(1);
@@ -68,7 +89,15 @@ export async function runRetentionSweep(db: Database): Promise<RetentionSweepRes
     }
   }
 
-  return { anonymousSubmissionsDeleted, namedPersonDraftsDeleted };
+  // ADR-0020 review finding: prune the TOTP replay store past its safe
+  // cutoff -- see TOTP_USED_CODE_PRUNE_CUTOFF_DAYS docblock above.
+  const totpPruneResult = await db.execute(sql`
+    DELETE FROM totp_used_codes
+    WHERE created_at < now() - interval '1 day' * ${TOTP_USED_CODE_PRUNE_CUTOFF_DAYS}
+  `);
+  const totpUsedCodesPruned = (totpPruneResult as unknown as { count: number }).count ?? 0;
+
+  return { anonymousSubmissionsDeleted, namedPersonDraftsDeleted, totpUsedCodesPruned };
 }
 
 /**
@@ -76,6 +105,19 @@ export async function runRetentionSweep(db: Database): Promise<RetentionSweepRes
  * against a device token. Published-check evidence is NEVER included
  * (ADR-0021: not subject to erasure/export) — this function only reads
  * submissions/drafts/comments tied to the device hash.
+ *
+ * AT-0021-4 closure (data-lifecycle hardening pass): `submissions` now
+ * carries `deviceTokenHash` (migration 0011, written at creation time by
+ * `services/api/src/routes/submissions.ts`) — the schema gap this
+ * function used to stub out with an explicit empty array is closed.
+ * "Drafts" are the unpublished checks (`isDraft: true` or
+ * `publishedAt: null`) attached to this device's submissions; a
+ * PUBLISHED check reachable from one of this device's submissions is
+ * deliberately excluded from `submissions[].checks` too, not just from
+ * a separate "evidence" field — ADR-0021 is explicit that published
+ * checks are never subject to export/erasure, and a draft-shaped export
+ * leaking a published verdict's content would defeat that rule by a
+ * different door.
  */
 export async function runDsarExport(
   db: Database,
@@ -90,12 +132,32 @@ export async function runDsarExport(
 }> {
   const deviceTokenHash = hashDeviceToken(deviceToken);
 
-  // This codebase's submissions table doesn't carry a device-token
-  // column yet (submittedBy is a free-text field, not the ADR-0020
-  // device token) -- tracked as tech debt below. Comments DO carry
-  // authorDeviceHash, so that slice is real; submissions is a stub
-  // returning an empty array with an explicit marker, not a silent
-  // omission.
+  const ownSubmissions = await db
+    .select()
+    .from(schema.submissions)
+    .where(eq(schema.submissions.deviceTokenHash, deviceTokenHash));
+
+  const submissionsExport: Array<Record<string, unknown>> = [];
+  for (const submission of ownSubmissions) {
+    const draftChecks = await db
+      .select({ id: schema.checks.id, summary: schema.checks.summary, rating: schema.checks.rating, createdAt: schema.checks.createdAt })
+      .from(schema.checks)
+      .where(and(eq(schema.checks.submissionId, submission.id), isNull(schema.checks.publishedAt)));
+
+    submissionsExport.push({
+      id: submission.id,
+      url: submission.url,
+      text: submission.text,
+      status: submission.status,
+      createdAt: submission.createdAt.toISOString(),
+      // Unpublished drafts only -- see docblock above for why a
+      // published check is excluded here too, not only from a
+      // separate "evidence" field.
+      drafts: draftChecks.map((c) => ({ id: c.id, summary: c.summary, rating: c.rating, createdAt: c.createdAt.toISOString() })),
+    });
+  }
+
+  // Comments DO carry authorDeviceHash directly, so that slice is real.
   const comments = await db.select().from(schema.comments).where(eq(schema.comments.authorDeviceHash, deviceTokenHash));
 
   await db.transaction(async (tx) => {
@@ -105,13 +167,13 @@ export async function runDsarExport(
       action: "dsar.exported",
       targetType: "device_token_hash",
       targetId: deviceTokenHash,
-      metadata: { commentCount: comments.length },
+      metadata: { commentCount: comments.length, submissionCount: submissionsExport.length },
     });
   });
 
   return {
     deviceTokenHash,
-    submissions: [], // STUB: submissions aren't keyed by device token hash yet -- see docblock above.
+    submissions: submissionsExport,
     comments: comments.map((c) => ({ id: c.id, checkId: c.checkId, body: c.body, status: c.status, createdAt: c.createdAt.toISOString() })),
     excludedPublishedEvidence: true,
     exportedAt: new Date().toISOString(),
