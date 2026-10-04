@@ -24,6 +24,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from app.models.enums import Rating
+
 
 class RiskTier(StrEnum):
     """ADR-0031 risk tiers. A (low) -> C (high, always human-gated)."""
@@ -72,4 +74,32 @@ def classify_risk_tier(
     return RiskTier.B
 
 
-__all__ = ["ImputationSeverity", "RiskTier", "classify_risk_tier"]
+# A draft verdict's rating counts as a "hard-negative finding" for
+# ADR-0031's severity axis -- a Misleading/False rating on a named-person
+# claim unavoidably imputes dishonesty, even though the rating itself
+# carries no explicit severity field (see module docstring: a dedicated
+# draft-prompt-side severity classification is still a follow-on; this is
+# the least-speculative signal available from the wire today).
+_HARD_NEGATIVE_RATINGS = frozenset({Rating.false, Rating.misleading})
+
+
+def imputation_severity_from_rating(rating: Rating | None) -> ImputationSeverity:
+    """Map a draft verdict's `rating` to an ADR-0031 imputation severity.
+
+    `None` (a rejected draft, or a named-person draft whose rating is
+    withheld pre-approval) is treated as the weaker INACCURACY severity,
+    never CRIME_OR_DISHONESTY -- this function only escalates severity on
+    a rating actually present and hard-negative; it never infers severity
+    from the absence of one.
+    """
+    if rating in _HARD_NEGATIVE_RATINGS:
+        return ImputationSeverity.CRIME_OR_DISHONESTY
+    return ImputationSeverity.INACCURACY
+
+
+__all__ = [
+    "ImputationSeverity",
+    "RiskTier",
+    "classify_risk_tier",
+    "imputation_severity_from_rating",
+]

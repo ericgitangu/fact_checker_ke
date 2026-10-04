@@ -23,6 +23,8 @@ from __future__ import annotations
 
 from pydantic import Base64Bytes, BaseModel, ConfigDict, Field, model_validator
 
+from app.models.generated import Attribution
+
 
 class HopContent(BaseModel):
     """Exactly one of `url` / `text` must be present, mirroring
@@ -123,6 +125,19 @@ class VerifyHopRequest(BaseModel):
     claim_text: str = Field(min_length=1, max_length=2000)
     language: str = Field(default="en", min_length=2, max_length=16)
     named_person_involved: bool = False
+    # ADR-0031 risk-tier wiring: the claim's real wire `Attribution`
+    # (ADR-0004, `Claim.attribution`), reused here rather than the hop
+    # inventing its own placeholder -- see app/stages/publish.py's
+    # finalize_publish, the one caller that consumes this.
+    attribution: Attribution = Attribution.not_applicable
+    # ADR-0032/AT-0032-8: the fetch engine's best-effort content
+    # fingerprint for this claim's image/video-thumbnail (see
+    # app/protocols/fetch_source.py's FetchCandidate.fingerprint, or a
+    # hash computed by app/stages/media_processing.py for an uploaded
+    # image) -- None when the claim carries no image/video evidence to
+    # reverse-image-search against. See app/stages/verify.py's
+    # run_verify_hop for the consumer.
+    media_hash: str | None = None
 
 
 class MediaProcessHopRequest(BaseModel):
