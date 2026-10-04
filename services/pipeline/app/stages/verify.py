@@ -13,7 +13,13 @@ from datetime import UTC, datetime
 from pydantic import ValidationError
 
 from app.models.hop_requests import VerifyHopRequest
-from app.models.pipeline_io import Citation, DraftVerdictOutput, UsageRecord, VerifyResult
+from app.models.pipeline_io import (
+    Citation,
+    DraftVerdictOutput,
+    PublishDecisionPayload,
+    UsageRecord,
+    VerifyResult,
+)
 from app.prompts.templates import build_draft_verdict_prompt
 from app.protocols.check_store import CheckStore
 from app.protocols.embedder import Embedder
@@ -23,6 +29,7 @@ from app.registry.credibility import render_registry_as_prompt_context
 from app.stages.citation_guard import CitationIntegrityError, RetrievedDoc, verify_citations
 from app.stages.dedup_guard import may_reuse
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
+from app.stages.publish import finalize_publish
 
 # Cosine-similarity threshold for dedup reuse (ADR-0004 step 3 / amendment
 # #8). Not yet tuned against a real eval set (tracked as tech debt — see
@@ -135,6 +142,24 @@ async def run_verify_hop(
                 valid_as_of=datetime.now(UTC).date().isoformat(),
                 usage=usage,
             )
+            # ADR-0031 amendment (C1 gap): the ONE real, non-test call
+            # into decide_publish_policy (via app.stages.publish.
+            # finalize_publish), for every completed draft on either
+            # engine (submission today; the ADR-0032 fetch engine once
+            # it converges on this same hop).
+            outcome = finalize_publish(result, named_person_involved=request.named_person_involved)
+            result = result.model_copy(
+                update={
+                    "publish": PublishDecisionPayload(
+                        risk_tier=outcome.risk_tier.value,
+                        auto_publish=outcome.decision.auto_publish,
+                        reason=outcome.decision.reason,
+                        publish_mode=outcome.decision.publish_mode,
+                        queued_for_async_audit=outcome.decision.queued_for_async_audit,
+                        requires_human_tap=outcome.decision.requires_human_tap,
+                    )
+                }
+            )
             store.set(cache_key, result)
             return result
         except (
@@ -150,6 +175,23 @@ async def run_verify_hop(
         verdict=None,
         rejected=True,
         rejection_reason=str(last_error),
+    )
+    # Fail-closed by construction: verdict is None, so
+    # finalize_publish's `_rendered_summary` returns None and this
+    # NEVER reaches decide_publish_policy's auto_publish=True path (the
+    # RED->GREEN "no-summary draft never auto-publishes" case).
+    rejected_outcome = finalize_publish(rejected_result, named_person_involved=request.named_person_involved)
+    rejected_result = rejected_result.model_copy(
+        update={
+            "publish": PublishDecisionPayload(
+                risk_tier=rejected_outcome.risk_tier.value,
+                auto_publish=rejected_outcome.decision.auto_publish,
+                reason=rejected_outcome.decision.reason,
+                publish_mode=rejected_outcome.decision.publish_mode,
+                queued_for_async_audit=rejected_outcome.decision.queued_for_async_audit,
+                requires_human_tap=rejected_outcome.decision.requires_human_tap,
+            )
+        }
     )
     store.set(cache_key, rejected_result)
     return rejected_result
