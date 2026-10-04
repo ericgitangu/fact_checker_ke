@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { ApiClient, type MaandamanoResponse } from "@fact-checker-ke/core";
+import { Reveal } from "@fact-checker-ke/brand";
 import { DemonstrationStatusChip } from "../../components/status-chip";
 import { NightBand } from "../../components/night-band";
 
@@ -57,42 +58,50 @@ export default async function MaandamanoPage(): Promise<React.JSX.Element> {
         )}
       </NightBand>
 
-      <div>
-        <h1>{t("heading")}</h1>
-        <p style={{ color: "var(--ink-2)", marginTop: 6 }}>{t("intro")}</p>
-      </div>
+      <Reveal motion="rise">
+        <div>
+          <h1>{t("heading")}</h1>
+          <p style={{ color: "var(--ink-2)", marginTop: 6 }}>{t("intro")}</p>
+        </div>
+      </Reveal>
 
       {frozen ? (
         <p className="form-note form-note-muted" role="status">
           {t("frozen.body")}
         </p>
       ) : (
-        <ul className="flex flex-col gap-4" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {demonstrations.map((demo) => (
-            <li key={demo.id} className="advisory-card">
-              <div className="flex items-center justify-between">
-                <h3>{demo.title}</h3>
-                <DemonstrationStatusChip status={demo.status} />
-              </div>
-              <p style={{ color: "var(--ink-2)" }}>{demo.summary}</p>
-              <div className="advisory-meta">
-                <span>
-                  {demo.area}, {demo.county}
-                  {demo.date ? ` · ${demo.date}` : ""}
-                </span>
-                {demo.sourceUrl && (
-                  <a href={demo.sourceUrl} target="_blank" rel="noopener noreferrer">
-                    {t("sourcedFrom")}
-                  </a>
-                )}
-                <span>
-                  {t("updatedAt")}: {new Date(demo.updatedAt).toLocaleString()}
-                </span>
-              </div>
-              {isStale(demo.updatedAt) && <p className="advisory-stale">{t("staleWarning")}</p>}
-            </li>
-          ))}
-        </ul>
+        <Reveal motion="rise" threshold={0.05}>
+          <ul className="advisory-list" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {demonstrations.map((demo, i) => (
+              <li
+                key={demo.id}
+                className="advisory-card"
+                style={{ "--fck-advisory-i": i } as React.CSSProperties}
+              >
+                <div className="advisory-card-head">
+                  <h3>{demo.title}</h3>
+                  <DemonstrationStatusChip status={demo.status} />
+                </div>
+                <p style={{ color: "var(--ink-2)" }}>{demo.summary}</p>
+                <div className="advisory-meta">
+                  <span>
+                    {demo.area}, {demo.county}
+                    {demo.date ? ` · ${demo.date}` : ""}
+                  </span>
+                  {demo.sourceUrl && (
+                    <a href={demo.sourceUrl} target="_blank" rel="noopener noreferrer">
+                      {t("sourcedFrom")}
+                    </a>
+                  )}
+                  <span>
+                    {t("updatedAt")}: {new Date(demo.updatedAt).toLocaleString()}
+                  </span>
+                </div>
+                {isStale(demo.updatedAt) && <p className="advisory-stale">{t("staleWarning")}</p>}
+              </li>
+            ))}
+          </ul>
+        </Reveal>
       )}
     </div>
   );

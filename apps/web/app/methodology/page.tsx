@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
-import { TwoEngineFlow, VerdictScale } from "@fact-checker-ke/brand";
+import { getTranslations } from "next-intl/server";
+import {
+  TwoEngineFlow,
+  VerdictScale,
+  type TwoEngineFlowCopy,
+  type VerdictScaleCopy,
+} from "@fact-checker-ke/brand";
 
 export const metadata: Metadata = {
   title: "Methodology — fact_checker_ke",
@@ -16,11 +22,18 @@ export const metadata: Metadata = {
 // keeps its own RATING_DEFINITIONS/RATING_ORDER.
 
 // NOTE (i18n gap, honestly flagged per ADR-0028 scope note): this page's
-// prose stays English-only in this wave — it is long-form editorial
+// long-form PROSE stays English-only in this wave — it is editorial
 // content, not UI chrome, and translating it accurately needs editorial
 // review rather than a mechanical catalog entry. The `check`/`tracker`/
 // `common` namespaces (the ADR's required scope) are fully covered
 // elsewhere (submit, status, checks/[id], maandamano, editor).
+//
+// The two shared brand set pieces on this page (<VerdictScale> and
+// <TwoEngineFlow>) ARE now localised: their user-facing copy is passed in
+// from the new `brand` i18n namespace below, so the scale and the flow
+// render in Swahili when the web locale is SW. apps/site keeps the English
+// defaults carried in the components (it passes no copy), so that surface
+// is unchanged — see packages/brand/src/{verdict-scale,two-engine-flow}.tsx.
 //
 // ALIGNMENT PASS (2026-10-04): this page previously described a single
 // submission-only intake and a blocking "a human editor reviews every
@@ -29,7 +42,46 @@ export const metadata: Metadata = {
 // now the default; the editor is an async auditor, not a pre-publish
 // approver, for the large majority of published checks). This rewrite
 // tells that corrected story — it does not invent new capabilities.
-export default function MethodologyPage(): React.JSX.Element {
+export default async function MethodologyPage(): Promise<React.JSX.Element> {
+  const tb = await getTranslations("brand");
+
+  // Localised copy for the two shared brand set pieces. Keys that resolve to
+  // SW under a SW request render the scale/flow in Swahili; apps/site passes
+  // nothing and keeps the English defaults carried in the components.
+  const scaleCopy: VerdictScaleCopy = {
+    true: { name: tb("scale.true.name"), description: tb("scale.true.description") },
+    mostly: { name: tb("scale.mostly.name"), description: tb("scale.mostly.description") },
+    misleading: {
+      name: tb("scale.misleading.name"),
+      description: tb("scale.misleading.description"),
+    },
+    false: { name: tb("scale.false.name"), description: tb("scale.false.description") },
+    unproven: { name: tb("scale.unproven.name"), description: tb("scale.unproven.description") },
+    notcheckable: {
+      name: tb("scale.notcheckable.name"),
+      description: tb("scale.notcheckable.description"),
+    },
+  };
+  const flowCopy: TwoEngineFlowCopy = {
+    entriesLabel: tb("flow.entriesLabel"),
+    stepsLabel: tb("flow.stepsLabel"),
+    entries: {
+      fetch: { tag: tb("flow.fetch.tag"), title: tb("flow.fetch.title"), body: tb("flow.fetch.body") },
+      submit: {
+        tag: tb("flow.submit.tag"),
+        title: tb("flow.submit.title"),
+        body: tb("flow.submit.body"),
+      },
+    },
+    steps: {
+      extract: { title: tb("flow.steps.extract.title"), body: tb("flow.steps.extract.body") },
+      ground: { title: tb("flow.steps.ground.title"), body: tb("flow.steps.ground.body") },
+      assess: { title: tb("flow.steps.assess.title"), body: tb("flow.steps.assess.body") },
+      publish: { title: tb("flow.steps.publish.title"), body: tb("flow.steps.publish.body") },
+      audit: { title: tb("flow.steps.audit.title"), body: tb("flow.steps.audit.body") },
+    },
+  };
+
   return (
     <div className="shell-narrow flex flex-col gap-10">
       <div>
@@ -51,7 +103,7 @@ export default function MethodologyPage(): React.JSX.Element {
             skips review: either way, the same pipeline below checks it.
           </p>
         </div>
-        <TwoEngineFlow ariaLabel="How a claim gets checked, from entry to published audit" />
+        <TwoEngineFlow ariaLabel={tb("flow.ariaLabel")} copy={flowCopy} />
       </section>
 
       <section className="flex flex-col gap-4">
@@ -61,7 +113,7 @@ export default function MethodologyPage(): React.JSX.Element {
           calibrated confidence weight (below). Each rating applies to the{" "}
           <strong>claim</strong>, not to the person who made it.
         </p>
-        <VerdictScale ariaLabel="The six-verdict rating scale and what each verdict means" />
+        <VerdictScale ariaLabel={tb("scale.ariaLabel")} verdicts={scaleCopy} />
       </section>
 
       <section className="flex flex-col gap-3">

@@ -48,11 +48,27 @@ const RATING_KEYS: Record<Rating, string> = {
   NotCheckable: "rating.NotCheckable",
 };
 
+/**
+ * The full verdict stamp — the money shot on a check's own page. The rating
+ * is literally "pressed onto the public record": the bespoke verdict glyph
+ * (same icon system as the <VerdictScale> seals) sits in a large
+ * double-ruled ink seal carrying its earned colour, beside the kicker +
+ * stamped rating word. The seal and word share the house `stamp-in` press
+ * on load (one orchestrated moment), reduced-motion-safe via the
+ * `@media (prefers-reduced-motion)` block in globals.css.
+ */
 export async function VerdictStamp({ rating }: { rating: Rating }): Promise<React.JSX.Element> {
   const t = await getTranslations("check");
+  const Icon = RATING_ICON[rating];
   return (
-    <div className={`verdict v-${rating}`}>
-      <span className="verdict-stamp">{t(RATING_KEYS[rating])}</span>
+    <div className={`verdict verdict-hero v-${rating}`}>
+      <span className="verdict-hero-seal" aria-hidden="true">
+        <Icon size={34} className="verdict-hero-glyph" />
+      </span>
+      <span className="verdict-hero-body">
+        <span className="verdict-hero-kicker">{t("rating.label")}</span>
+        <span className="verdict-stamp">{t(RATING_KEYS[rating])}</span>
+      </span>
     </div>
   );
 }

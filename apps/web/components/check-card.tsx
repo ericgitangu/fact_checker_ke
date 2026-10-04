@@ -1,5 +1,6 @@
 import type { Check } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
+import { ConfidenceGauge, ExternalLinkIcon, ShieldCheckIcon, Reveal } from "@fact-checker-ke/brand";
 import { LegalCaveat } from "./legal-caveat";
 import { AwaitingEditorNotice, VerdictStamp } from "./verdict";
 
@@ -26,118 +27,131 @@ export async function CheckCard({ check }: { check: Check }): Promise<React.JSX.
       ? await AwaitingEditorNotice()
       : await VerdictStamp({ rating: check.rating });
 
+  // Iconed sources (the credibility marker + external-link cue) are the
+  // check-page treatment; the compact feed row keeps its bare list.
+  const legalCaveat = !check.isDraft ? await LegalCaveat({ riskTier: check.riskTier }) : null;
+
   return (
-    <article className="checkcard" aria-label="Fact-check">
-      {check.isDraft ? (
-        <p className="checkcard-tag">{t("draft.pending")}</p>
-      ) : (
-        <p className="checkcard-tag">fact_checker_ke</p>
-      )}
+    // One orchestrated reveal on load: the whole record "presses" onto the
+    // page (house `press` motion), reduced-motion-safe at the useReveal
+    // source + reveal.css belt-and-braces. The verdict seal + stamp then
+    // carry their own stamp-in press within it — the one focal accent.
+    <Reveal motion="press" threshold={0.05} className="checkcard-reveal">
+      <article className="checkcard" aria-label="Fact-check">
+        {check.isDraft ? (
+          <p className="checkcard-tag">{t("draft.pending")}</p>
+        ) : (
+          <p className="checkcard-tag checkcard-tag-record">
+            <ShieldCheckIcon size={13} />
+            fact_checker_ke
+          </p>
+        )}
 
-      <h1 className="checkcard-claim">{check.summary}</h1>
+        <h1 className="checkcard-claim">{check.summary}</h1>
 
-      {verdictOrAwaitingNotice}
-
-      <section aria-labelledby="claims-h">
-        <h2 id="claims-h" className="sr-only">
-          {t("claims.heading")}
-        </h2>
-        <ul className="source-list">
-          {check.claims.map((claim) => (
-            <li key={claim.id}>
-              {claim.text}
-              <span className="source-tier"> · {claim.claimType}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <dl className="checkcard-meta">
-        <div>
-          <dt>{t("sources.heading")}</dt>
-          <dd>
-            <ul className="source-list">
-              {check.sources.map((source) => (
-                <li key={source.id}>
-                  <a href={source.url} target="_blank" rel="noopener noreferrer">
-                    {source.title}
-                  </a>
-                  <span className="source-tier">{source.credibilityTier}</span>
-                </li>
-              ))}
-            </ul>
-          </dd>
+        {/* The focal "record" row: the pressed verdict stamp, and — for a
+            published check — the calibrated confidence dial beside it. A
+            confidence weight is NOT a verdict (ADR-0031), so the gauge
+            carries the brand accent, never a rating hue. */}
+        <div className="checkcard-verdict-row">
+          {verdictOrAwaitingNotice}
+          {!check.isDraft && check.calibratedConfidence !== null && (
+            <ConfidenceGauge
+              value={check.calibratedConfidence}
+              label={t("guidance.confidenceLabel")}
+              size="md"
+              className="checkcard-gauge-block"
+            />
+          )}
         </div>
-      </dl>
 
-      {!check.isDraft && check.reviewedBy && (
-        <p className="checkcard-rationale" style={{ marginTop: 16 }}>
-          {t("reviewedBy")}
-        </p>
-      )}
+        {/* ADR-0031/0033: claim-attributed framing, spelled out (not just
+            implied by the absence of a person's name) — rendered on every
+            published check regardless of tier. */}
+        {!check.isDraft && (
+          <p className="checkcard-claim-note">{t("guidance.claimAttributedNote")}</p>
+        )}
 
-      {/* ADR-0031: a published Check is an assessment, not an accusation —
-          the calibrated confidence weight, cited evidence, and the
-          falsifiability note are all surfaced here so the reader (not a
-          bare verdict) does the judging. `CheckSchema`'s `superRefine`
-          (packages/core/src/schemas/check.ts) is what guarantees these
-          are non-null on any check that reaches this component with
-          `isDraft: false`. */}
-      {!check.isDraft && check.calibratedConfidence !== null && (
-        <p className="checkcard-confidence">
-          {t("guidance.confidenceLabel")}: {Math.round(check.calibratedConfidence * 100)}%
-        </p>
-      )}
-
-      {/* ADR-0031/0033: claim-attributed framing, spelled out as a label
-          next to the confidence weight (not just implied by the absence
-          of a person's name) — "we assess the claim, not the person...
-          you decide" is the reader-facing restatement of the ADR-0023
-          framing rule, rendered on every published check regardless of
-          tier. */}
-      {!check.isDraft && (
-        <p className="checkcard-rationale">{t("guidance.claimAttributedNote")}</p>
-      )}
-
-      {!check.isDraft && check.evidence.length > 0 && (
-        <section aria-labelledby="evidence-h">
-          <h2 id="evidence-h" className="sr-only">
-            {t("guidance.evidenceHeading")}
+        <section aria-labelledby="claims-h">
+          <h2 id="claims-h" className="sr-only">
+            {t("claims.heading")}
           </h2>
-          <ul className="source-list">
-            {check.evidence.map((item) => {
-              const source = check.sources.find((s) => s.id === item.sourceId);
-              return (
-                <li key={`${item.sourceId}-${item.quote}`}>
-                  &ldquo;{item.quote}&rdquo;
-                  {source ? <span className="source-tier"> — {source.title}</span> : null}
-                </li>
-              );
-            })}
+          <ul className="source-list source-list-claims">
+            {check.claims.map((claim) => (
+              <li key={claim.id}>
+                {claim.text}
+                <span className="source-tier"> · {claim.claimType}</span>
+              </li>
+            ))}
           </ul>
         </section>
-      )}
 
-      {!check.isDraft && check.whatWouldChangeThis && (
-        <p className="checkcard-rationale">
-          <strong>{t("guidance.whatWouldChangeThisHeading")}:</strong> {check.whatWouldChangeThis}
-        </p>
-      )}
+        <dl className="checkcard-meta">
+          <div>
+            <dt>{t("sources.heading")}</dt>
+            <dd>
+              <ul className="source-list source-list-iconed">
+                {check.sources.map((source) => (
+                  <li key={source.id}>
+                    <span className="source-cred-icon" aria-hidden="true">
+                      <ShieldCheckIcon size={15} />
+                    </span>
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="source-link"
+                    >
+                      {source.title}
+                      <ExternalLinkIcon size={12} className="source-link-ext" />
+                    </a>
+                    <span className="source-tier">{source.credibilityTier}</span>
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        </dl>
 
-      {/* ADR-0033 AT-0033-1: the standing legal caveat renders on every
-          PUBLISHED check, every risk tier (fetch- or submission-sourced) —
-          never on a draft, which already carries its own
-          AwaitingEditorNotice and has nothing published to caveat yet.
-          Awaited explicitly (unlike VerdictStamp/AwaitingEditorNotice
-          above, a pre-existing pattern this change does not touch) so the
-          caveat also renders correctly under a plain ReactDOM test render
-          (@testing-library/react), not only Next's real RSC renderer —
-          confirmed empirically: embedding an async Server Component as a
-          bare JSX tag fails under plain ReactDOM with "Only Server
-          Components can be async at the moment" / an unresolved `act`
-          suspension, verified against this exact codebase via a scratch
-          test before this fix. */}
-      {!check.isDraft && (await LegalCaveat({ riskTier: check.riskTier }))}
-    </article>
+        {!check.isDraft && check.reviewedBy && (
+          <p className="checkcard-rationale checkcard-audited">
+            <ShieldCheckIcon size={14} />
+            {t("reviewedBy")}
+          </p>
+        )}
+
+        {!check.isDraft && check.evidence.length > 0 && (
+          <section aria-labelledby="evidence-h" className="checkcard-evidence">
+            <h2 id="evidence-h" className="checkcard-section-label">
+              {t("guidance.evidenceHeading")}
+            </h2>
+            <ul className="source-list">
+              {check.evidence.map((item) => {
+                const source = check.sources.find((s) => s.id === item.sourceId);
+                return (
+                  <li key={`${item.sourceId}-${item.quote}`} className="evidence-quote">
+                    &ldquo;{item.quote}&rdquo;
+                    {source ? <span className="source-tier"> — {source.title}</span> : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        {!check.isDraft && check.whatWouldChangeThis && (
+          <p className="checkcard-rationale checkcard-change">
+            <strong>{t("guidance.whatWouldChangeThisHeading")}:</strong>{" "}
+            {check.whatWouldChangeThis}
+          </p>
+        )}
+
+        {/* ADR-0033 AT-0033-1: the standing legal caveat renders on every
+            PUBLISHED check, every risk tier — never on a draft. Awaited
+            explicitly (see `legalCaveat` above) so it also renders under a
+            plain ReactDOM test render, not only Next's real RSC renderer. */}
+        {legalCaveat}
+      </article>
+    </Reveal>
   );
 }
