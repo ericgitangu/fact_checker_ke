@@ -7,6 +7,8 @@ import { buildApp } from "../app.js";
 import { drainOutbox } from "../lib/outbox.js";
 import { FakePublisher } from "../lib/publisher.js";
 import type { SignatureVerifier } from "../lib/internal-auth.js";
+import { setAutonomousPublishKillSwitch } from "../lib/publish-kill-switch.js";
+import { setFetchEngineKillSwitch } from "../lib/fetch-kill-switch.js";
 import { requireIntegrationDatabaseUrl } from "./integration-env.js";
 
 /**
@@ -64,6 +66,28 @@ describe.skipIf(!connectionString)(
       const created = createDb(connectionString as string);
       db = created.db;
       close = created.close;
+
+      // db/migrations/0014_safe_launch_shadow_mode_seed.sql now seeds a
+      // fresh DB with BOTH kill-switches frozen (go-live.md §0's "safe
+      // by default" posture) -- this suite's first test specifically
+      // proves the opposite path (a real auto-publish happening through
+      // the live route), so it must explicitly unfreeze both switches
+      // first rather than relying on the pre-0014 implicit
+      // unfrozen-by-default DB state. The other two tests in this file
+      // never reach a publish decision regardless (one never gets past
+      // claim-type classification, the other's confidence never crosses
+      // the auto-publish threshold), so unfreezing here doesn't change
+      // their behaviour.
+      const [unfreezeActor] = await db
+        .insert(schema.users)
+        .values({
+          email: `submission-e2e-unfreeze-${randomUUID()}@example.test`,
+          passwordHash: "x",
+          role: "admin",
+        })
+        .returning();
+      await setAutonomousPublishKillSwitch(db, { actorId: unfreezeActor!.id, enabled: false });
+      await setFetchEngineKillSwitch(db, { actorId: unfreezeActor!.id, enabled: false });
 
       // Real services/pipeline FastAPI app, fakes-only (no ANTHROPIC/
       // vendor keys set in this process's env) -- see app/main.py's

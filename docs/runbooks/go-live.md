@@ -45,25 +45,33 @@ assessments** — with no additional action required. That is the exact
 risk this runbook's step 2 exists to neutralise *before* step 3 adds any
 key.
 
-**A second, deeper finding from this session's audit (read as a gap, not
-a reason to skip the freeze step — freeze first regardless):**
-`services/api/src/lib/publish-enactment.ts#enactPublishDecision` is the
-*only* place in the codebase that actually checks either kill-switch
-before writing `isDraft=false` to a `checks` row — and it is currently
-**called only from integration tests**, never from a production route.
-No route in `services/api/src/routes/*.ts` calls
-`services/pipeline`'s `/hops/verify` and then feeds its
-`PublishDecisionPayload` into `enactPublishDecision`. Practically, this
-means: **today, nothing in the live HTTP path can auto-publish at all,
-because the wiring that would act on a verify-hop's publish decision
-does not exist yet** — the risk described above is latent until that
-wiring lands, not live today. This is tracked as a blocking gap in
-`activate-on-keys-audit.md` (§"Gap: publish-enactment is not wired into
-any live route") and does not change the order below: freeze the
-switches first regardless, because (a) the gap could be closed by
-another change between now and go-live without this runbook being
-re-read, and (b) flipping the switches is free and reversible, so there
-is no reason to rely on an absence-of-wiring as a safety net.
+**UPDATE (go-live plumbing pass, see the companion PR): the gap
+described in this subsection when it was first written is now CLOSED —
+re-verified empirically this session, not assumed.**
+`services/api/src/lib/publish-enactment.ts#enactPublishDecision` is
+called from `services/api/src/lib/submission-orchestrator.ts`, which is
+itself wired into the live `POST /internal/hops/orchestrate` route
+(`app.ts`) — confirmed via
+`grep -rln "enactPublishDecision" services/api/src --include="*.ts" | grep -v __tests__`
+returning `app.ts`, `lib/submission-orchestrator.ts`, and
+`lib/publish-enactment.ts` itself (previously this returned only the
+defining file). The orchestrator calls `services/pipeline`'s
+`/hops/analyze` then `/hops/verify` directly over HTTP and feeds the
+verify hop's publish decision into `enactPublishDecision`, which checks
+both kill-switches before writing `isDraft=false`
+(`services/api/src/__tests__/submission-orchestration-e2e.integration.test.ts`
+exercises this end-to-end through the real relay + a real spawned
+pipeline process, fakes-only). **Practical effect: the live HTTP path
+CAN auto-publish for real today** — the risk described above in this
+section is live, not latent. This makes step 2's freeze operationally
+meaningful (not just a precaution against a future wiring change), and
+§2.4 below is now itself verified rather than deferred: this session's
+db/migrations/0014_safe_launch_shadow_mode_seed.sql + a dedicated
+integration test (`services/api/src/__tests__/
+safe-launch-seed.integration.test.ts`) prove, against a freshly migrated
+throwaway database, that both kill-switches read frozen on a DB that has
+never had a policy_flags row written — closing exactly the loop this
+section used to say couldn't be closed yet.
 
 ---
 
@@ -215,13 +223,19 @@ and defaults to `"true"`. The DB flag above (`fetch_engine_kill_switch`)
 is the fast, no-redeploy lever; the env var is the slow, requires-
 redeploy lever — **both independently halt ingestion** (per
 `fetch-kill-switch.ts`'s own docstring: "either one being 'disabled'
-halts ingestion"). Set it explicitly in the Cloud Run env (not just via
-`--set-secrets`, since this is non-secret config) when you create the
-service in step 4, rather than leaving it at the implicit default:
-```
---set-env-vars FETCH_ENGINE_ENABLED=false
-```
-Only remove this once you deliberately decide to un-freeze (step 5).
+halts ingestion").
+
+**Now wired by Terraform, not a manual flag at deploy time:**
+`infra/terraform/envs/prod/cloud_run.tf`'s `pipeline_service` module
+sets `plain_env = { FETCH_ENGINE_ENABLED = "false" }` unconditionally —
+every `terraform apply` of this service (including the very first one in
+step 4) deploys with ingestion halted by construction. No manual
+`--set-env-vars` flag is needed at `gcloud run deploy` time any more;
+flipping this requires a deliberate `.tf` edit (step 5.1), which is the
+point. Confirm it's actually on the deployed revision after step 4 with
+the `gcloud run services describe ... | grep FETCH_ENGINE_ENABLED` check
+in step 4.4 below — Terraform setting it correctly in the plan is not
+the same as the deployed revision having it.
 
 ### 2.3 Decide Tier-C mode's policy_flags row now, if not mode (a)
 
@@ -233,41 +247,68 @@ not call for a stricter mode.
 
 ### 2.4 Confirm the freeze actually blocks (closes the loop before trusting it)
 
-Given §0's finding that `enactPublishDecision` is not yet wired into any
-live route, **the freeze above cannot be verified against a real
-end-to-end publish today** — there is no live path to exercise. Record
-that explicitly rather than claiming it was tested:
-- If the wiring lands before go-live: re-run this step and verify with a
-  real (test-data) submission that a would-be auto-publish is blocked
-  and audit-logged as `check.auto_publish_blocked`.
-- If it has not landed by go-live: this is a **blocking gap**, not a
-  green light — see §6 "Rollback" and the audit doc's gap list. Do not
-  proceed past step 1-2 into step 3 (adding real keys) while this gap is
-  open, because the absence of a publish path is not the same as a
-  verified-safe publish path; closing the gap is itself part of
-  "wiring the keys so they just work" per this task's own framing.
+**Now verified — not deferred.** §0's update above confirms
+`enactPublishDecision` is wired into the live
+`POST /internal/hops/orchestrate` route, so this loop is real, and this
+session closed it two ways, both against the REAL code (no
+reimplementation):
+
+1. **Migration-level proof.** `db/migrations/0014_safe_launch_shadow_mode_seed.sql`
+   seeds both `policy_flags` rows frozen on a DB that has never had them
+   written. `services/api/src/__tests__/safe-launch-seed.integration.test.ts`
+   provisions a throwaway sibling Postgres database, runs every real
+   migration file against it via drizzle's own migrator, and asserts
+   `isAutonomousPublishFrozen`/`isFetchEngineFrozen` both read `true` —
+   proving a FRESH prod DB starts frozen, not auto-publish-live.
+2. **End-to-end proof.** `services/api/src/__tests__/
+   submission-orchestration-e2e.integration.test.ts` drives a real
+   `submission.received` event through the real outbox relay, the real
+   `/internal/hops/orchestrate` route, and a real spawned
+   `services/pipeline` process (fakes-only, no vendor keys) into
+   `enactPublishDecision`. Before this session's go-live-plumbing pass,
+   this suite exercised the *unfrozen* (auto-publish) path only; it now
+   explicitly unfreezes both switches in its own `beforeAll` (since
+   migration 0014 changed the shared integration DB's default) and
+   proves the happy path still reaches `check.published` when
+   deliberately unfrozen. The companion assertion — that the SAME route
+   blocks when frozen — was not added as a fourth test in this pass (out
+   of the stated scope: this task touched `services/api` config/CORS +
+   `packages/db`/migrations only, not new route-level test coverage) and
+   remains a good next step for whoever wires the admin kill-switch HTTP
+   routes mentioned below.
+
+**Still open, not closed by this pass:** no admin HTTP route exists yet
+to flip either kill-switch outside a direct DB/tsx script (the gap named
+in step 2.1 above) — flipping still goes through the one-off `tsx`
+snippet there, not a `POST /v1/admin/.../kill-switch` route like
+`maandamano`'s.
 
 ---
 
 ## 3. Wire keys (after step 2 is verified)
 
-Full per-client table in [`activate-on-keys-audit.md`](./activate-on-keys-audit.md).
-Summary of the exact sequence per key — **never echo a secret value in a
-shell history, log, or this runbook**:
+Full per-client table in [`activate-on-keys-audit.md`](./activate-on-keys-audit.md)
+(now updated — see that doc's own revision note at the top). Summary of
+the exact sequence per key — **never echo a secret value in a shell
+history, log, or this runbook**:
 
 ```bash
-# 1. Create (or confirm) the Secret Manager container — Terraform owns
-#    containers only, never values (ADR-0016). New containers for
-#    ANTHROPIC_API_KEY / YOUTUBE_API_KEY / GOOGLE_FACTCHECK_API_KEY do
-#    NOT exist in infra/terraform/envs/prod/secrets.tf today — see the
-#    audit doc's gap list. Add the module blocks there first (a doc
-#    change this task may make — see §"Readiness gaps" below), then:
+# 1. Secret Manager containers already exist in
+#    infra/terraform/envs/prod/secrets.tf as of the go-live-plumbing PR
+#    (module blocks secret_anthropic_api_key, secret_youtube_api_key,
+#    secret_google_factcheck_api_key, secret_reverse_image_api_key,
+#    secret_revalidate_secret, secret_x_api_bearer_token -- the last one
+#    is a container only, nothing reads it yet, see §"Readiness gaps").
+#    Apply that plan first if it hasn't already landed in this
+#    environment (containers only -- no values, no cost, safe before any
+#    key exists):
 terraform -chdir=infra/terraform/envs/prod plan -out=plan.out
 bash infra/terraform/policy/plan-guard.sh plan.out   # must pass before apply
 terraform -chdir=infra/terraform/envs/prod apply plan.out
 
 # 2. Add the secret VALUE, no-echo, from stdin (established pattern,
-#    ADR-0016 "First real deploy" section):
+#    ADR-0016 "First real deploy" section) -- exact secret ids, matching
+#    secrets.tf:
 printf '%s' "$ANTHROPIC_API_KEY" | gcloud secrets versions add fact-checker-ke-anthropic-api-key \
   --data-file=- --project=master-crossing-435409-r1
 printf '%s' "$YOUTUBE_API_KEY" | gcloud secrets versions add fact-checker-ke-youtube-api-key \
@@ -276,6 +317,17 @@ printf '%s' "$YOUTUBE_API_KEY" | gcloud secrets versions add fact-checker-ke-you
 # make_factcheck_client as the retrieval source, ADR-0004 step 4 — not
 # itself part of the ADR-0032 fetch engine but shares this step):
 printf '%s' "$GOOGLE_FACTCHECK_API_KEY" | gcloud secrets versions add fact-checker-ke-factcheck-api-key \
+  --data-file=- --project=master-crossing-435409-r1
+# Reverse-image search (ADR-0006 signal, services/pipeline/app/clients/
+# reverse_image_search.py):
+printf '%s' "$REVERSE_IMAGE_API_KEY" | gcloud secrets versions add fact-checker-ke-reverse-image-api-key \
+  --data-file=- --project=master-crossing-435409-r1
+# apps/web ISR revalidation webhook shared secret (services/api/src/
+# config.ts's revalidateSecret, services/api/src/lib/
+# maandamano-revalidate.ts). Optional: the kill-switch flip still
+# succeeds and is still audit-logged without it, just without CDN
+# propagation -- see config.ts's doc comment.
+printf '%s' "$REVALIDATE_SECRET" | gcloud secrets versions add fact-checker-ke-revalidate-secret \
   --data-file=- --project=master-crossing-435409-r1
 ```
 
@@ -311,21 +363,38 @@ printf '%s' "$GOOGLE_FACTCHECK_API_KEY" | gcloud secrets versions add fact-check
 
 ### 3.1 Cloud Run `--set-secrets` wiring (per ADR-0016)
 
-Today, `infra/terraform/envs/prod/cloud_run.tf`'s `secret_env` maps only
-wire `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
-into the `api_service` and `pipeline_service` modules. **None of
-`ANTHROPIC_API_KEY`, `YOUTUBE_API_KEY`, `GOOGLE_FACTCHECK_API_KEY`, or
-`TRIAGE_FEED_URLS` are wired today.** Before the owner's keys will
-"just work," `cloud_run.tf`'s `pipeline_service` module call needs
-additional `secret_env` entries (for the three secrets) and
-`TRIAGE_FEED_URLS` needs either a plain env var (it's a list of URLs,
-not a secret) or its own secret container if the owner prefers not to
-commit it in a `.tfvars` file. This is flagged as a readiness gap below
-(§"Readiness gaps blocking go-live") — the recommended fix (adding
-`secret_env` entries, following the exact pattern the three existing
-entries already use) is a small, additive, no-cost Terraform change this
-task is in-scope to make if the owner wants it landed now (see
-"Readiness gaps" for the actual decision taken this session).
+**Now wired, as of the go-live-plumbing PR.**
+`infra/terraform/envs/prod/cloud_run.tf`'s `secret_env` maps:
+
+- `pipeline_service`: `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`,
+  `UPSTASH_REDIS_REST_TOKEN` (pre-existing) + `ANTHROPIC_API_KEY`,
+  `YOUTUBE_API_KEY`, `GOOGLE_FACTCHECK_API_KEY`, `REVERSE_IMAGE_API_KEY`
+  (new).
+- `api_service`: `DATABASE_URL`, `UPSTASH_REDIS_REST_URL`,
+  `UPSTASH_REDIS_REST_TOKEN` (pre-existing) + `REVALIDATE_SECRET` (new).
+
+Each real client still activates on its own env var alone, falling back
+to its fake/stub when the secret has no version yet — this wiring only
+makes the Cloud Run *container* have the env var available; it does not
+by itself add a value or make any vendor call.
+
+**Still not wired, by design (confirmed no code reads it yet):**
+`TRIAGE_FEED_URLS` — a plain env var (a list of feed URLs, not a secret)
+with no Terraform entry at all. Free, zero-key, highest-signal source
+per ADR-0032; left as a documented gap rather than fixed in this pass
+because it wasn't in this task's named scope (see
+`activate-on-keys-audit.md`'s gap table) — add a `plain_env.TRIAGE_FEED_URLS`
+entry to `pipeline_service` alongside `FETCH_ENGINE_ENABLED` the next
+time this file is touched.
+
+**Also not wired, deliberately:** `X_API_BEARER_TOKEN`. The Secret
+Manager *container* `fact-checker-ke-x-api-bearer-token` exists
+(secrets.tf), but no `secret_env` entry references it on either service,
+because no code anywhere reads an X-related env var — confirmed via
+`fetch_source_factory.py`'s own docstring and a repo-wide grep (no
+`XFetchSource`-equivalent file exists). Wiring a Cloud Run env var that
+nothing reads would be dead plumbing; wire it in the same change that
+ships a real, budgeted X client (ADR-0032 §4).
 
 ---
 
@@ -363,10 +432,9 @@ task is in-scope to make if the owner wants it landed now (see
    ```bash
    ENABLE_SERVICES=true bash scripts/release/release.sh
    ```
-   Confirm the `FETCH_ENGINE_ENABLED=false` env var from step 2.2 is
-   still present on the deployed revision (it is not a secret, so it is
-   plain `--set-env-vars`, not `--set-secrets`; verify it is not
-   accidentally dropped by a Terraform var default):
+   Confirm the `FETCH_ENGINE_ENABLED=false` env var from step 2.2 (now a
+   `plain_env` entry Terraform sets unconditionally on `pipeline_service`
+   — see 2.2's update) is still present on the deployed revision:
    ```bash
    gcloud run services describe fact-checker-ke-pipeline --region=africa-south1 \
      --format='value(spec.template.spec.containers[0].env)' | grep FETCH_ENGINE_ENABLED
@@ -384,9 +452,24 @@ task is in-scope to make if the owner wants it landed now (see
    scripts/deploy/vercel-web.sh
    scripts/deploy/vercel-site.sh
    ```
-6. **Confirm `services/api`'s CORS allow-list** (AT-0015-2, still
-   unverified per the vercel-deploy runbook's deviation #7) actually
-   includes both Vercel origins before calling this done.
+6. **Confirm `services/api`'s CORS allow-list** (AT-0015-2). **Now
+   wired, as of the go-live-plumbing PR:**
+   `infra/terraform/envs/prod/cloud_run.tf`'s `api_service` module sets
+   `plain_env = { CORS_ORIGINS = "https://fact-checker-ke-web.vercel.app" }`
+   — the ONLY origin, since `apps/site` was retired to a redirect-only
+   stub in the single-frontend consolidation (no second origin exists to
+   add). Before this PR, `CORS_ORIGINS` was unset anywhere in Terraform
+   at all (`services/api/src/config.ts` fell back to its localhost-only
+   dev default in every real deploy) — this was the actual gap, not a
+   stale `apps/site` entry to remove. Verify the deployed value:
+   ```bash
+   gcloud run services describe fact-checker-ke-api --region=africa-south1 \
+     --format='value(spec.template.spec.containers[0].env)' | grep CORS_ORIGINS
+   ```
+   If the owner's Vercel project is actually aliased under the longer
+   per-project domain (`fact-checker-ke-web-eric-gitangus-projects.vercel.app`
+   — see ADR-0015's implementation notes on the two aliases), add it as a
+   second comma-separated origin before relying on this in production.
 7. **Confirm scale-to-zero held** (ADR-0016 AT-0016-7, deferred):
    ```bash
    gcloud run services describe fact-checker-ke-api --region=africa-south1 --format='value(status.traffic)'
@@ -469,23 +552,29 @@ go-live.
 
 ## Readiness gaps blocking go-live (summary — full detail in the audit doc)
 
-1. **Blocking: `enactPublishDecision` (the kill-switch enforcement
-   function) is not called from any production route.** The function
-   and both kill-switch checks are correct and tested in isolation, but
-   there is no live code path from a pipeline `/hops/verify` response to
-   this function. Until this is wired, auto-publish cannot happen for
-   real — which is *currently* safe by accident, not by the kill-switch
-   actually being exercised. Closing this gap and then verifying the
-   freeze (step 2.4) is a prerequisite for this runbook's safety
-   guarantees to mean anything operationally.
-2. **Blocking (for the affected secrets only): no Secret Manager
-   containers or Cloud Run `secret_env` wiring exist yet for
-   `ANTHROPIC_API_KEY`, `YOUTUBE_API_KEY`, or `GOOGLE_FACTCHECK_API_KEY`.**
-   Only the four pre-existing DB/Redis secrets are wired
-   (`infra/terraform/envs/prod/secrets.tf`, `cloud_run.tf`). Dropping a
-   real Anthropic/YouTube key into `gcloud secrets versions add` today
-   has nowhere to land without first adding the Terraform
-   module blocks + `secret_env` map entries described in step 3.1.
+**Status as of the go-live-plumbing PR (secret wiring + CORS + shadow-mode
+seed): gaps #1 and #2 below, the two that were previously blocking, are
+CLOSED.** What remains is #3-#6, none of which block a shadow-mode go-live
+(real keys + a deploy, kill-switches frozen, nothing auto-publishes until
+the deliberate step-5 un-freeze).
+
+1. ~~**Blocking: `enactPublishDecision` not called from any production
+   route.**~~ **CLOSED.** `services/api/src/lib/submission-orchestrator.ts`
+   now calls it, wired into the live `POST /internal/hops/orchestrate`
+   route — see §0's update and §2.4 above for the empirical proof (an
+   integration test exercising the real route + a real spawned pipeline
+   process).
+2. ~~**Blocking: no Secret Manager containers or Cloud Run `secret_env`
+   wiring for `ANTHROPIC_API_KEY`, `YOUTUBE_API_KEY`,
+   `GOOGLE_FACTCHECK_API_KEY`.**~~ **CLOSED**, plus two more this task's
+   brief named (`REVERSE_IMAGE_API_KEY`, `REVALIDATE_SECRET`) — see §3.1.
+   `terraform validate` passes against the new config (full `plan`/`apply`
+   not run — this PR makes no real infra change, see its description).
+   **`TRIAGE_FEED_URLS` remains unwired** (free, zero-key, not in this
+   task's named scope) — see §3.1's note.
+   **`X_API_BEARER_TOKEN`'s secret container was created (task scope) but
+   deliberately left un-wired in `secret_env`** — no code reads it; see
+   §3.1 and `secrets.tf`'s own comment on that module.
 3. **Not blocking, but coverage-limiting: no real STT client exists**
    (`Transcriber` protocol has only a fake implementation). This narrows
    fetch-engine coverage to text-derivable claims (titles, descriptions,
@@ -497,9 +586,25 @@ go-live.
    (do not deploy ADR-0033's user-facing text, do not loosen Tier-C
    beyond mode (a)) until it is implemented and actually set, rather than
    assuming a flag exists to check.
+5. **Not blocking, but worth closing soon: no admin HTTP route exists to
+   flip either kill-switch** (unlike `maandamano`'s
+   `POST /v1/admin/maandamano/kill-switch`) — flipping still goes through
+   the one-off `tsx` script in step 2.1. Low-risk (the DB row is writable
+   either way), but an HTTP route would be audit-loggable from the admin
+   UI instead of requiring shell access to `$PROD_DATABASE_URL`.
+6. **New, introduced BY this PR, tracked explicitly (not silent): a
+   second system-actor convention.** `db/migrations/
+   0014_safe_launch_shadow_mode_seed.sql` seeds a non-authenticatable
+   `users` row (`system-seed@fact-checker-ke.internal`,
+   id `00000000-0000-0000-0000-0000000000f0`) purely so the seeded
+   `policy_flags` rows have a valid `updated_by` FK target. This mirrors
+   `organizations`' fixed-UUID seed convention (0002) but is a new
+   pattern for `users` specifically — worth a short ADR note or at least
+   a one-line mention in `docs/architecture/overview.md` if a third such
+   seed actor is ever added, so the convention doesn't silently
+   multiply ad hoc.
 
-See `activate-on-keys-audit.md` for the complete table and which of
-these this session chose to fix vs. document-only (per the task's
-"prefer documenting gaps over changing infra" instruction, no Terraform
-file was changed by this session — see that doc's final section for the
-one exception considered and why it was not taken).
+See `activate-on-keys-audit.md` for the complete table (now updated with
+the same status) and this PR's description for the exact secret names
+created, the migration proof, and the Docker build/terraform-validate
+results.
