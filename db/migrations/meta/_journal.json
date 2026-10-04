@@ -85,6 +85,13 @@
       "when": 1791093546884,
       "tag": "0011_adr_0021_0030_0031_data_lifecycle_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791097264130,
+      "tag": "0012_adr_0031_autopublish_async_audit",
+      "breakpoints": true
     }
   ]
 }

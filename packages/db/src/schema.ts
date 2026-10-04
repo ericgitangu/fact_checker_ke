@@ -4,6 +4,7 @@ import {
   check,
   customType,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -30,6 +31,17 @@ import {
   SubmissionStatusSchema,
   WaitlistSourceSchema,
 } from "@fact-checker-ke/core";
+
+/**
+ * ADR-0031 amendment (two-engine pivot) / AT-0031-9, AT-0025-6: the
+ * async-audit queue's disposition. `pending` until an editor samples it;
+ * `confirmed` = audited, no issue found; `error_found` = audited, an
+ * error was found — the editor-side handler for that outcome MUST then
+ * call `correctCheck` (services/api/src/lib/editorial.ts), which writes
+ * a NEW `checks` row (`check.corrected`), never an update of this row's
+ * outcome standing in for a correction.
+ */
+const ASYNC_AUDIT_OUTCOMES = ["pending", "confirmed", "error_found"] as const;
 
 /**
  * zod v4 types `.options` as `T[]`; Drizzle's pgEnum requires a non-empty
@@ -74,6 +86,7 @@ export const rightOfReplyStatusEnum = pgEnum(
 );
 export const commentStatusEnum = pgEnum("comment_status", enumValues("comment_status", CommentStatusSchema.options));
 export const riskTierEnum = pgEnum("risk_tier", enumValues("risk_tier", RiskTierSchema.options));
+export const asyncAuditOutcomeEnum = pgEnum("async_audit_outcome", ASYNC_AUDIT_OUTCOMES);
 
 /**
  * ADR-0031: the source of a flywheel-captured labeled row — an editor's
@@ -806,5 +819,52 @@ export const funnelAuditLog = pgTable(
     // services/api/src/lib/flywheel.ts#recordFunnelPost): a row can
     // never claim a post predates the check's own publication.
     check("funnel_audit_log_posted_after_published", sql`${table.postedAt} >= ${table.publishedAt}`),
+  ],
+);
+
+/**
+ * ADR-0031 amendment (two-engine pivot) / AT-0031-9, AT-0025-6/7: the
+ * async-audit sampling queue. The editor is no longer a pre-publish
+ * approver for Tier A/B and Tier-C mode (a) — a row here is the record
+ * that a published check was SAMPLED for post-publish human audit, at
+ * what rate (`sampleRateAtQueueTime`, a snapshot of
+ * app/eval/calibrate.py's `compute_audit_sample_rate` output at the
+ * moment this row was written — a later recomputation naturally yields
+ * a different rate for later checks, which is exactly "an output, not a
+ * constant").
+ *
+ * ONE row per published check (`uniqueIndex` below) — a check is queued
+ * for audit at most once, at publish time; an outcome is recorded by
+ * UPDATING this row's `outcome`/`auditedBy`/`auditedAt`/`notes`
+ * (deliberately mutable, unlike `audit_log`/`review_actions`: this is a
+ * worklist row, not an append-only history record — the HISTORY of what
+ * happened to the check is `review_actions` + a `check.corrected` row on
+ * an error finding, both append-only; this row only tracks "has someone
+ * looked at the sampled item yet").
+ */
+export const asyncAuditQueue = pgTable(
+  "async_audit_queue",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    checkId: uuid("check_id")
+      .notNull()
+      .references(() => checks.id, { onDelete: "cascade" }),
+    tier: riskTierEnum("tier").notNull(),
+    // "open_question" (Tier-C mode a) | "plain_caveat" (Tier A/B, or
+    // Tier-C mode c under advocate sign-off) — mirrors
+    // app/stages/publish_policy.py's `PublishDecision.publish_mode`.
+    // Free text (not a pgEnum) because new publish modes are a config/
+    // product concern this table should not need a migration to track.
+    publishMode: text("publish_mode").notNull(),
+    sampleRateAtQueueTime: doublePrecision("sample_rate_at_queue_time").notNull(),
+    outcome: asyncAuditOutcomeEnum("outcome").notNull().default("pending"),
+    auditedBy: uuid("audited_by").references(() => users.id),
+    auditedAt: timestamp("audited_at", { withTimezone: true }),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("async_audit_queue_check_id_idx").on(table.checkId),
+    index("async_audit_queue_outcome_idx").on(table.outcome),
   ],
 );

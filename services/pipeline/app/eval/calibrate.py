@@ -204,6 +204,42 @@ def load_calibration_artifact(path: Path) -> CalibrationArtifact | None:
     )
 
 
+# ADR-0031 amendment (two-engine pivot) / AT-0031-9, AT-0025-7: the
+# human-audit sampling rate is a FUNCTION of measured calibration (an
+# output), not a hardcoded constant. No calibration artifact at all
+# (brand-new pilot) samples EVERYTHING that auto-published; as ECE
+# (Expected Calibration Error) falls, the sampled fraction shrinks
+# linearly down to a floor; a calibration artifact that REGRESSES
+# (degrading ECE) raises the rate back up, symmetrically with the same
+# function -- there is no separate "ratchet" that only ever lowers it.
+PILOT_AUDIT_SAMPLE_RATE = 1.0
+MIN_AUDIT_SAMPLE_RATE = 0.05
+MAX_AUDIT_SAMPLE_RATE = 1.0
+# ECE at/above this is treated as "pilot-grade" (sample everything);
+# placeholder starting value, same tech-debt note as TAU_A/TAU_B in
+# app/stages/publish_policy.py -- the real reference point is a
+# calibration-harness output from production data, not a number chosen
+# here.
+AUDIT_SAMPLE_RATE_ECE_REFERENCE = 0.10
+
+
+def compute_audit_sample_rate(artifact: CalibrationArtifact | None) -> float:
+    """Maps a calibration artifact's ECE to a human-audit sampling rate
+    in [MIN_AUDIT_SAMPLE_RATE, MAX_AUDIT_SAMPLE_RATE]. `artifact=None`
+    (no calibration measured yet) returns `PILOT_AUDIT_SAMPLE_RATE`
+    (everything). Monotonic non-decreasing in ECE: a LOWER (better) ECE
+    always yields a rate <= a HIGHER (worse) ECE's rate for the same
+    function -- "shrinks as calibration proves out, rises as it
+    degrades" (AT-0031-9), evaluated fresh against whatever artifact is
+    current, not a one-way ratchet.
+    """
+    if artifact is None or artifact.n_samples == 0:
+        return PILOT_AUDIT_SAMPLE_RATE
+    normalized_ece = min(artifact.ece / AUDIT_SAMPLE_RATE_ECE_REFERENCE, 1.0)
+    rate = MIN_AUDIT_SAMPLE_RATE + (MAX_AUDIT_SAMPLE_RATE - MIN_AUDIT_SAMPLE_RATE) * normalized_ece
+    return max(MIN_AUDIT_SAMPLE_RATE, min(MAX_AUDIT_SAMPLE_RATE, rate))
+
+
 def calibration_artifact_exists(path: Path) -> bool:
     """ADR-0031 hard constraint 1's gate: `decide_publish_policy`
     (app/stages/publish_policy.py) is handed the result of this check as
@@ -214,11 +250,16 @@ def calibration_artifact_exists(path: Path) -> bool:
 
 
 __all__ = [
+    "AUDIT_SAMPLE_RATE_ECE_REFERENCE",
     "CALIBRATION_FIXTURES_PATH",
+    "MAX_AUDIT_SAMPLE_RATE",
+    "MIN_AUDIT_SAMPLE_RATE",
+    "PILOT_AUDIT_SAMPLE_RATE",
     "CalibrationArtifact",
     "ReliabilityBin",
     "apply_calibration",
     "calibration_artifact_exists",
+    "compute_audit_sample_rate",
     "compute_ece",
     "compute_reliability_curve",
     "fit_calibration_from_fixtures",
