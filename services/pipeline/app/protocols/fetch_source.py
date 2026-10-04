@@ -60,6 +60,17 @@ class FetchCandidate:
     # when the source has no such signal (the claim-text content hash
     # computed downstream, in the dedup store, still applies).
     fingerprint: str | None = None
+    # ADR-0032/0005 AT-0032-4 / AT-0005-5 STT compliance boundary: when a
+    # source has no claim-bearing TEXT at all (`text == ""`) but DOES have
+    # an audio/video track reachable at `audio_url`, that audio is only
+    # ever transcribed when `stt_eligible` is True — i.e. the item is in
+    # the lawful/compliant subset (owner-authorized, partner-supplied,
+    # openly licensed, or this org's own live capture), never a bare
+    # third-party YouTube/TikTok download. A FetchSource implementation
+    # must set this explicitly per item; the default (False) is fail-
+    # closed — see app/stages/fetch_hop.py's `_resolve_claim_text`.
+    audio_url: str | None = None
+    stt_eligible: bool = False
 
 
 class FetchSource(Protocol):
