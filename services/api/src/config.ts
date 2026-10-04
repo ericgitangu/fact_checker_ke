@@ -17,6 +17,34 @@ export interface ResolvedConfig {
   /** ADR-0017 §1/§4: QStash publish token and the analyze-hop target URL. */
   qstashToken: string | null;
   analyzeHopUrl: string;
+  /**
+   * ADR-0032/0017 "C1 gap" closer: the base URL of services/pipeline
+   * itself (POST {pipelineBaseUrl}/hops/analyze, /hops/verify), called
+   * directly over plain HTTP by the submission-orchestrator
+   * (lib/submission-orchestrator.ts) — NOT via QStash, since both calls
+   * happen inside one bounded orchestration request. Same env-var
+   * naming convention apps/web already uses for the reverse direction
+   * (`API_BASE_URL` pointing at this service — see docs/runbooks/
+   * vercel-deploy.md).
+   */
+  // Optional for the same reason webBaseUrl/revalidateSecret are below:
+  // several existing tests construct a `ResolvedConfig` literal
+  // directly, predating these three fields. `app.ts` falls back to the
+  // same defaults `resolveConfig` would have used when omitted.
+  pipelineBaseUrl?: string;
+  /**
+   * ADR-0032/0017: this service's OWN externally-reachable base URL —
+   * used to build `orchestrationHopUrl` below, the target the outbox
+   * relay (drainOutbox/publishOutboxRowInline) now publishes
+   * `submission.received` (and every other outbox event type) to,
+   * replacing the old "publish straight to the pipeline" wiring with
+   * "publish to this service's own `/internal/hops/orchestrate`",
+   * which then calls the pipeline hops itself and enacts the result —
+   * see routes/internal.ts and lib/submission-orchestrator.ts.
+   */
+  apiSelfBaseUrl?: string;
+  /** Derived: `${apiSelfBaseUrl}/internal/hops/orchestrate`. */
+  orchestrationHopUrl?: string;
   /** ADR-0017 §4: QStash signature verification (internal endpoints). */
   qstashCurrentSigningKey: string | null;
   qstashNextSigningKey: string | null;
@@ -76,6 +104,8 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     );
   }
 
+  const apiSelfBaseUrl = env.API_SELF_BASE_URL ?? "http://localhost:8080";
+
   return {
     databaseUrl,
     corsOrigins,
@@ -84,6 +114,9 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     isProduction,
     qstashToken: env.QSTASH_TOKEN ?? null,
     analyzeHopUrl: env.PIPELINE_ANALYZE_URL ?? "http://localhost:8000/internal/analyze",
+    pipelineBaseUrl: env.PIPELINE_BASE_URL ?? "http://localhost:8000",
+    apiSelfBaseUrl,
+    orchestrationHopUrl: `${apiSelfBaseUrl}/internal/hops/orchestrate`,
     qstashCurrentSigningKey: env.QSTASH_CURRENT_SIGNING_KEY ?? null,
     qstashNextSigningKey: env.QSTASH_NEXT_SIGNING_KEY ?? null,
     capabilityTokenSecret: capabilityTokenSecret ?? "dev-only-insecure-capability-secret",

@@ -10,6 +10,7 @@ import type { SignatureVerifier } from "../lib/internal-auth.js";
 import { drainOutbox, cleanupExpiredIdempotencyKeys, publishOutboxRowInline } from "../lib/outbox.js";
 import { advanceWithInbox } from "../lib/advance.js";
 import { runRetentionSweep } from "../lib/retention.js";
+import { runSubmissionOrchestration } from "../lib/submission-orchestrator.js";
 
 const SubmissionAdvancedBodySchema = z.object({
   messageId: z.string().min(1),
@@ -24,6 +25,14 @@ export interface InternalRoutesDeps {
   publisher: Publisher;
   pubsub: PubSub;
   analyzeHopUrl: string;
+  /**
+   * ADR-0032/0017 "C1 gap" closer: base URL of services/pipeline itself,
+   * called directly by `/internal/hops/orchestrate` (see
+   * lib/submission-orchestrator.ts). Optional + defaulted so existing
+   * tests constructing `InternalRoutesDeps` literally (predating this
+   * route) keep compiling unchanged.
+   */
+  pipelineBaseUrl?: string;
   verifier: SignatureVerifier;
   isProduction: boolean;
 }
@@ -127,6 +136,48 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
     }
 
     return reply.status(200).send({ outcome: "advanced" });
+  });
+
+  // ADR-0032/0017 "C1 gap" closer: the outbox relay's new target (see
+  // app.ts's `orchestrationHopUrl` wiring, which REPLACES the old
+  // "publish straight to the pipeline" default). Every outbox row --
+  // not only `submission.received` -- lands here now (the relay has
+  // always had exactly one target URL per `drainOutbox`/
+  // `publishOutboxRowInline` call); every OTHER event type is acked as
+  // a no-op (there is nothing further for this route to do for a
+  // `check.published`/`check.corrected`/`fetch.*` row -- its own
+  // producer already did everything required).
+  app.post("/internal/hops/orchestrate", async (request, reply) => {
+    if (!(await verifyOrReject(request, reply, deps.verifier))) return;
+    if (!deps.db) {
+      return reply.status(503).send({ error: "db_unavailable" });
+    }
+
+    const parsed = OutboxEventSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "validation_error", issues: parsed.error.issues });
+    }
+    const event = parsed.data;
+
+    if (event.event_type !== "submission.received") {
+      return reply.status(200).send({ outcome: "ignored_non_submission_received", eventType: event.event_type });
+    }
+
+    try {
+      const outcome = await runSubmissionOrchestration({
+        db: deps.db,
+        pipelineBaseUrl: deps.pipelineBaseUrl ?? "http://localhost:8000",
+        event,
+      });
+      return reply.status(200).send({ outcome: outcome.kind, ...outcome });
+    } catch (err) {
+      // Propagate as a 5xx (unlike the producer-side relay's own
+      // swallowed-failure convention) so QStash retries this delivery —
+      // this route is the CONSUMER of record for submission.received;
+      // nothing else will ever re-drive this event if it's dropped here.
+      request.log.error({ err, submissionId: event.submission_id }, "submission orchestration failed");
+      return reply.status(500).send({ error: "orchestration_failed" });
+    }
   });
 
   // Dev-only simulator (task brief §5): drives a submission through the
