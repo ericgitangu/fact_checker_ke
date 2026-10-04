@@ -26,10 +26,36 @@ import { NightBand } from "../../components/night-band";
  */
 export const revalidate = 60;
 
-async function getMaandamanoData(): Promise<MaandamanoResponse> {
+/**
+ * Load outcome for the advisory source. `unavailable` is a first-class,
+ * non-throwing outcome: in production the Vercel runtime has no reachable
+ * `services/api` (and `API_BASE_URL` may be unset, defaulting to an
+ * unreachable `http://localhost:8080`), so the underlying `fetch` throws
+ * `TypeError: fetch failed` (ECONNREFUSED). A non-2xx status
+ * (`ApiClientError`) or a contract-drift zod parse error land here too.
+ * None of these may propagate out of the Server Component — an uncaught
+ * throw here is exactly what rendered `/maandamano` as an HTTP 500. The
+ * page degrades to an honest "source unavailable" state instead, and
+ * NEVER shows a cached/guessed advisory as current (ADR-0007 safety
+ * posture: silence is safer than a stale protest advisory).
+ */
+type MaandamanoLoad =
+  | { kind: "ok"; data: MaandamanoResponse }
+  | { kind: "unavailable" };
+
+async function getMaandamanoData(): Promise<MaandamanoLoad> {
   const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:8080";
   const client = new ApiClient({ baseUrl: apiBaseUrl });
-  return client.getMaandamano({ next: { revalidate: 60, tags: ["maandamano"] } });
+  try {
+    const data = await client.getMaandamano({ next: { revalidate: 60, tags: ["maandamano"] } });
+    return { kind: "ok", data };
+  } catch {
+    // Intentionally swallow the error class (network / non-2xx / parse):
+    // the branch rendered to the user is the same honest unavailable
+    // state regardless of which failure occurred, and the stack is not
+    // user-actionable. The thrown detail is already logged by the runtime.
+    return { kind: "unavailable" };
+  }
 }
 
 /**
@@ -44,7 +70,10 @@ function isStale(updatedAt: string): boolean {
 
 export default async function MaandamanoPage(): Promise<React.JSX.Element> {
   const t = await getTranslations("tracker");
-  const { frozen, demonstrations } = await getMaandamanoData();
+  const load = await getMaandamanoData();
+  const unavailable = load.kind === "unavailable";
+  const frozen = load.kind === "ok" && load.data.frozen;
+  const demonstrations = load.kind === "ok" ? load.data.demonstrations : [];
 
   return (
     <div className="shell flex flex-col gap-10">
@@ -69,6 +98,24 @@ export default async function MaandamanoPage(): Promise<React.JSX.Element> {
         <p className="form-note form-note-muted" role="status">
           {t("frozen.body")}
         </p>
+      ) : unavailable ? (
+        <Reveal motion="rise" threshold={0.05}>
+          <div className="advisory-card" role="status">
+            <div className="advisory-card-head">
+              <h3>{t("offline.title")}</h3>
+            </div>
+            <p style={{ color: "var(--ink-2)" }}>{t("offline.body")}</p>
+          </div>
+        </Reveal>
+      ) : demonstrations.length === 0 ? (
+        <Reveal motion="rise" threshold={0.05}>
+          <div className="advisory-card" role="status">
+            <div className="advisory-card-head">
+              <h3>{t("empty.title")}</h3>
+            </div>
+            <p style={{ color: "var(--ink-2)" }}>{t("empty.body")}</p>
+          </div>
+        </Reveal>
       ) : (
         <Reveal motion="rise" threshold={0.05}>
           <ul className="advisory-list" style={{ listStyle: "none", margin: 0, padding: 0 }}>

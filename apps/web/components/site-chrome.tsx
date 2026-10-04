@@ -36,7 +36,9 @@ export async function AppHeader(): Promise<React.JSX.Element> {
         <Link href="/feed">{t("nav.feed")}</Link>
         <Link href="/methodology">{t("nav.methodology")}</Link>
         <Link href="/maandamano">{t("nav.tracker")}</Link>
-        <Link href="/editor">{t("nav.editor")}</Link>
+        {/* `/editor` is intentionally NOT linked here: it is an internal,
+            authenticated-only surface (see app/editor/page.tsx), not a
+            public destination. */}
         <LocaleSwitcher />
         {/* Light/dark toggle, carried over from the retired apps/site so the
             sole frontend keeps it — on every page via this shared header

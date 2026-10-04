@@ -190,6 +190,10 @@
       "title": "Can't confirm current status",
       "body": "We never show a cached advisory as current. Reconnect to see the latest status."
     },
+    "empty": {
+      "title": "No active demonstrations tracked right now",
+      "body": "There are no confirmed maandamano advisories at the moment. When verified advisories come in, they'll appear here by ward and sub-county."
+    },
     "staleWarning": "Not re-verified in over 2 hours — status may be out of date."
   },
   "feed": {
@@ -212,7 +216,10 @@
   },
   "editorial": {
     "heading": "Editor review",
-    "devBanner": "Dev-only stub: real session auth lands with ADR-0020 (Better Auth). You are viewing this as a pretend-logged-in editor.",
+    "signInRequired": {
+      "title": "Sign-in required",
+      "body": "The editor workspace is an internal, authenticated-only surface. There is no public editor access, and real editor sign-in is not available yet."
+    },
     "drafts": {
       "empty": "No drafts awaiting review.",
       "heading": "Pending drafts"
