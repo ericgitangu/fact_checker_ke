@@ -92,6 +92,13 @@
       "when": 1791097264130,
       "tag": "0012_adr_0031_autopublish_async_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791103157394,
+      "tag": "0013_adr_0032_fetch_enactment_persistence",
+      "breakpoints": true
     }
   ]
 }

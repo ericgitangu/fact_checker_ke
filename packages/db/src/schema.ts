@@ -89,6 +89,36 @@ export const riskTierEnum = pgEnum("risk_tier", enumValues("risk_tier", RiskTier
 export const asyncAuditOutcomeEnum = pgEnum("async_audit_outcome", ASYNC_AUDIT_OUTCOMES);
 
 /**
+ * ADR-0032 (two-engine pivot) / AT-0032-6: provenance of which engine
+ * produced a `submissions` or `checks` row — "submission" (a reader
+ * submitted it) or "fetch" (the autonomous fetch engine discovered it).
+ * Mirrors the `ingest_source` field on `SubmissionReceivedEvent` /
+ * `CheckPublishedEvent` in @fact-checker-ke/core's events schema — same
+ * single-source-of-truth rule as the other core-sourced enums above,
+ * but this one is locally defined (not derived from a core zod enum)
+ * since it is a plain two-value literal, not a schema export.
+ */
+export const ingestSourceEnum = pgEnum("ingest_source", ["submission", "fetch"]);
+
+/**
+ * ADR-0032 §3: lifecycle status of a tracked fetch candidate (persistent
+ * mirror of app/protocols/fetch_dedup_store.py's `FetchCandidateStatus`
+ * Literal — kept in sync by hand, same cross-language-mirror discipline
+ * as framing_guard.py / tier-c-policy.ts).
+ */
+export const fetchCandidateStatusEnum = pgEnum("fetch_candidate_status", ["pending", "emitted", "dropped"]);
+
+/**
+ * ADR-0032 §4 / AT-0032-5: which autonomous engine a per-engine daily
+ * spend counter belongs to. Only "fetch" is written by this change (the
+ * submission engine has no spend-breaker caller yet — see
+ * app/stores/engine_breaker.py's module docstring) but the column is a
+ * real enum, not a bare string, so a future submission-engine breaker
+ * can reuse this exact table without a migration.
+ */
+export const spendEngineEnum = pgEnum("spend_engine", ["fetch", "submission"]);
+
+/**
  * ADR-0031: the source of a flywheel-captured labeled row — an editor's
  * disposition on a draft (`editor_correction`), or a reader's post-publish
  * signal (`user_agree` / `user_dispute`).
@@ -169,6 +199,13 @@ export const submissions = pgTable(
     // third-party video URLs (we never download the audio).
     quote: text("quote"),
     timestampSec: integer("timestamp_sec"),
+    // ADR-0032 (two-engine pivot) / AT-0032-6: provenance — which engine
+    // produced this submission. Defaults "submission" so every existing
+    // row and every existing INSERT (the human-submission path, which
+    // never sets this column) is unaffected; only the fetch engine's own
+    // outbox-write path (services/pipeline/app/stores/outbox_postgres.py)
+    // sets "fetch" explicitly.
+    ingestSource: ingestSourceEnum("ingest_source").notNull().default("submission"),
     status: submissionStatusEnum("status").notNull().default("received"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     // ADR-0018: the polling ETag is derived from (status, updated_at).
@@ -257,6 +294,13 @@ export const checks = pgTable(
     calibratedConfidence: numeric("calibrated_confidence", { precision: 5, scale: 4 }),
     whatWouldChangeThis: text("what_would_change_this"),
     riskTier: riskTierEnum("risk_tier"),
+    // ADR-0032 (two-engine pivot) / AT-0032-6: "every published fetched
+    // assessment carries ingest_source: 'fetch' provenance" — carried
+    // forward from the owning submission at enactment time (see
+    // services/api/src/lib/publish-enactment.ts), not re-derived from a
+    // join, so the provenance survives even if the submission row is
+    // later retention-purged (ADR-0021).
+    ingestSource: ingestSourceEnum("ingest_source").notNull().default("submission"),
   },
   (table) => [
     index("checks_org_id_idx").on(table.orgId),
@@ -866,5 +910,92 @@ export const asyncAuditQueue = pgTable(
   (table) => [
     uniqueIndex("async_audit_queue_check_id_idx").on(table.checkId),
     index("async_audit_queue_outcome_idx").on(table.outcome),
+  ],
+);
+
+/**
+ * ADR-0032 §3 (migration 0013): the PERSISTENT replacement for
+ * services/pipeline/app/stores/fetch_dedup_memory.py's process-lifetime
+ * `InMemoryFetchDedupStore`. One row per distinct claim-text content
+ * hash the fetch engine has ever scored above tau — survives a Cloud Run
+ * instance recycling between QStash-triggered polls (the exact gap that
+ * module's TECH-DEBT docstring flagged). Written/read directly by
+ * services/pipeline via asyncpg (app/stores/fetch_dedup_postgres.py),
+ * not through drizzle — this schema is the single source of truth for
+ * the table SHAPE (ADR-0009: Python reads/writes the same tables with
+ * raw SQL), not for the writes themselves.
+ */
+export const fetchCandidates = pgTable(
+  "fetch_candidates",
+  {
+    contentHash: text("content_hash").primaryKey(),
+    claimText: text("claim_text").notNull(),
+    score: doublePrecision("score").notNull(),
+    status: fetchCandidateStatusEnum("status").notNull().default("pending"),
+    submissionId: uuid("submission_id"),
+    trendCount: integer("trend_count").notNull().default(1),
+    // text[] rather than a join table: platform membership is a small,
+    // append-only set per candidate (ADR-0032 §3 layer 2/3 just needs
+    // "has this claim been seen on platform X"), not something ever
+    // queried independently of its candidate row.
+    platformsSeen: text("platforms_seen").array().notNull(),
+    firstObservedAt: timestamp("first_observed_at", { withTimezone: true }).notNull(),
+    lastObservedAt: timestamp("last_observed_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("fetch_candidates_status_idx").on(table.status),
+  ],
+);
+
+/**
+ * ADR-0032 §3 layer 1: the exact (platform, native_id) "have we already
+ * ingested this exact post" set — the FIRST, cheapest dedup layer, run
+ * before any scoring. Separate from `fetch_candidates` because a single
+ * claim (one content_hash) can be reposted under many distinct
+ * (platform, native_id) pairs.
+ */
+export const fetchObservations = pgTable(
+  "fetch_observations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    platform: text("platform").notNull(),
+    nativeId: text("native_id").notNull(),
+    contentHash: text("content_hash").notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("fetch_observations_platform_native_id_idx").on(table.platform, table.nativeId),
+    index("fetch_observations_content_hash_idx").on(table.contentHash),
+  ],
+);
+
+/**
+ * ADR-0032 §4 / AT-0032-5, ADR-0011: the per-engine daily spend breaker's
+ * persisted counter. One row per (engine, day in UTC) — `usdSpent` is
+ * incremented by services/pipeline on every LLM call the engine makes
+ * (fetch's own breaker only — see app/stores/engine_breaker.py's module
+ * docstring on the submission engine's budget being tracked
+ * independently, keyed on its own `engine` value, so an overspend on one
+ * row can never affect the other engine's row). `dailyBudgetUsd` is a
+ * snapshot of the configured budget AT THE TIME the row was created —
+ * changing the env var mid-day does not retroactively rewrite an
+ * already-open day's threshold, same "snapshot at decision time"
+ * discipline as `async_audit_queue.sampleRateAtQueueTime`.
+ */
+export const engineSpendDaily = pgTable(
+  "engine_spend_daily",
+  {
+    engine: spendEngineEnum("engine").notNull(),
+    day: date("day").notNull(),
+    usdSpent: numeric("usd_spent", { precision: 10, scale: 6 }).notNull().default("0"),
+    dailyBudgetUsd: numeric("daily_budget_usd", { precision: 10, scale: 2 }).notNull(),
+    // AT-0032-5's two breaker states, persisted so a hard-stop survives
+    // past the single request that tripped it (an instance recycle must
+    // not quietly reopen polling mid-day).
+    hardStopped: boolean("hard_stopped").notNull().default(false),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("engine_spend_daily_engine_day_idx").on(table.engine, table.day),
   ],
 );

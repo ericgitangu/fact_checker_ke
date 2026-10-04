@@ -223,7 +223,11 @@ export async function approveCheck(db: Database, args: ApproveArgs): Promise<Edi
         org_id: check.orgId,
         event_type: "check.published",
         schema_version: "v1",
-        payload: { check_id: args.checkId, rating },
+        // ADR-0032 (two-engine pivot): a human-approved publish is
+        // always the submission engine's provenance — this editor
+        // pathway never handles a fetch-sourced draft (see
+        // services/api/src/lib/publish-enactment.ts for that path).
+        payload: { check_id: args.checkId, rating, ingest_source: "submission" },
       },
     });
   });

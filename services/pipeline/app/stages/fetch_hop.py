@@ -5,21 +5,29 @@ provenance, into the SAME pipeline entry (`run_analyze_hop`) the
 submission engine uses.
 
 Scope note (bounded slice — see task brief): this hop implements
-sources + scorer + dedup + the emitting call into analyze. It does
-NOT implement (deferred to later waves, per ADR-0032's own review
-triggers and acceptance tests AT-0032-4/5/6/7/8):
+sources + scorer + dedup + the emitting call into analyze, PLUS (this
+pass, ADR-0032/0017 fetch-enactment slice): the real-outbox emission
+path (`emit_submission`, closing the AT-0017-C bypass — see module
+docstring below on why `run_analyze_hop` is still the default) and the
+per-engine spend breaker (`cost_breaker`, AT-0032-5).
+
+This hop still does NOT implement (deferred to later waves, per
+ADR-0032's own review triggers and acceptance tests AT-0032-4/7/8):
   - reverse-image/frame search (AT-0032-8)
-  - the fetch engine's own per-engine daily-spend breaker (AT-0032-5)
-  - `fetch.*` outbox events / the real QStash-triggered EDA topology
-    (ADR-0032 §2) — this hop is called directly/synchronously, not via
-    a cron-posted outbox row
   - the STT compliance-subset boundary (AT-0032-4) — this slice never
     calls a transcriber at all, which trivially satisfies "never
     fabricates a transcript", but does not implement the owner-
     authorized/partner-audio allow path
-  - API-side publish enactment / FETCH_ENGINE_ENABLED kill-switch wiring
-    (AT-0032-6) — this hop has no publish-policy or kill-switch
-    integration; it stops at the analyze hop boundary.
+  - fuzzy claim-*embedding* dedup (AT-0032-3's exact-hash collapse is
+    implemented; a paraphrased repost of the same claim is not yet
+    collapsed) — reuses app/stages/dedup_guard.py the same way the
+    submission engine's verify hop already does, deferred to F3/F4
+  - API-side enactment of a fetch-sourced publish decision and the
+    fetch kill-switch's PUBLISH-side half live in services/api (see
+    services/api/src/lib/publish-enactment.ts +
+    services/api/src/lib/fetch-kill-switch.ts) — this hop only owns the
+    INGESTION-side kill-switch check (app/main.py's
+    FETCH_ENGINE_ENABLED read) and the per-engine breaker below.
 
 Claim identity for dedup (ADR-0032 §3 layers 2/3): this slice collapses
 on an EXACT (normalized) claim-text content hash. The ADR's fuzzy
@@ -31,7 +39,9 @@ is not yet collapsed by this hop. Flagged, not hidden.
 
 from __future__ import annotations
 
+import os
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from app.models.hop_requests import AnalyzeHopRequest, HopContent
@@ -42,12 +52,34 @@ from app.protocols.llm_client import LlmClient
 from app.stages.analyze import run_analyze_hop
 from app.stages.fetch_scoring import FetchScoringConfig, FetchScoringInput, score_candidate
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
+from app.stores.engine_breaker import EngineCostBreaker
+
+# A pluggable "how does a surviving candidate actually become a tracked
+# submission" strategy. `run_fetch_hop`'s DEFAULT (`emit_submission=None`)
+# keeps calling `run_analyze_hop` in-process — this preserves every
+# existing unit test of this module's pure dedup/scoring/capping logic
+# with no Postgres dependency. app/main.py's REAL wiring passes a
+# strategy backed by app/stores/outbox_postgres.py's
+# `emit_fetch_submission_received`, which is what actually closes the
+# AT-0017-C "bypasses the outbox" gap in the running system — see that
+# module's docstring. Takes (claim_text, org_id, submission_id) and
+# returns the (possibly server-confirmed) submission id.
+EmitSubmission = Callable[[str, str, str], str]
 
 # ADR-0032 §4: "per-source, per-run candidate cap" — each poll emits at
 # most this many surviving (above-tau) candidates; this slice enforces
 # it as a hard cap on EMISSIONS per run (the per-engine spend breaker
 # itself, AT-0032-5, is deferred — see module docstring).
 DEFAULT_MAX_EMISSIONS_PER_RUN = 10
+
+# AT-0032-5: a placeholder per-emission cost estimate metered against the
+# fetch engine's breaker (app/stores/engine_breaker.py). NOT a measured
+# figure (tracked as tech debt, same class as publish_policy.py's TAU_*
+# placeholders) — a real deployment should meter the ACTUAL downstream
+# analyze+verify LLM spend this emission goes on to trigger, not a flat
+# estimate charged at emission time. Overridable via env for ops tuning
+# without a code change.
+FETCH_EMISSION_ESTIMATED_USD_COST = float(os.environ.get("FETCH_EMISSION_ESTIMATED_USD_COST", "0.02"))
 
 
 def _normalize_claim_text(text: str) -> str:
@@ -61,7 +93,11 @@ class EmittedCandidate:
     claim_text: str
     platform: str
     score: float
-    analyze_result: AnalyzeResult
+    # None when emitted via the real-outbox path (`emit_submission` —
+    # see module docstring): that path hands off to the async relay and
+    # has no synchronous AnalyzeResult to report. Only the default
+    # in-process `run_analyze_hop` path populates this.
+    analyze_result: AnalyzeResult | None = None
 
 
 @dataclass(slots=True)
@@ -72,6 +108,16 @@ class FetchHopResult:
     attached_observation_only: int = 0
     emitted: list[EmittedCandidate] = field(default_factory=list)
     capped_by_max_emissions: int = 0
+    # AT-0032-5: candidates that crossed tau and were NOT already
+    # emitted, but were skipped at the emission step because the fetch
+    # engine's breaker was soft-stopped (>= 80% of its daily budget).
+    # Dedup/trend-counter updates for these still ran (upsert_candidate
+    # above already happened) — only the emission itself is skipped.
+    skipped_soft_stopped: int = 0
+    # AT-0032-5: True when this run's hard-stop check (before polling
+    # ANY source) found the breaker already at >= 100% — no source was
+    # polled at all this run.
+    hard_stopped: bool = False
 
 
 async def run_fetch_hop(
@@ -84,10 +130,19 @@ async def run_fetch_hop(
     idempotency_store: InMemoryIdempotencyStore | None = None,
     limit_per_source: int = 20,
     max_emissions_per_run: int = DEFAULT_MAX_EMISSIONS_PER_RUN,
+    cost_breaker: EngineCostBreaker | None = None,
+    emit_submission: EmitSubmission | None = None,
 ) -> FetchHopResult:
     scoring_config = scoring_config or FetchScoringConfig.from_env()
     idempotency_store = idempotency_store or InMemoryIdempotencyStore()
     result = FetchHopResult()
+
+    # AT-0032-5, 100% threshold: "hard-stops polling" — checked ONCE,
+    # before any source.poll() call, so an already-exhausted budget
+    # never makes even a single outbound fetch-source request this run.
+    if cost_breaker is not None and cost_breaker.current_state("fetch").hard_stopped:
+        result.hard_stopped = True
+        return result
 
     for source in sources:
         candidates = await source.poll(limit=limit_per_source)
@@ -102,6 +157,8 @@ async def run_fetch_hop(
                 idempotency_store=idempotency_store,
                 result=result,
                 max_emissions_per_run=max_emissions_per_run,
+                cost_breaker=cost_breaker,
+                emit_submission=emit_submission,
             )
 
     return result
@@ -117,6 +174,8 @@ async def _process_candidate(
     idempotency_store: InMemoryIdempotencyStore,
     result: FetchHopResult,
     max_emissions_per_run: int,
+    cost_breaker: EngineCostBreaker | None,
+    emit_submission: EmitSubmission | None,
 ) -> None:
     # Layer 1 (ADR-0032 §3): exact (platform, native_id) already seen ->
     # drop immediately, no scoring at all.
@@ -183,21 +242,40 @@ async def _process_candidate(
         pass
 
     if len(result.emitted) >= max_emissions_per_run:
-        # ADR-0032 §4 per-run candidate cap (coarse form — see module
-        # docstring on the deferred real spend breaker).
+        # ADR-0032 §4 per-run candidate cap.
         result.capped_by_max_emissions += 1
         return
 
+    # AT-0032-5, 80% threshold: "stops emitting new candidates while
+    # dedup/trend updates continue" — the upsert_candidate call above
+    # (dedup/trend bookkeeping) has already run; only this emission
+    # step is skipped once soft-stopped.
+    if cost_breaker is not None and cost_breaker.current_state("fetch").soft_stopped:
+        result.skipped_soft_stopped += 1
+        return
+
     submission_id = str(uuid.uuid4())
-    request = AnalyzeHopRequest(
-        submission_id=submission_id,
-        org_id=org_id,
-        content=HopContent(text=candidate.text),
-        language_hint=None,
-    )
-    analyze_result = await run_analyze_hop(request, llm=llm, store=idempotency_store)
+    if emit_submission is not None:
+        # Real-outbox path (AT-0017-C) — see module docstring.
+        submission_id = emit_submission(candidate.text, org_id, submission_id)
+        analyze_result: AnalyzeResult | None = None
+    else:
+        request = AnalyzeHopRequest(
+            submission_id=submission_id,
+            org_id=org_id,
+            content=HopContent(text=candidate.text),
+            language_hint=None,
+        )
+        analyze_result = await run_analyze_hop(request, llm=llm, store=idempotency_store)
 
     dedup_store.mark_emitted(claim_hash, submission_id=submission_id)
+    if cost_breaker is not None:
+        # Metered per emission (not per candidate observed) — a
+        # below-tau or already-emitted candidate costs nothing against
+        # the breaker, matching "stops emitting new candidates" (the
+        # thing actually metered is the downstream verification pass a
+        # new emission triggers, not the cheap local scoring).
+        cost_breaker.record_spend("fetch", FETCH_EMISSION_ESTIMATED_USD_COST)
     result.emitted.append(
         EmittedCandidate(
             content_hash=claim_hash,
@@ -212,6 +290,8 @@ async def _process_candidate(
 
 __all__ = [
     "DEFAULT_MAX_EMISSIONS_PER_RUN",
+    "FETCH_EMISSION_ESTIMATED_USD_COST",
+    "EmitSubmission",
     "EmittedCandidate",
     "FetchHopResult",
     "run_fetch_hop",

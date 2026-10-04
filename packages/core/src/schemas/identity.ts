@@ -61,6 +61,12 @@ export const AuditActionSchema = z.enum([
   // scanning audit_log for this action name doesn't have to also
   // disambiguate it from an ordinary ADR-0031 threshold tweak.
   "policy.kill_switch_flipped",
+  // ADR-0032 (two-engine pivot) / AT-0032-6: the fetch-engine kill switch
+  // blocked an auto-publish decision that would otherwise have published
+  // (ingest_source === "fetch" and the fetch kill switch was frozen at
+  // enactment time) — the draft is left pending for a human instead. See
+  // services/api/src/lib/publish-enactment.ts.
+  "check.auto_publish_blocked",
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;
 

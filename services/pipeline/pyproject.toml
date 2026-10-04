@@ -11,6 +11,15 @@ dependencies = [
   "anthropic>=0.69.0",
   "fastembed>=0.5.1",
   "c2pa-python>=0.38.0",
+  # ADR-0032 (two-engine pivot), migration 0013: the first real Postgres
+  # driver dependency in this service. Sync client (not asyncpg) is a
+  # deliberate choice — app/protocols/fetch_dedup_store.py's
+  # FetchDedupStore Protocol (and app/stores/engine_breaker.py's
+  # EngineCostBreaker Protocol) are both sync, same as every other
+  # Protocol in this service (CheckStore, IdempotencyStore); keeping the
+  # Postgres-backed implementations sync avoids an async-Protocol
+  # refactor across every existing caller/test double.
+  "psycopg[binary]>=3.2.3",
 ]
 
 [dependency-groups]
