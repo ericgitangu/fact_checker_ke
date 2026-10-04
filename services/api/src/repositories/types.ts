@@ -1,4 +1,4 @@
-import type { Check, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
+import type { Check, FeedItem, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
 
 /**
  * Result type for repository operations that can fail in an expected way.
@@ -18,6 +18,14 @@ export interface SubmissionRepository {
 
 export interface CheckRepository {
   getById(id: string): Promise<RepoResult<Check>>;
+  /**
+   * ADR-0032 payoff: recently PUBLISHED checks (`isDraft=false AND
+   * publishedAt IS NOT NULL`), newest first — the "what we're checking
+   * now" feed. `cursor` is the previous page's last item's `publishedAt`
+   * (a keyset cursor, not an offset, so it stays correct under
+   * concurrent inserts); omit it for the first page.
+   */
+  listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItem[]>;
 }
 
 export interface WaitlistRepository {
