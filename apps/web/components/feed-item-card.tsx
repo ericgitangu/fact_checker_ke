@@ -1,16 +1,16 @@
 import type { FeedItem } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
 import { VerdictChip } from "./verdict";
-import { LegalCaveat } from "./legal-caveat";
+import { FeedItemCaveatNote } from "./legal-caveat";
 
 /**
  * ADR-0032's visible payoff, rendered: one row in the "what we're
  * checking now" feed. Deliberately reuses the same primitives
  * `check-card.tsx` renders on a full check page (`VerdictChip` for the
- * rating, `LegalCaveat` for the standing caveat, and the `check`
- * namespace's confidence/claim-attributed copy) rather than inventing a
- * parallel rendering — a feed row and a check page must never say two
- * different things about the same published assessment.
+ * rating, and the `check` namespace's confidence/claim-attributed copy)
+ * rather than inventing a parallel rendering — a feed row and a check
+ * page must never say two different things about the same published
+ * assessment.
  *
  * The one thing a feed row adds that a check page doesn't need: the
  * ingest-source badge (AT-0032-6's provenance, made visible) — "Auto-
@@ -18,6 +18,11 @@ import { LegalCaveat } from "./legal-caveat";
  * reader sent it in). This is the whole point of this component: a
  * visitor should be able to tell, at a glance, that the product is
  * finding things on its own, not only waiting on submissions.
+ *
+ * Caveat: unlike `check-card.tsx`, this does NOT render the full
+ * `LegalCaveat` per row — see `FeedItemCaveatNote`'s doc comment and
+ * `feed-section.tsx`, which renders the full standing disclosure once,
+ * for the whole list, rather than once per item.
  */
 export async function FeedItemCard({ item }: { item: FeedItem }): Promise<React.JSX.Element> {
   const t = await getTranslations("feed");
@@ -71,7 +76,7 @@ export async function FeedItemCard({ item }: { item: FeedItem }): Promise<React.
         <a href={`/checks/${item.id}`}>{t("viewCheck")}</a>
       </p>
 
-      {await LegalCaveat({ riskTier: item.riskTier })}
+      {await FeedItemCaveatNote({ riskTier: item.riskTier })}
     </article>
   );
 }

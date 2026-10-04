@@ -607,6 +607,29 @@ a:hover {
   background: var(--status-slate-tint);
 }
 
+/* Per-item collapsed caveat note (legal-caveat.tsx's `FeedItemCaveatNote`)
+   -- deliberately the SAME quiet footnote register as `.legal-caveat-body`
+   (small type, muted ink) but with no top rule of its own: it is the tail
+   end of a feed row, not a separate disclosure block. The full standing
+   caveat (`.legal-caveat`) renders once, after the list, in
+   `.feed-section-disclosure` below. */
+.feedcard-caveat-note {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.feed-section-disclosure {
+  margin-top: 4px;
+}
+
+.feed-disclosure-intro {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--ink-3);
+  margin-bottom: 4px;
+}
+
 .feed-empty {
   padding: 24px 22px;
   border: 1px dashed var(--rule-strong);

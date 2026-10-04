@@ -53,3 +53,43 @@ export async function LegalCaveat({
     </section>
   );
 }
+
+/**
+ * Collapsed per-item caveat for a LIST surface (the "what we're checking
+ * now" feed). Repeating the FULL standing-caveat block (draft badge +
+ * full body + Terms link) under every single row read as heavy and
+ * repetitive -- an eye-sore, not something the honesty requirement
+ * (AT-0033-1) actually demands. The fix is NOT to drop the disclosure:
+ * `FeedSection` renders the full `LegalCaveat` once, at the bottom of the
+ * page, covering every item in the list. This component is the per-item
+ * remainder that stays attached to its own claim:
+ *   - the canonical short-form line, `STANDING_CAVEAT_SHORT.heading` --
+ *     the exact same string AT-0033-1 pins on the full caveat elsewhere,
+ *     not a re-typed paraphrase, so it can never drift from it; and
+ *   - for a Tier-C item only, the AT-0033-4 open-question framing, which
+ *     is substantive per-claim content (not legal boilerplate) and must
+ *     stay next to the claim it qualifies rather than move to the
+ *     page-level disclosure.
+ * Deliberately a plain `<p>`, not another `aria-labelledby` section --
+ * one caveat-note landmark per feed row would itself be the kind of
+ * noise this change is removing.
+ */
+export async function FeedItemCaveatNote({
+  riskTier,
+}: {
+  riskTier?: RiskTier | null;
+}): Promise<React.JSX.Element> {
+  const t = await getTranslations("legal");
+
+  return (
+    <p className="feedcard-caveat-note">
+      {STANDING_CAVEAT_SHORT.heading}
+      {riskTier === "C" && (
+        <>
+          {" "}
+          <strong>{t("caveat.tierCNotice")}</strong> {TIER_C_INLINE_CAVEAT.body}
+        </>
+      )}
+    </p>
+  );
+}
