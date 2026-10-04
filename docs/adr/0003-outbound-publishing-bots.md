@@ -38,3 +38,11 @@ Revisit if a platform offers a sanctioned fact-checker programme (for example X 
 - AI reply bots reportedly need **prior written X approval** under the April 2026 Automation Rules update **[V2-SECONDARY]**. Our own-timeline design avoids this, but confirm against the Automation Rules page.
 - X write pricing: $0.015 per post, $0.20 per post with a URL **[V2-SECONDARY]**. The image-card approach stands.
 - Threads: own-account publishing via `threads_content_publish` is available **[V2-SECONDARY]**. Add it as a second channel.
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — auto-published assessments are the new outbound source
+
+**Status:** Accepted direction (owner-approved pivot 2026-10-04). Additive; the own-timeline-only, operator-disclosed, claim-attributed, image-card-for-URL-surcharge decision is all retained unchanged.
+
+- The outbound account now posts **auto-published** assessments (ADR-0031 default), from **both** ingest sources (fetch + submission), not only human-approved verdicts. The wording policy is unchanged and is now **enforced at auto-publish time in code** (ADR-0023 AT-0023-7 framing gate): target the claim never the person, quote+rating+sources+link, Tier-C mode (a) renders the open-question framing. The standing caveat (ADR-0033) travels with every post.
+- The kill-switch (ADR-0031/0032) halts outbound auto-posting within one propagation cycle. The X per-post-with-URL surcharge and image-card mitigation are unchanged; outbound volume is now a function of auto-publish throughput, so the monthly budget cap (original Decision) is load-bearing.

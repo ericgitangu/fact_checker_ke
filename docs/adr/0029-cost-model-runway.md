@@ -122,3 +122,11 @@ This ADR's STT variable-cost line is corrected accordingly:
   code-switched, and noisy/crowd audio — none of which Round A's clean
   FLEURS clips tested) and pending the still-[GAP] advocate retainer,
   which remains the single largest unknown fixed cost in this model.
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — the autonomous fetch engine adds a baseline cost line
+
+**Status:** Accepted direction (owner-approved pivot 2026-10-04). Additive; the existing cost lines and runway model stand, with one new variable-cost line to model.
+
+- **New cost line: autonomous fetch-engine spend** — LLM claim-density pre-filter + verify passes on fetched candidates, STT on the compliant subset, QStash fetch polls, and **X API v2 metered reads (~$0.005/read, ~2M/mo cap)**. Unlike submission spend it has no user throttle, so it is bounded structurally (ADR-0032 §4 caps + ADR-0011 per-engine breaker), not by demand. YouTube (free quota) and PesaCheck/Africa Check (free open data) carry the primary fetch load, keeping the baseline near-zero; X is the only metered discovery source and is budget-capped.
+- **The dedup/content-addressed cache (ADR-0017) is the dominant cost control** under autonomy: a viral claim observed 500× across submissions and fetches is verified and paid **once**. The STT unit cost correction (Chirp_2/Gemini, ADR-0005) and this amortization keep the modelled variable cost bounded even as auto-publish volume rises. Advocate retainer + media-liability insurance (ADR-0008 Phase-1 gate) remain the larger fixed-cost [GAP] and now matter more given raised exposure.

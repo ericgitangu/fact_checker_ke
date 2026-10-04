@@ -92,3 +92,11 @@ Enablers already in place: moon (ADR-0014) orchestrates arbitrary toolchains —
 `~/Development/wave` is the house reference for two patterns the polyglot roadmap will reuse:
 - **Rust-in-Python images:** `backend/Dockerfile.lambda` multi-stage builds a PyO3 Rust `.so` into a Python Lambda container (`linux/amd64`), with Rust `#[cfg(test)]` + pytest side by side — the packaging template for the Rust slots above (chunker, C2PA verifier) if they ship embedded rather than as standalone services; the PyO3 0.23 ↔ Python-version ABI pin is the known trap it documents.
 - **Cost arc as precedent:** wave's always-on SageMaker endpoint (~$86/mo) → 59-min auto-stop scheduler → finally an in-process library at $0. Same trajectory the plan-guard (ADR-0016) enforces here from day one: the cheapest ML component is the one that runs inside a process you already pay for.
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — the fetch hop in the topology
+
+**Status:** Accepted direction (owner-approved pivot 2026-10-04). Additive; the two-runtime decision, data stores and event flow are unchanged.
+
+- A **fetch hop** joins the topology as a QStash-cron-triggered, scale-to-zero endpoint (ADR-0032 §2): `QStash cron → POST /internal/fetch/poll → score/dedup → outbox → submission.received.v1 → existing analyze/verify/assess`. It is a new *source* front door, not a new pipeline; it reuses services/pipeline (scoring/claim-density, STT on the compliant subset) and the services/api outbox/relay (ADR-0017). No new runtime, no new data store — trend counters reuse Upstash, candidate state reuses Neon.
+- **No always-on resource** (global cost policy): the fetch poller has min-instances=0 and is woken by QStash, exactly like the outbox sweeper. The per-engine cost breaker (ADR-0011/0032) governs its spend independently of the submission engine.

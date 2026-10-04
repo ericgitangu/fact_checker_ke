@@ -47,7 +47,9 @@ Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 
 | [0028](0028-client-ux-baseline.md) | Client UX baseline — i18n, accessibility, low bandwidth, offline | red-team gap | Proposed |
 | [0029](0029-cost-model-runway.md) | Cost model and runway | red-team gap | Accepted — STT line corrected to Chirp_2 post Round-A |
 | [0030](0030-creator-funnel-conflict-of-interest.md) | Creator funnel and conflict-of-interest firewall | red-team gap | Proposed — process doc at `docs/architecture/creator-funnel-firewall.md`; code/audit-table ATs still open |
-| [0031](0031-confidence-weighted-guidance.md) | Confidence-weighted guidance & data-flywheel threshold evolution | model direction |
+| [0031](0031-confidence-weighted-guidance.md) | Confidence-weighted guidance & data-flywheel threshold evolution | model direction | Proposed — **auto-publish flipped to DEFAULT** (two-engine pivot amendment, 2026-10-04) |
+| [0032](0032-virality-trending-detection.md) | Virality / trending-detection engine (autonomous fetch engine) | pivot | Proposed (two-engine pivot, 2026-10-04) — direction accepted, not built; KE source allow-list appendix pending research |
+| [0033](0033-legal-caveat-indemnity-framework.md) | Legal caveat, T&Cs, Privacy Policy & indemnity framework | pivot / legal | Proposed — **STARTER DRAFT, NOT LEGAL ADVICE**, advocate sign-off required before any text is published (2026-10-04) |
 
 Each row's status is copied verbatim from that ADR's own `**Status:**`
 line (source of truth); "implemented"/"implementation notes" callouts
@@ -200,3 +202,35 @@ Evidence-based state of every ADR after the weekend build merged to `main`. "Imp
 | 0031 confidence-weighted | Implemented (scaffold) | Contracts (`calibratedConfidence`/`whatWouldChangeThis`/`evidence`/`riskTier` + published-check framing refine), risk-tier classifier, calibration harness (PAVA isotonic + ECE on fixtures), publish-policy table, flywheel capture (migration 0010: `check_evidence`/`policy_flags`/`training_eval_labels`), threshold-change + advocate-signoff audit, and `check-card` surfacing — all GREEN (AT-0031-1..5). **Both hard constraints enforced in code** (Tier C never auto; calibration-before-thresholds) with **auto-publish OFF by default** and no billable keys. `training_eval_labels (check_id, actor_ref)` dedup (flywheel-poisoning guard) closed in migration 0011 — `captureUserSignal` now upserts last-signal-wins on that constraint. Residual: risk-tier not yet wired into the verify-hop draft prompt; τA/τB are placeholders, not fit from data |
 
 **Billable/live surfaces deliberately deferred** (owner: "billable last"): the Cloud Run backend deploy (`enable_services=true`), real LLM/STT API keys, platform-posting bots, payments/ads, and app-store submission. The pipeline runs on fakes until a key lands.
+
+## Two-engine pivot (2026-10-04)
+
+Owner-approved product pivot: fact_checker_ke is now a **self-sufficient, autonomous, near-real-time** fact-checker with **two co-equal event-driven ingestion engines** (a primary **fetch engine** and a secondary **submission engine**) feeding **one** verification+publish pipeline, with **auto-publish as the default operating mode**. This is a **pilot** (data-flywheel/quality-ramp posture). Pre-election Kenya, high defamation stakes.
+
+This was encoded **additively** across the ADR set — every change is a dated `## Amendment (two-engine pivot, 2026-10-04)` section or a new ADR; **no prior decision text was deleted**, superseded lines are marked in place. The pivot is **docs-only direction**: no application code was written for it, so **every new acceptance test below is RED** and every amendment is "direction accepted, not built".
+
+### New ADRs
+| ADR | One line | Honest state |
+|---|---|---|
+| 0032 virality/trending engine | How the fetch engine decides what to check (velocity/cross-platform/claim-density/recency), the EDA topology (QStash cron → fetch → dedup → analyze), dedup, and per-engine backpressure/cost controls. YouTube-primary, PesaCheck/Africa Check triage feed, X sampled+budgeted, TikTok embed-only. Reverse-image-search is a first-class check. | Proposed; `FakeSource` fixtures only; named KE allow-list pending companion research (Appendix A placeholder). AT-0032-1..8 RED. |
+| 0033 legal caveat/indemnity | Standing caveat on every published assessment + T&Cs + Privacy structure (incl. training-moat consent) + indemnification/limitation-of-liability. | Proposed **STARTER DRAFT, NOT LEGAL ADVICE**; advocate sign-off gates publication; residual named-person defamation risk stated honestly. AT-0033-1..6 RED. |
+
+### Amended ADRs (two-engine pivot)
+| ADR | What the amendment does | New ATs (all RED) |
+|---|---|---|
+| 0001 scope & phasing | Product is autonomous two-engine near-real-time pilot; CNN-rating-scale framing corrected (use Africa Check + PesaCheck). | — |
+| 0002 content ingestion | **Fetch engine becomes PRIMARY** source (official APIs first, owner accounts, fakes fallback); feasibility folded in (YouTube primary, X metered/sampled, TikTok gated, PesaCheck/AfricaCheck feed); ToS audio boundary carried forward. | AT-0002-1..3 |
+| 0003 outbound bots | Auto-published assessments (both engines) are the new outbound source; framing enforced in code; kill-switch. | — |
+| 0004 verification pipeline | Human review gate → **async auditor** for the auto-published majority; two front doors, one pipeline; technical gates still pre-publish. | AT-0004-F |
+| 0005 speech & language | STT now also powers the fetch engine, **only on the same compliant subset** (no third-party audio); silent-empty-transcript risk sharpened. | AT-0005-5 |
+| 0008 legal compliance | Auto-publish/autonomy **raises** defamation exposure; right-of-reply becomes **async** for auto-published Tier A/B & Tier-C mode (a); caveat is editorial policy; advocate question flagged as the pivot's #1. | AT-0008-C, AT-0008-D |
+| 0009 runtime topology | Fetch hop added (QStash-cron, scale-to-zero, no new runtime/store). | — |
+| 0011 AI cost controls | Fetch engine gets its **own budget-breaker line**; engines cannot starve/overspend for each other. | — |
+| 0017 event-driven core | New `fetch.*` events; **QStash quota ledger re-sized** to include fetch polls (supersedes AT-0017-A formula). | AT-0017-C |
+| 0021 data protection | Training-moat consent operationalized (severable/revocable, protest content excluded); new fetched-candidate & async-audit data classes. | AT-0021-6 |
+| 0023 adversarial AI | Framing ban becomes a **publish-time code gate** for all auto-published output; fetch metadata is untrusted input; fetch cost-DoS surface noted. | AT-0023-7 |
+| 0025 editorial ops | Reviewer: **blocking approver → async auditor** of a shrinking, calibration-driven sample; corrections become the primary lever; right-of-reply splits by tier. | AT-0025-6, AT-0025-7 |
+| 0029 cost model | New autonomous fetch-engine variable-cost line (X metered reads); dedup/cache is the dominant control. | — |
+| 0031 confidence-weighted | **Auto-publish flipped OFF→DEFAULT**; configurable Tier-C spectrum (hybrid all three: (a) caveated open-question + async audit [default], (b) fast-track human tap, (c) plain caveat floor); calibration = quality ramp not blocking gate; human = async auditor. Legal honesty (caveat ≠ full shield), framing ban, kill-switch preserved. | AT-0031-6..10 |
+
+**Legal-risk flags recorded (honest):** (1) an auto-published false defamatory named-person assessment is public before any human sees it and cannot be recalled — the largest residual risk, mitigated (Tier-C open-question framing, async audit, caveat, insurance, kill-switch) not eliminated; (2) a caveat reduces but does not erase named-person defamation exposure (ADR-0008/0031/0033; no Kenyan fact-checker-rating precedent); (3) the indemnity framework protects against user-origin/reliance claims but **does not run to a third party we defame**; (4) ADR-0033 is a starter draft requiring Kenyan advocate sign-off — publishing unreviewed terms can be worse than none; (5) the ToS audio-download boundary (no third-party YouTube/TikTok audio) still binds the autonomous engine — crossing it risks irreversible account bans.
