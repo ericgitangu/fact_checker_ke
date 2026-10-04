@@ -9,7 +9,8 @@
       "feed": "Feed",
       "language": "Language",
       "terms": "Terms",
-      "privacy": "Privacy"
+      "privacy": "Privacy",
+      "menu": "Menu"
     },
     "footer": {
       "tagline": "An independent, open-source fact-checking project for Kenya.",
@@ -221,5 +222,71 @@
       "publishing": "Publishing…"
     },
     "noRatingToSubmitter": "Rating withheld from the submitter until published (AT-0004-B)."
+  },
+  "brand": {
+    "scale": {
+      "ariaLabel": "The six-verdict rating scale and what each verdict means",
+      "true": {
+        "name": "True",
+        "description": "Backed by credible evidence, with no material caveat."
+      },
+      "mostly": {
+        "name": "Mostly true",
+        "description": "Accurate in the main — but missing context shifts the picture."
+      },
+      "misleading": {
+        "name": "Misleading",
+        "description": "Sourced, yet framed to imply what the evidence doesn't."
+      },
+      "false": {
+        "name": "False",
+        "description": "Contradicted by the credible evidence we can find."
+      },
+      "unproven": {
+        "name": "Unproven",
+        "description": "No reliable evidence either way — not yet."
+      },
+      "notcheckable": {
+        "name": "Not checkable",
+        "description": "An opinion, a prediction, or a matter of belief — not a fact."
+      }
+    },
+    "flow": {
+      "ariaLabel": "How a claim gets checked, from entry to published audit",
+      "entriesLabel": "How a claim enters — two engines",
+      "stepsLabel": "What happens once a claim is in",
+      "fetch": {
+        "tag": "Primary engine",
+        "title": "We fetch",
+        "body": "We continuously surface viral, trending claims from YouTube, X, and fact-check feeds like PesaCheck and Africa Check — a pilot; TikTok is embed-only, not autonomously monitored."
+      },
+      "submit": {
+        "tag": "Secondary engine",
+        "title": "You submit",
+        "body": "Anyone can submit a link or a quote. The same pipeline checks it next."
+      },
+      "steps": {
+        "extract": {
+          "title": "Extract",
+          "body": "We pull out the checkable claims and translate them, keeping the original words."
+        },
+        "ground": {
+          "title": "Ground",
+          "body": "Each claim is matched against credible sources — KNBS, Kenya Law, the Hansard, newsrooms."
+        },
+        "assess": {
+          "title": "Assess",
+          "body": "AI weighs the evidence into a confidence-weighted, claim-attributed assessment. We rate claims, not people."
+        },
+        "publish": {
+          "title": "Publish",
+          "body": "It goes live with its sources, a confidence weight, and the standing caveat."
+        },
+        "audit": {
+          "title": "Audit",
+          "body": "A person audits a shrinking sample afterwards, and can correct it."
+        }
+      }
+    }
   }
 }
