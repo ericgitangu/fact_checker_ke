@@ -13,7 +13,8 @@
     "footer": {
       "tagline": "An independent, open-source fact-checking project for Kenya.",
       "languages": "English, Swahili & Sheng",
-      "builtIn": "Built in Nairobi"
+      "builtIn": "Built in Nairobi",
+      "legalPending": "Terms & Privacy (pending legal review)"
     },
     "action": {
       "submit": "Check this",
@@ -27,10 +28,10 @@
     }
   },
   "check": {
-    "aiAssisted": "AI-assisted analysis — not a verdict",
+    "aiAssisted": "AI-assisted, confidence-weighted assessment — not a verdict",
     "draft": {
-      "pending": "Pending human review",
-      "awaitingEditor": "Awaiting editor review. Evidence and sources are shown below, but no rating is published until an editor signs off."
+      "pending": "Pending publication",
+      "awaitingEditor": "Still being assessed. Evidence and sources are shown below; most checks publish automatically once the evidence is weighed, but this one is held for additional review before publishing."
     },
     "rating": {
       "label": "Rating",
@@ -47,11 +48,12 @@
     "sources": {
       "heading": "Sources"
     },
-    "reviewedBy": "Reviewed by an editor before publishing",
+    "reviewedBy": "Audited by an editor",
     "guidance": {
-      "confidenceLabel": "Confidence",
+      "confidenceLabel": "Confidence weight",
       "evidenceHeading": "Cited evidence",
-      "whatWouldChangeThisHeading": "What would change this"
+      "whatWouldChangeThisHeading": "What would change this",
+      "claimAttributedNote": "We assess the claim, not the person — the evidence speaks to what was said; you decide."
     },
     "notFound": {
       "title": "Check not found",
@@ -92,7 +94,7 @@
   },
   "submit": {
     "heading": "fact_checker_ke",
-    "lede": "Submit a link or paste text. We transcribe, extract claims, run retrieval against known sources, and draft a verdict — always reviewed by a human before it is published.",
+    "lede": "Two ways a claim gets checked: we catch what's trending, or you submit one. Either way, AI weighs the evidence and publishes a confidence-weighted assessment, sources cited — you decide. People audit results afterward and can correct them.",
     "smartInput": {
       "placeholder": "Paste a link, or type what they said…",
       "label": "Paste a link or type a claim"
@@ -128,10 +130,10 @@
       "heading": "What happens next",
       "received": "We receive your submission",
       "analyzing": "AI drafts an analysis",
-      "verifying": "A human editor reviews it",
-      "ready": "The verdict is published"
+      "verifying": "AI weighs the evidence and sets a confidence",
+      "ready": "Published as a confidence-weighted assessment, sources cited — a human audits it afterward"
     },
-    "awaitingReview": "Awaiting review — not a verdict yet",
+    "awaitingReview": "Awaiting assessment — not a verdict yet",
     "success": "Submitted. Watch it move through the pipeline.",
     "error": {
       "network": "Network error — please try again.",
@@ -153,8 +155,8 @@
       "received": "Your submission is queued for analysis.",
       "analyzing": "Extracting claims and translating, keeping the original words.",
       "analyzed": "Claims extracted. Matching each one against credible sources.",
-      "verifying": "A human editor is reviewing the evidence and draft verdict.",
-      "ready": "Published. View the check below.",
+      "verifying": "Weighing the evidence and setting a confidence level for the assessment.",
+      "ready": "Published as a confidence-weighted assessment. View it below.",
       "failed": "Something went wrong processing this submission."
     },
     "viewCheck": "View the published check",
