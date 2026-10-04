@@ -52,3 +52,20 @@ Revisit the throughput ceiling if a partner/volunteer reviewer (ADR-0008 §6) ac
 - **Corrections are a new row, never an UPDATE** (`correctCheck`): inserts a fresh `checks` row with `correctedFromCheckId` pointing at the superseded verdict, emits `check.corrected` to the outbox, and leaves the original row — including its `review_actions` history — completely untouched (AT-0025-4). No apps/web history-view UI exists yet to render "both states side by side"; that's explicitly apps/web's ownership, not stubbed silently, just not this package's job.
 - **Verified empirically against real Neon Postgres**, via `services/api/src/__tests__/editorial-gate.integration.test.ts` and `scripts/at/at-0025.sh`: a full transcript — seed a named-person draft with an unverified quote → submitter sees `rating: null` → approve blocked (`attribution_unverified`) → confirm attribution → approve blocked again (`right_of_reply_pending`, no right-of-reply logged yet) → admin public-safety override with a reason → publish succeeds → `check.published` lands in the outbox in the same transaction → `audit_log` has `check.approved` and `check.published` rows → submitter now sees the real rating.
 - **Explicit stub, not faked:** AT-0025-5 (backlog-overflow extended-ETA state). No queue-depth monitor, no configured throughput-ceiling constant, and no extended-ETA field on the submitter-facing submission/check response exist in this wave. Implementing it honestly needs a decision this ADR doesn't operationalize yet (where the 4-8/day ceiling constant lives, how "sustained 48h" is measured — a rolling window needs a time-series store this codebase doesn't have). Left RED rather than hand-waved.
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — reviewer becomes an ASYNC AUDITOR of a shrinking sample
+
+**Status:** Accepted direction (owner-approved pivot 2026-10-04). Additive; the reviewer roster, right-of-reply workflow, corrections/complaints process, and the backlog-overflow behaviour are retained. The *throughput-ceiling-as-publish-bottleneck* model is superseded for the auto-published majority.
+
+- **The 4–8/day verdict ceiling was computed on the human as a pre-publish approver.** Under auto-publish-by-default (ADR-0031), that ceiling **no longer caps published volume** — the pipeline publishes autonomously. The founder's time is re-pointed from *approving every named-person verdict before publish* to **auditing a sample of already-published assessments after the fact**, feeding corrections into the flywheel (ADR-0031/0021).
+- **The sample rate is an output of calibration, and shrinks as it proves out** (ADR-0031 AT-0031-9): high early (pilot, conservative), lower as measured precision improves. The 30–45-min/verdict budget now buys *audit depth per sampled item*, not *throughput of a blocking queue*.
+- **Tier-C mode (b)** (ADR-0031) is the one place a **pre-publish** human tap remains, and only where configured for a high-risk entity/topic/window — the fast-track tap, not the old blocking gate.
+- **Corrections become the primary lever, not the exception.** Because errors are now caught *after* publish, the correction path (§6, additive `check.corrected`, ADR-0018) and the complaint/takedown SLA (ADR-0008) are load-bearing. A sampled-audit finding of an error is a correction, not a silent edit.
+- **Right-of-reply workflow (§4) splits by tier:** pre-publish 48h for Tier-C mode (b); async notice + correction path for Tier A/B and Tier-C mode (a) (ADR-0008 amendment). Public-safety carve-out unchanged.
+
+### Acceptance tests (additive)
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0025-6 | An auto-published assessment is recorded into an async-audit sampling queue at a configurable rate; the editor can record an audit outcome that, on a found error, creates a correction (new row, `check.corrected`) — never a silent edit. | RED |
+| AT-0025-7 | The audit sampling rate is driven by the ADR-0031 calibration metric (shrinks as calibration improves, rises as it degrades), not a hardcoded constant; it is not the old pre-publish throughput ceiling. | RED |

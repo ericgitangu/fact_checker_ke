@@ -75,3 +75,27 @@ Source: fact_checker_ke ADR set red-team report, Section D #10 (high severity).
 |---|---|---|
 | AT-0008-A | A named-person publish is blocked without an evidence file, archived sources, a logged right-of-reply attempt and a window of 48h or more (unless the public-safety flag is set *with the reason recorded*). | RED |
 | AT-0008-B | A check page rates a claim, never an account. The badge or embed carries the claim text and date. Per-account submission caps apply to any one target handle. | RED |
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — auto-publish, autonomy, and the async right-of-reply
+
+**Status of this amendment:** Accepted direction (owner-approved pivot 2026-10-04); still **requires advocate sign-off** — this amendment *raises*, it does not lower, the need for counsel. Additive: §1–7, the Research-round-2 additions, and the 48h/public-safety/takedown red-team amendments are all retained. **ADR-0033** now owns the full Terms/Privacy/caveat/indemnity draft; this ADR keeps the editorial-policy consequences.
+
+### What the pivot changes for legal exposure
+Auto-publish (ADR-0031) is now the **default** operating mode, and the **fetch engine** (ADR-0002/0032) publishes named-person assessments **autonomously, with no human in the submit loop**. This materially **increases** the defamation exposure this ADR is built around (verified KES 6–20M awards; no Kenyan fact-checker-rating precedent — first-mover risk). The mitigations are strengthened and made explicit, not relaxed:
+
+- **The standing caveat (ADR-0033 §A) is part of editorial policy**, shown on every published assessment, claim-attributed, pilot-stage, AI-generated, sources-cited, right-of-reply linked. **It reduces but does not erase** named-person exposure — stated here as the ADR-0008 legal position, matching ADR-0031.
+- **Right of reply becomes ASYNC for auto-published Tier A/B and Tier-C mode (a).** The 48h pre-publish window fixed by the earlier red-team amendment (point 3 / AT-0008-A) was built for the human-gated model. Under auto-publish it is **reframed, not deleted**:
+  - Tier C **mode (b)** (configurable stricter mode, ADR-0031) retains the **pre-publish** 48h window.
+  - Tier C **mode (a)** (default) and Tier A/B auto-publish in **claim-attributed / open-question** framing and provide an **async right-of-reply + correction path** (notice to the named person's public channel at/after publish, plus a prominent correction mechanism, ADR-0025). **`[ADVOCATE: confirm an async right-of-reply on a claim-attributed, caveated, open-question assessment is defensible for a named living person under Cap 36 — this is the single most important question raised by the pivot.]`**
+- **The public-safety carve-out and takedown/complaint SLA are unchanged** and now also apply to auto-published items; a takedown demand on an auto-published assessment triggers the SLA and may trip the kill-switch (ADR-0031/0032).
+- **Evidence file + source archival at publish time (Research round 2) now runs for auto-published items too** — autonomy does not remove the justification-defence record; it makes it mandatory per auto-published named-person assessment.
+
+### Irreversible / legal-risk (additive)
+An **auto-published** false defamatory assessment is public before any human reviews it (async audit catches it after, ADR-0031). This is the largest single risk the pivot introduces, flagged irreversible-in-consequence (ADR-0031/0032/0033 concur). Media-liability insurance (Phase-1 gate, above) and the kill-switch are load-bearing, not optional.
+
+### Acceptance tests (additive)
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0008-C | An auto-published named-person assessment (Tier A/B or Tier-C mode a) carries the ADR-0033 standing caveat, claim-attributed framing, cited+archived evidence file, and a working async right-of-reply/correction link — and is never a declarative person-indicting statement. | RED |
+| AT-0008-D | Tier-C mode (b) retains the pre-publish 48h right-of-reply window (AT-0008-A behaviour); switching an entity/topic from mode (a) to a weaker-than-(a) posture is blocked without an audit-logged advocate-signoff reference. | RED |

@@ -157,3 +157,17 @@ Clip `fleurs_sw_ke_01671` (reference: *"...FBI lazima itoe makachero kumi kwa po
 
 ---
 **See ADR-0031:** the custom-model roadmap (Sheng/Swahili STT fine-tune, claim/credibility classifiers) is the output of the data flywheel (checks + editor corrections + user signals → eval → fine-tune).
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — STT now also powers the fetch engine, within the same compliance boundary
+
+**Status:** Accepted direction (owner-approved pivot 2026-10-04). Additive; the provider gate (≤25% WER), the paid-tier-only rule (AT-0005-3), the Round A result (Chirp_2 provisional) and the two-tier triage/publication tolerance are all retained unchanged.
+
+- **New consumer:** the autonomous **fetch engine** (ADR-0002/0032) transcribes video content via this same `Transcriber` interface — but **only on the compliant subset** already defined in Research round 2: owner-authorized/partner content, live-capture of permitted streams, our own uploads, and openly-licensed official audio (Bunge). **The ToS prohibition on downloading/isolating third-party YouTube/TikTok audio (ADR-0002 blockers #5/#8) binds the fetch engine exactly as it binds the submission engine.** The fetch engine does **not** expand the lawful STT input set — it expands *who triggers transcription* (a scheduler instead of a user), not *what may be transcribed*.
+- **Autonomy sharpens the silent-empty-transcript risk** (the Round A Gemini finding on sensitive Bunge/FBI content): with no human in the submit loop, a provider silently returning an empty transcript on politically sensitive Kenyan speech could drop a real claim with no operator signal. This reinforces the Chirp_2-over-Gemini provisional call for the autonomous path and is a named fetch-engine input (ADR-0032 review trigger).
+- **Paid-tier-only (AT-0005-3) still holds** — autonomous volume makes an accidental unpaid-tier call *more* likely, so the config/CI backstop (ADR-0023 AT-0005-3 backstop) is load-bearing for the fetch engine too.
+
+### Acceptance tests (additive)
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0005-5 | A fetch-engine video item triggers STT only when its source is in the compliant subset (owner-authorized/partner/open-licensed/live-capture); a third-party YouTube/TikTok item never triggers an audio download or transcription, hitting the `needs_quote` short-circuit instead. | RED |

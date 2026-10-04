@@ -54,3 +54,11 @@ Source: fact_checker_ke ADR set red-team report, Section D #12 (high severity).
 ## Pricing re-check resolved (2026-10-03)
 
 The round-2 table's "needs re-check" row is settled: claude.com/pricing (fetched directly today) lists **Sonnet 5.5 — $2 / $10 per MTok** as a current model, alongside Opus 5.5 ($4/$20), Haiku 4.5 ($1/$5) and Fable 5.1 ($10/$50); Sonnet 5 is now in the legacy list. The 50% batch discount is confirmed on the same page. The tiered-routing plan stands: Haiku 4.5 for claim detection/classification, Sonnet 5.5 as the default draft-verdict model, Opus-class reserved for contested named-person drafts if the eval set justifies it **[V-PRIMARY]**.
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — a second, autonomous spend surface needs its own breaker
+
+**Status:** Accepted direction (owner-approved pivot 2026-10-04). Additive; the global cap breaker and routing are retained.
+
+- The autonomous **fetch engine** (ADR-0032) spends LLM/STT budget with **no user and no Turnstile (ADR-0023) in front of it** — it is a self-inflicted cost-DoS surface the submission-side admission controls do not cover. It therefore carries its **own budget line** in the breaker, independent of the submission engine: at 80% it stops emitting new candidates (dedup/trend updates continue); at 100% it hard-stops polling. **Neither engine can starve or overspend on behalf of the other.**
+- Structural ceilings (ADR-0032 §4): per-source per-run candidate caps, conservative cron cadence, X per-read monthly budget (X API v2 is metered pay-per-use, ~$0.005/read — "sample, don't firehose"), and dedup (a viral claim seen 500× is paid once via the ADR-0017 content-addressed cache). The near-zero target holds because YouTube (free quota) + PesaCheck/Africa Check (free open data) carry the primary fetch load.

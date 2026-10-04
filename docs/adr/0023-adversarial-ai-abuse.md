@@ -118,3 +118,17 @@ embedder).
 
 ---
 **See ADR-0031:** admission/confidence thresholds here are calibration-derived and per-risk-tier; no confidence gates auto-publish until measured-calibrated on held-out data.
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — the framing rule and all guards apply to ALL auto-published output
+
+**Status:** Accepted direction (owner-approved pivot 2026-10-04). Additive; §1–6 (injection containment, citation integrity, dedup guards, cost-DoS admission control, Sheng eval gate, creator-gaming controls) are all retained unchanged.
+
+- **The framing ban is now a publish-time gate, not an editor expectation.** With auto-publish as the default (ADR-0031), the ban on person-indicting phrasing ("[Name] lied") and the claim-attributed requirement (§"framing", ADR-0008/0033) must be **enforced in code before any auto-publish**, for both ingest sources — no human is guaranteed to catch it first. Tier-C mode (a) additionally requires the open-question rendering (ADR-0031/0033).
+- **The autonomous fetch engine is a new cost-DoS surface the §4 admission controls do NOT cover.** Turnstile/device-quotas sit in front of the *submission* endpoint; the fetch engine has no Turnstile and no human throttle. Its cost ceiling is the **per-engine spend breaker + per-run candidate caps + conservative cron cadence** defined in ADR-0032 §4 — the fetch-engine analogue of §4's admission control. The two engines carry **independent budget lines** so neither can starve or overspend on behalf of the other.
+- **Injection surface widens:** fetched metadata, titles, descriptions and cross-posted text are untrusted input exactly like a submitted quote, and go into the same delimited `<untrusted_submission>`/`<untrusted_source>` blocks (§1) — an attacker can craft a viral post's description to try to steer an autonomous verdict. The structural containment (no tool access, schema-validated output) is what makes autonomy safe here.
+
+### Acceptance tests (additive)
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0023-7 | A Tier A/B/C auto-published assessment (either ingest source) passes a publish-time framing gate that rejects any person-indicting phrasing and requires claim-attributed (Tier-C mode a: open-question) rendering, enforced in code with no human in the loop; fetched metadata/description is wrapped in the same delimited untrusted blocks as a submitted quote. | RED |
