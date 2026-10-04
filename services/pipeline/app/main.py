@@ -17,6 +17,7 @@ from app.config import UnpaidGeminiUsageError, assert_no_unpaid_gemini_usage
 from app.fakes.fake_abuse_scan import FakeAbuseScan
 from app.fakes.fake_reverse_image import FakeReverseImageSearch
 from app.fakes.fake_synthetic_media import FakeSyntheticMediaDetector
+from app.fakes.fake_transcriber import FakeTranscriber
 from app.models.hop_requests import (
     AnalyzeHopEnvelope,
     MediaProcessHopRequest,
@@ -93,6 +94,14 @@ _abuse_scan = FakeAbuseScan()
 # app/clients/fetch_source_factory.py.
 _fetch_sources = make_fetch_sources()
 _fetch_scoring_config = FetchScoringConfig.from_env()
+# ADR-0032/0005 AT-0032-4 / AT-0005-5: no real STT vendor is wired in this
+# slice (HARD RULE: no billable/live calls) -- FakeTranscriber never calls
+# out, so the compliant-subset "STT allowed" path still makes zero real
+# vendor calls today. The gate itself (app/stages/fetch_hop.py's
+# `_resolve_claim_text`) is vendor-agnostic: swapping this singleton for a
+# real Transcriber implementation later does not change the compliance
+# boundary that decides WHETHER it gets called.
+_transcriber = FakeTranscriber()
 
 # ADR-0032 fetch-enactment slice (migration 0013): when a database is
 # configured, the fetch engine's dedup state, outbox emission, and spend
@@ -191,6 +200,11 @@ class FetchHopResponse(BaseModel):
     # throttled (80%) or it never polled at all (100%, hard-stopped).
     skipped_soft_stopped: int
     hard_stopped: bool
+    # AT-0032-4/AT-0005-5 observability: candidates with no claim-bearing
+    # text that were blocked rather than transcribed (non-compliant
+    # media, or no transcriber/audio available) -- zero STT/LLM calls
+    # made for each one.
+    blocked_non_compliant_media_needs_quote: int
 
 
 def _fetch_hop_response(result: FetchHopResult) -> FetchHopResponse:
@@ -203,6 +217,7 @@ def _fetch_hop_response(result: FetchHopResult) -> FetchHopResponse:
         emitted_submission_ids=[e.submission_id for e in result.emitted],
         skipped_soft_stopped=result.skipped_soft_stopped,
         hard_stopped=result.hard_stopped,
+        blocked_non_compliant_media_needs_quote=result.blocked_non_compliant_media_needs_quote,
     )
 
 
@@ -226,6 +241,7 @@ async def hop_fetch(payload: FetchHopRequest) -> FetchHopResponse:
             emitted_submission_ids=[],
             skipped_soft_stopped=0,
             hard_stopped=False,
+            blocked_non_compliant_media_needs_quote=0,
         )
     result = await run_fetch_hop(
         sources=_fetch_sources,
@@ -237,6 +253,7 @@ async def hop_fetch(payload: FetchHopRequest) -> FetchHopResponse:
         limit_per_source=payload.limit_per_source,
         cost_breaker=_fetch_cost_breaker,
         emit_submission=_fetch_emit_submission if _fetch_db_conn is not None else None,
+        transcriber=_transcriber,
     )
     return _fetch_hop_response(result)
 

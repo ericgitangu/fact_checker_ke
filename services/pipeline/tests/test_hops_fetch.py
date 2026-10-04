@@ -38,6 +38,7 @@ def test_hop_fetch_kill_switch_short_circuits(monkeypatch) -> None:
         "emitted_submission_ids": [],
         "skipped_soft_stopped": 0,
         "hard_stopped": False,
+        "blocked_non_compliant_media_needs_quote": 0,
     }
 
 

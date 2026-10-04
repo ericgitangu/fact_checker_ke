@@ -49,6 +49,7 @@ from app.models.pipeline_io import AnalyzeResult
 from app.protocols.fetch_dedup_store import FetchDedupStore
 from app.protocols.fetch_source import FetchCandidate, FetchSource
 from app.protocols.llm_client import LlmClient
+from app.protocols.transcriber import Transcriber, TranscriptionError
 from app.stages.analyze import run_analyze_hop
 from app.stages.fetch_scoring import FetchScoringConfig, FetchScoringInput, score_candidate
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
@@ -118,6 +119,13 @@ class FetchHopResult:
     # ANY source) found the breaker already at >= 100% — no source was
     # polled at all this run.
     hard_stopped: bool = False
+    # ADR-0032/0005 AT-0032-4 / AT-0005-5: a candidate with no
+    # claim-bearing text and an audio/video track that is NOT in the
+    # lawful/compliant subset (`stt_eligible=False`) hits this
+    # short-circuit — same spirit as app/stages/analyze.py's SEC-4
+    # `needs_quote` outcome, but one hop earlier: it never reaches
+    # scoring, the transcriber, or the LLM at all.
+    blocked_non_compliant_media_needs_quote: int = 0
 
 
 async def run_fetch_hop(
@@ -132,6 +140,7 @@ async def run_fetch_hop(
     max_emissions_per_run: int = DEFAULT_MAX_EMISSIONS_PER_RUN,
     cost_breaker: EngineCostBreaker | None = None,
     emit_submission: EmitSubmission | None = None,
+    transcriber: Transcriber | None = None,
 ) -> FetchHopResult:
     scoring_config = scoring_config or FetchScoringConfig.from_env()
     idempotency_store = idempotency_store or InMemoryIdempotencyStore()
@@ -159,9 +168,51 @@ async def run_fetch_hop(
                 max_emissions_per_run=max_emissions_per_run,
                 cost_breaker=cost_breaker,
                 emit_submission=emit_submission,
+                transcriber=transcriber,
             )
 
     return result
+
+
+async def _resolve_claim_text(candidate: FetchCandidate, *, transcriber: Transcriber | None) -> str | None:
+    """ADR-0032/0005 AT-0032-4 / AT-0005-5 STT compliance boundary.
+
+    Returns the claim-bearing text to process, or None when this
+    candidate must be blocked (no checkable text, and transcription is
+    not lawfully available) — the caller must then stop WITHOUT calling
+    the transcriber or the LLM, never fabricate a transcript.
+
+    `candidate.text` already present -> used as-is, no STT call, no
+    change to any existing fetch source's behaviour.
+
+    `candidate.text` empty AND `candidate.audio_url` set:
+      - `candidate.stt_eligible=True` (owner-authorized / partner /
+        open-licensed / live-capture subset) -> transcribe for real
+        (fake in dev/test, no vendor key configured).
+      - otherwise -> blocked; returns None.
+    """
+    if candidate.text.strip():
+        return candidate.text
+
+    if not candidate.audio_url:
+        return None
+
+    if not candidate.stt_eligible:
+        # Fail-closed: audio exists but this item is NOT in the lawful
+        # subset -- never download/transcribe third-party audio here.
+        return None
+
+    if transcriber is None:
+        # No transcriber wired (e.g. local dev with STT disabled) -- the
+        # compliant-subset ALLOWANCE never implies a transcriber must be
+        # called if one wasn't configured; fail closed the same way.
+        return None
+
+    try:
+        transcription = await transcriber.transcribe(candidate.audio_url)
+    except TranscriptionError:
+        return None
+    return transcription.text
 
 
 async def _process_candidate(
@@ -176,6 +227,7 @@ async def _process_candidate(
     max_emissions_per_run: int,
     cost_breaker: EngineCostBreaker | None,
     emit_submission: EmitSubmission | None,
+    transcriber: Transcriber | None = None,
 ) -> None:
     # Layer 1 (ADR-0032 §3): exact (platform, native_id) already seen ->
     # drop immediately, no scoring at all.
@@ -183,7 +235,17 @@ async def _process_candidate(
         result.duplicate_platform_item_skipped += 1
         return
 
-    normalized_text = _normalize_claim_text(candidate.text)
+    claim_text = await _resolve_claim_text(candidate, transcriber=transcriber)
+    if claim_text is None:
+        # AT-0032-4/AT-0005-5: no lawful claim-bearing text at all --
+        # never scored, never dedup-tracked as a claim, never reaches
+        # the transcriber (ineligible) or the LLM. Mirrors
+        # app/stages/analyze.py's SEC-4 `needs_quote` short-circuit one
+        # hop earlier.
+        result.blocked_non_compliant_media_needs_quote += 1
+        return
+
+    normalized_text = _normalize_claim_text(claim_text)
     claim_hash = content_hash(normalized_text)
 
     dedup_store.record_observation(
@@ -208,7 +270,7 @@ async def _process_candidate(
     platforms_seen: frozenset[str] = frozenset({candidate.platform})
 
     signals = FetchScoringInput(
-        text=candidate.text,
+        text=claim_text,
         engagement_delta=total_engagement,
         hours_since_previous_observation=hours_since_previous,
         platforms_seen=platforms_seen,
@@ -257,13 +319,13 @@ async def _process_candidate(
     submission_id = str(uuid.uuid4())
     if emit_submission is not None:
         # Real-outbox path (AT-0017-C) — see module docstring.
-        submission_id = emit_submission(candidate.text, org_id, submission_id)
+        submission_id = emit_submission(claim_text, org_id, submission_id)
         analyze_result: AnalyzeResult | None = None
     else:
         request = AnalyzeHopRequest(
             submission_id=submission_id,
             org_id=org_id,
-            content=HopContent(text=candidate.text),
+            content=HopContent(text=claim_text),
             language_hint=None,
         )
         analyze_result = await run_analyze_hop(request, llm=llm, store=idempotency_store)

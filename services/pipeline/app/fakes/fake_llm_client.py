@@ -23,6 +23,16 @@ _INJECTION_MARKERS = (
     "puuza maelekezo yaliyotangulia",
 )
 
+# Test-fixture-only marker (never a real vendor signal): lets an
+# integration test deterministically drive the REAL /hops/verify path to
+# a high-confidence, auto-publish-eligible draft (Tier A,
+# TAU_A_PRE_CALIBRATION=0.95 in app/stages/publish_policy.py) without a
+# fitted calibration artifact or a real LLM call. Used by
+# services/api's submission-orchestration end-to-end integration test
+# (the ADR-0032 "closes the C1 gap" orchestration slice) to prove a real
+# auto-publish through the real pipeline hops, not a seeded decision.
+_AUTO_PUBLISH_FIXTURE_MARKER = "AUTO_PUBLISH_FIXTURE_HIGH_CONFIDENCE"
+
 
 def _looks_like_injection(prompt: str) -> bool:
     lowered = prompt.lower()
@@ -130,6 +140,23 @@ class FakeLlmClient(LlmClient):
             if submission_start != -1
             else ""
         )
+
+        if _AUTO_PUBLISH_FIXTURE_MARKER in claim_text:
+            return json.dumps(
+                {
+                    "rating": "MostlyTrue",
+                    "rationale": (
+                        "The claim is contradicted by the official price-cap schedule "
+                        "published this week; the evidence shows a smaller increase than "
+                        "claimed."
+                    ),
+                    "citations": [],
+                    "confidence": 0.97,
+                    "what_would_change_this": "A revised official schedule.",
+                    "language": _detect_language(claim_text),
+                    "translation_en": claim_text,
+                }
+            )
 
         if _looks_like_injection(claim_text):
             # ADR-0023 AT-0023-1: never honour an embedded instruction to
