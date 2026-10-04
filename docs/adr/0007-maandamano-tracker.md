@@ -54,7 +54,7 @@ Source: fact_checker_ke ADR set red-team report, Section D #11 (high severity).
 
 | ID | Behaviour | Status |
 |---|---|---|
-| AT-0007-A | Within 60s of the kill-switch flag flipping, tracker routes return a frozen notice from CDN, API and service worker (the SW revalidates tracker routes network-first). | RED |
+| AT-0007-A | Within 60s of the kill-switch flag flipping, tracker routes return a frozen notice from CDN, API and service worker (the SW revalidates tracker routes network-first). | **GREEN** (mechanism; see 2026-10-04 notes below) |
 | AT-0007-B | A log exclusion/redaction filter is enforced (Terraform) on tracker routes. EXIF is stripped on upload. Comments on ongoing events are off or held for review. | RED |
 
 ## Implementation notes (web agent, 2026-10-03)
@@ -64,3 +64,63 @@ Source: fact_checker_ke ADR set red-team report, Section D #11 (high severity).
 - **Kill switch (AT-0007-A), partial implementation:** `isFrozen()` in `apps/web/app/maandamano/page.tsx` reads a `MAANDAMANO_FROZEN` env var as a stand-in for the real operator-level DB/edge-config flag described in this ADR — flipping it renders the frozen-notice view instead of advisories. This covers only the **apps/web rendering half** of AT-0007-A; the real flag storage/propagation (DB row, CDN tag purge) is backend/infra scope, out of this wave's file ownership. The **service-worker half is implemented unconditionally** (not gated on the env var): `apps/web/app/sw.ts` runs `/maandamano*` through `NetworkOnly` — no offline cache at all, ever, independent of whether the mock flag is set — so a stale cached advisory can never be served regardless of kill-switch state. This is stronger than strictly required (ADR-0028 agrees: "no offline cache at all" for tracker routes) but was the simplest correct policy to implement with confidence.
 - **2h staleness amendment:** `apps/web/app/maandamano/page.tsx`'s `isStale()` marks an advisory with a visible warning (`tracker.staleWarning`, EN/SW) when `updatedAt` is more than 2 hours old — evaluated against the fixture's static timestamps, not a live re-verification clock (no editor re-verification workflow exists yet to update it).
 - **Not implemented this wave (explicitly out of scope per the task brief):** log redaction (AT-0007-B, Terraform/infra), EXIF stripping on upload (no upload feature exists in apps/web yet), comment gating on ongoing events (no comments feature exists yet — Phase 1 per the ADR itself).
+
+## Kill-switch mechanism, real implementation (2026-10-04)
+
+AT-0007-A closes the gap the 2026-10-03 notes above left open (the
+`MAANDAMANO_FROZEN` env var was a client-only mock). The mechanism is
+now real, end to end:
+
+- **The flag.** `maandamano_kill_switch` is an ordinary row in the
+  existing `policy_flags` table (ADR-0031 scaffold) — no new table or
+  migration. Defaults OFF (missing row = not frozen). Flipped ONLY via
+  the existing `updatePolicyFlag` (`services/api/src/lib/policy-audit.ts`),
+  so every flip writes a `policy_flags` row AND an `audit_log` row
+  (`action: 'policy.kill_switch_flipped'`, `target_id:
+  'maandamano_kill_switch'`) in the SAME transaction — a rolled-back
+  flip leaves zero rows in either table, same discipline as every other
+  audited mutation in this codebase. See
+  `services/api/src/lib/maandamano.ts`.
+- **Admin-only flip:** `POST /v1/admin/maandamano/kill-switch`
+  (`services/api/src/routes/maandamano.ts`), guarded by
+  `requireRole(auth, ["admin"])` — same pattern as
+  `routes/funnel.ts`. Body `{ enabled: boolean }`.
+- **Server-side enforcement (the part a CSS/JS hide can't fake):**
+  `GET /v1/maandamano` (same route file) calls
+  `getMaandamanoAdvisories(db)`, which reads the flag FIRST and, when
+  it's on, returns `{ frozen: true, demonstrations: [] }` WITHOUT ever
+  querying the `demonstrations` table. The live rows are never deleted
+  — they're simply never read while frozen, and reappear the instant
+  the flag flips back. Proven against a real Postgres instance by
+  `services/api/src/__tests__/maandamano-killswitch.integration.test.ts`
+  (inserts a live row, flips the switch, asserts the row still exists
+  in Postgres but `GET /v1/maandamano` returns `demonstrations: []`).
+  `apps/web/app/maandamano/page.tsx` now renders directly from this
+  endpoint (`ApiClient.getMaandamano`) instead of a bundled fixture —
+  there is no client-side "hide the list" step for a reader to bypass,
+  because the server never sends the list while frozen.
+- **Fast propagation (no redeploy):** `/maandamano` is ISR-cached
+  (`export const revalidate = 60`, fetch tag `"maandamano"`). Flipping
+  the switch calls `services/api/src/lib/maandamano-revalidate.ts`,
+  which POSTs `apps/web/app/api/revalidate/route.ts` (secret-gated via
+  `REVALIDATE_SECRET`), which calls `revalidateTag("maandamano", {
+  expire: 0 })` — Next 16's documented route-handler/webhook form for
+  "I need this gone immediately" (its `updateTag` alternative only
+  works inside Server Actions, not here). If `WEB_BASE_URL`/
+  `REVALIDATE_SECRET` aren't configured, the flip still succeeds and is
+  still audit-logged — propagation just can't also reach the CDN layer,
+  logged as a warning rather than failing the request. The runbook
+  (`docs/runbooks/nc4-kill-switch.md`) now documents this exact
+  mechanism instead of a TBD curl placeholder.
+- **Residual, honestly flagged:** the actual `/maandamano` route
+  renders dynamically (`ƒ` in the `next build` output) because of
+  shared app-shell logic (locale resolution), not because of this
+  change — so in THIS build, the CDN never held a static/ISR page for
+  that tag purge to act on in the first place; what the webhook
+  actually buys today is instant invalidation of the Next **Data
+  Cache** entry for the `GET /v1/maandamano` fetch (bounding staleness
+  to 0s instead of up to 60s), not a CDN edge-cache purge. If a future
+  change makes `/maandamano` statically/ISR-renderable, the same tag
+  purge then also covers the CDN layer with no further code change.
+  AT-0007-B (log redaction, EXIF stripping, ongoing-event comment
+  gating) is still RED and out of this change's scope.

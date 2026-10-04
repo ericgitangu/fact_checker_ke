@@ -42,51 +42,95 @@ current team size this is the founder.
 
 ## Step 2 — flip the flag
 
-The kill switch is a **runtime flag in the DB/edge config, not a deploy**
-(ADR-0007 decision). Flipping it must do all three of the following —
-flipping only the DB flag and stopping there reproduces red-team C-7
-("kill switch is leaky"):
+The kill switch is the `maandamano_kill_switch` row in the existing
+`policy_flags` table (ADR-0031 scaffold) — a runtime flag, not a deploy.
+Flipping it must do all of the following — flipping only the DB flag
+and stopping there reproduces red-team C-7 ("kill switch is leaky"):
 
-1. **Flip the flag** via the admin action (writes an `audit_log` row per
-   ADR-0020 §5 — `action: 'kill_switch_activated'`, `target_type:
-   'maandamano_tracker'`).
-2. **Purge the ISR tag** for tracker routes so Vercel's CDN stops serving
-   stale (pre-freeze) pages:
+1. **Flip the flag** — admin bearer token required:
+
    ```bash
-   # Revalidate/purge the tracker tag — exact invocation depends on the
-   # revalidation helper wired in apps/web; confirm the tag name matches
-   # what apps/web/app/maandamano/** actually registers before relying on
-   # this command in a real incident.
-   curl -X POST "$WEB_URL/api/revalidate?tag=maandamano&secret=$REVALIDATE_SECRET"
+   curl -X POST "$API_URL/v1/admin/maandamano/kill-switch" \
+     -H "Authorization: Bearer $ADMIN_SESSION_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"enabled": true}'
+   # -> { "key": "maandamano_kill_switch", "enabled": true, "revalidated": true }
    ```
-3. **Confirm the PWA service worker flips to network-first** on tracker
-   routes, so a device that already cached the tracker doesn't keep
-   serving a frozen snapshot offline-first. This should happen
-   automatically once the flag is live (the SW checks the flag on
-   revalidation), but verify it on at least one real device/browser — do
-   not assume from the code path alone.
+
+   This goes through `updatePolicyFlag`
+   (`services/api/src/lib/maandamano.ts#setMaandamanoKillSwitch`), which
+   writes the `policy_flags` row AND an `audit_log` row in the SAME
+   transaction — `action: 'policy.kill_switch_flipped'`, `target_type:
+   'policy_flag'`, `target_id: 'maandamano_kill_switch'`, `metadata.value`
+   the new boolean. A rolled-back flip leaves zero rows in either table.
+   Route: `services/api/src/routes/maandamano.ts`, admin-only via
+   `requireRole(auth, ["admin"])`.
+
+2. **The flip already triggers the ISR/data-cache purge** — the route
+   handler calls `triggerMaandamanoRevalidation`
+   (`services/api/src/lib/maandamano-revalidate.ts`), which POSTs apps/web's
+   webhook:
+
+   ```bash
+   curl -X POST "$WEB_URL/api/revalidate?tag=maandamano&secret=$REVALIDATE_SECRET"
+   # -> { "revalidated": true, "tag": "maandamano" }
+   ```
+
+   (`apps/web/app/api/revalidate/route.ts`, secret-gated by
+   `REVALIDATE_SECRET`, calls `revalidateTag("maandamano", { expire: 0 })`
+   — Next 16's documented form for "the caller needs the data gone
+   immediately" from a webhook/Route Handler, as opposed to `updateTag`
+   which only works inside a Server Action.) The response's
+   `revalidated` field (step 1's curl) tells you whether this succeeded —
+   `false` means `WEB_BASE_URL`/`REVALIDATE_SECRET` are unset or the
+   webhook call failed; the FLAG FLIP AND ITS ENFORCEMENT STILL HOLD
+   either way (see step 3's first bullet), but check apps/web's env vars
+   if you see `false` here.
+3. **Server-side enforcement does not depend on steps 1-2's cache
+   layers at all**: `GET /v1/maandamano` reads the flag fresh from
+   Postgres on every request (`getMaandamanoAdvisories`,
+   `services/api/src/lib/maandamano.ts`) — while frozen it returns
+   `{ frozen: true, demonstrations: [] }` and NEVER queries the
+   `demonstrations` table. The ISR/data-cache purge in step 2 only
+   affects HOW FAST apps/web's rendered `/maandamano` page reflects
+   that — the API itself has zero propagation delay.
+4. **Confirm the PWA service worker's network-first policy for tracker
+   routes** (`apps/web/app/sw.ts`, unconditional `NetworkOnly` on
+   `/maandamano*` — not gated on the flag, always on) — verify on at
+   least one real device/browser that a previously-cached session isn't
+   serving an offline snapshot. Do not assume from the code path alone.
 
 ## Step 3 — verify within the 60-second target
 
 Per AT-0007-A, tracker routes must return a frozen notice from **all
-three** layers (CDN, API, service worker) within 60 seconds of the flag
-flip:
+three** layers (API, apps/web's render, service worker) within 60
+seconds of the flag flip — in practice the API is instant (step 2.3
+above) and apps/web should be too once the webhook succeeds:
 
 ```bash
-# CDN/edge response
-curl -sI "$WEB_URL/maandamano" | grep -i 'x-vercel-cache\|age:'
+# API response (should reflect frozen state immediately, every time —
+# this one has NO cache to propagate through)
+curl -s "$API_URL/v1/maandamano" | jq '.frozen, (.demonstrations | length)'
+# -> true
+#    0
 
-# API response (should reflect frozen state, not stale cached data)
-curl -s "$API_URL/v1/maandamano" | jq '.frozen'
+# apps/web's rendered page (reflects the API's state once the Data
+# Cache entry for this fetch is purged — instantly if step 2.2's
+# `revalidated: true`, within the normal revalidate window at worst)
+curl -s "$WEB_URL/maandamano" | grep -o 'frozen-banner' || echo "NOT YET FROZEN — investigate"
 
 # Service worker: open the tracker page in a browser with devtools,
 # confirm the SW's network request for tracker routes shows
-# network-first (not cache-first) in the Network panel.
+# network-first (not cache-first) in the Network panel — this is
+# ALWAYS on (apps/web/app/sw.ts), independent of the flag.
 ```
 
-If any layer still serves pre-freeze content past 60 seconds, that layer's
-cache/propagation is the actual incident — escalate it as a defect against
-AT-0007-A, don't just wait longer.
+If the API response (first check) isn't frozen immediately, that's a
+defect in the flag flip itself — escalate as a bug against
+`lib/maandamano.ts`, don't retry. If only the SECOND check lags past 60
+seconds, that's the revalidation webhook (step 2.2) — check its
+`revalidated` field from step 1 and apps/web's `REVALIDATE_SECRET` env
+var before assuming it's just slow.
 
 ## Step 4 — what users see
 
@@ -107,9 +151,11 @@ condition is resolved:
 - Safety escalation: editorial judgment that advisory-level (ward-
   granularity, delayed) data can resume safely.
 
-Flipping back repeats steps 2-3 (cache/SW propagation) in reverse — a
-stale "frozen" notice continuing to serve after un-freeze is the same
-class of defect as a stale live page continuing to serve after freeze.
+Flipping back is the same `POST /v1/admin/maandamano/kill-switch` call
+with `{"enabled": false}` — it repeats steps 2-3 (cache/SW propagation)
+in reverse. A stale "frozen" notice continuing to serve after un-freeze
+is the same class of defect as a stale live page continuing to serve
+after freeze.
 
 ## Related
 
