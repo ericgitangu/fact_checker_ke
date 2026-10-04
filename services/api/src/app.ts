@@ -166,13 +166,24 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   const deviceQuotaGuard: DeviceQuotaGuard =
     options.deviceQuotaGuard ?? (upstashRest ? new RedisDeviceQuotaGuard(upstashRest) : new InMemoryDeviceQuotaGuard());
 
+  // ADR-0032/0017 "C1 gap" closer: the outbox relay now publishes every
+  // outbox row (submission.received included) to THIS service's own
+  // `/internal/hops/orchestrate` route — not straight to the pipeline
+  // the way `config.analyzeHopUrl` still names (kept for back-compat/
+  // documentation; see config.ts) — which is what actually drives a
+  // submission.received event through /hops/analyze -> /hops/verify ->
+  // enactPublishDecision. See routes/internal.ts + lib/
+  // submission-orchestrator.ts.
+  const orchestrationHopUrl = config.orchestrationHopUrl ?? `${config.apiSelfBaseUrl ?? "http://localhost:8080"}/internal/hops/orchestrate`;
+  const pipelineBaseUrl = config.pipelineBaseUrl ?? "http://localhost:8000";
+
   const submissionService: SubmissionService =
     options.submissionService ??
     (db
-      ? new PostgresSubmissionService(db, idempotencyPreCheck, publisher, config.analyzeHopUrl, config.capabilityTokenSecret)
+      ? new PostgresSubmissionService(db, idempotencyPreCheck, publisher, orchestrationHopUrl, config.capabilityTokenSecret)
       : new InMemorySubmissionService(
           publisher,
-          config.analyzeHopUrl,
+          orchestrationHopUrl,
           inMemorySubmissionsStore ?? new InMemorySubmissionRepository(),
           config.capabilityTokenSecret,
         ));
@@ -194,7 +205,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       db,
       publisher,
       pubsub,
-      analyzeHopUrl: config.analyzeHopUrl,
+      analyzeHopUrl: orchestrationHopUrl,
+      pipelineBaseUrl,
       verifier: signatureVerifier,
       isProduction: config.isProduction,
     }),
