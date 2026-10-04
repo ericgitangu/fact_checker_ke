@@ -9,9 +9,11 @@ import {
   SunIcon,
   useTheme,
 } from "@fact-checker-ke/brand";
+import { ADVOCATE_SIGNOFF_COMPLETE, STANDING_CAVEAT_SHORT } from "@fact-checker-ke/core";
 
 const GITHUB_URL = "https://github.com/ericgitangu";
 const SAMPLE_CLAIM = "“Unemployment in Kenya fell to 2% last year.”";
+const SAMPLE_CONFIDENCE = 0.78;
 
 /**
  * Marketing site. Design concept "On the record" (see index.css header):
@@ -65,10 +67,10 @@ function App(): React.JSX.Element {
               checked against the evidence.
             </h1>
             <p className="hero-lede">
-              fact_checker_ke verifies what creators, politicians, and viral posts
-              claim &mdash; in English, Swahili, and Sheng. Every verdict cites its
-              sources, and a person reviews it before it&rsquo;s published. We rate
-              claims, not people.
+              fact_checker_ke checks claims we spot trending and claims you submit
+              &mdash; in English, Swahili, and Sheng. AI weighs each one against the
+              evidence and cites every source; a shrinking sample is audited by a
+              person after publishing. We rate claims, not people.
             </p>
             <div className="hero-actions">
               <a className="btn btn-primary" href="#waitlist">
@@ -88,6 +90,18 @@ function App(): React.JSX.Element {
             <p className="checkcard-source-claim">viral on TikTok &mdash; 1.2M views</p>
             <div className="verdict verdict-misleading">
               <span className={`verdict-stamp${claimTyped ? " stamp-ready" : ""}`}>Misleading</span>
+              <span className="confidence-weight">
+                <span className="confidence-weight-label">Confidence</span>
+                <span className="confidence-weight-bar" aria-hidden="true">
+                  <span
+                    className="confidence-weight-fill"
+                    style={{ width: `${Math.round(SAMPLE_CONFIDENCE * 100)}%` }}
+                  />
+                </span>
+                <span className="confidence-weight-value">
+                  {Math.round(SAMPLE_CONFIDENCE * 100)}%
+                </span>
+              </span>
             </div>
             <p className="checkcard-rationale">
               KNBS puts the 2024 unemployment rate near 5.6%. The 2% figure
@@ -107,9 +121,10 @@ function App(): React.JSX.Element {
                 </dd>
               </div>
             </dl>
-            <p className="checkcard-review">
+            <p className="checkcard-caveat">
               <ShieldCheckIcon size={15} />
-              Reviewed by an editor before publishing
+              {STANDING_CAVEAT_SHORT.heading} We rate claims, not people &mdash; this is an
+              AI assessment, for research purposes; you decide.
             </p>
           </figure>
         </section>
@@ -176,8 +191,11 @@ function App(): React.JSX.Element {
             </li>
             <li>
               <span className="step-no" aria-hidden="true">4</span>
-              <h3>Review</h3>
-              <p>A person confirms the evidence and the verdict before anything is published.</p>
+              <h3>Publish &amp; audit</h3>
+              <p>
+                The confidence-weighted assessment goes live with its sources; a person
+                audits a sample afterwards and can correct it.
+              </p>
             </li>
           </ol>
         </section>
@@ -209,12 +227,14 @@ function App(): React.JSX.Element {
               rests on.
             </li>
             <li>
-              <strong>A person signs off.</strong> AI drafts the analysis; an editor
-              approves it.
+              <strong>People audit the AI.</strong> A shrinking sample of published
+              assessments is reviewed and corrected after the fact &mdash; not gated
+              before every claim goes out.
             </li>
             <li>
-              <strong>Right of reply.</strong> Named people get a chance to respond before a
-              hard verdict.
+              <strong>Right of reply.</strong> Named people get a correction path and a
+              chance to respond; a claim-level flag is never read as an indictment of a
+              person.
             </li>
           </ul>
           <a className="principles-link" href={methodologyUrl}>
@@ -243,6 +263,16 @@ function App(): React.JSX.Element {
           </a>
           <span>English, Swahili &amp; Sheng</span>
           <span>Built in Nairobi</span>
+          {/* ADR-0033 AT-0033-2 deploy gate: /terms and /privacy exist as
+              direct-link routes (see main.tsx) but stay OUT of the footer
+              until ADVOCATE_SIGNOFF_COMPLETE flips true — draft legal text
+              is not something we publicly surface pre-advocate-signoff. */}
+          {ADVOCATE_SIGNOFF_COMPLETE && (
+            <>
+              <a href="/terms">Terms</a>
+              <a href="/privacy">Privacy</a>
+            </>
+          )}
         </div>
       </footer>
     </>
