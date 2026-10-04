@@ -78,6 +78,13 @@
       "when": 1791064953201,
       "tag": "0010_adr_0031_confidence_weighted_guidance",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791093546884,
+      "tag": "0011_adr_0021_0030_0031_data_lifecycle_hardening",
+      "breakpoints": true
     }
   ]
 }

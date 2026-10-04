@@ -10,6 +10,7 @@ import { internalRoutes } from "./routes/internal.js";
 import { sseRoutes } from "./routes/sse.js";
 import { authRoutes } from "./routes/auth.js";
 import { editorRoutes } from "./routes/editor.js";
+import { funnelRoutes } from "./routes/funnel.js";
 import { commentRoutes } from "./routes/comments.js";
 import { AuthService } from "./lib/auth/service.js";
 import {
@@ -218,6 +219,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     const authService = new AuthService(db);
     await app.register((instance) => authRoutes(instance, { auth: authService }));
     await app.register((instance) => editorRoutes(instance, { db, auth: authService }));
+    await app.register((instance) => funnelRoutes(instance, { db, auth: authService }));
     await app.register((instance) => commentRoutes(instance, { db, auth: authService }));
   } else {
     warn("DATABASE_URL unset — auth/editor/comment routes not registered (require Postgres).");

@@ -38,6 +38,23 @@ export async function captureEditorCorrection(
  * captured as a labeled flywheel row. `actorRef` is the hashed device
  * identity (ADR-0020 pattern, same as `comments.authorDeviceHash`) —
  * never the raw device token.
+ *
+ * ADR-0031 review finding (data-lifecycle hardening pass): a single
+ * device/editor could otherwise flood `training_eval_labels` with
+ * duplicate rows by resubmitting a signal on the same check (double-tap,
+ * client retry, or deliberate weighting of the flywheel's eval set).
+ * `migrations/0011` adds a UNIQUE index on `(check_id, actor_ref)`; this
+ * now upserts on that constraint — **last-signal-wins**: a later
+ * agree/dispute from the same actor on the same check overwrites the
+ * earlier one's `source`/`label`/`createdAt` rather than appending a new
+ * row. This intentionally does NOT distinguish "same actor changed their
+ * mind" from "same actor replayed the request" — both collapse to one
+ * row, which is the correct outcome for a labeled-dataset-integrity
+ * control (one vote per actor per check), even though it means a
+ * genuine mind-change loses the history of the original signal. If a
+ * future need arises to analyze signal *changes* over time, that is an
+ * append-only history table, not a mutation of this uniqueness
+ * constraint.
  */
 export async function captureUserSignal(
   db: Database,
@@ -57,12 +74,22 @@ export async function captureUserSignal(
     return { ok: false, error: { kind: "not_found", message: `Check ${args.checkId} not found.` } };
   }
 
-  await db.insert(schema.trainingEvalLabels).values({
-    checkId: args.checkId,
-    source: args.signal === "agree" ? "user_agree" : "user_dispute",
-    actorRef: args.deviceTokenHash,
-    label: { signal: args.signal, reason: args.reason },
-  });
+  await db
+    .insert(schema.trainingEvalLabels)
+    .values({
+      checkId: args.checkId,
+      source: args.signal === "agree" ? "user_agree" : "user_dispute",
+      actorRef: args.deviceTokenHash,
+      label: { signal: args.signal, reason: args.reason },
+    })
+    .onConflictDoUpdate({
+      target: [schema.trainingEvalLabels.checkId, schema.trainingEvalLabels.actorRef],
+      set: {
+        source: args.signal === "agree" ? "user_agree" : "user_dispute",
+        label: { signal: args.signal, reason: args.reason },
+        createdAt: new Date(),
+      },
+    });
 
   return { ok: true, value: { captured: true } };
 }
