@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { TERMS_SECTIONS } from "@fact-checker-ke/core";
+import { ADVOCATE_SIGNOFF_COMPLETE, TERMS_SECTIONS } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
 
+// ADR-0033 AT-0033-2 deploy gate: this draft legal text must not be
+// publicly indexed until a Kenyan advocate has signed off
+// (`ADVOCATE_SIGNOFF_COMPLETE`, @fact-checker-ke/core). The page itself
+// stays reachable by direct link (the LegalCaveat component on every
+// published check links here for right-of-reply purposes) — only search
+// indexing and the primary nav/footer discovery path are gated; see
+// components/site-chrome.tsx's `AppFooter`.
 export const metadata: Metadata = {
   title: "Terms & Conditions (draft) — fact_checker_ke",
   description:
     "DRAFT Terms & Conditions, pending a Kenyan advocate's review. Not yet legally binding.",
+  robots: ADVOCATE_SIGNOFF_COMPLETE ? undefined : { index: false, follow: false },
 };
 
 /**

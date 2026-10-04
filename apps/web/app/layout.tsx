@@ -52,7 +52,7 @@ const newsreader = Newsreader({
 export const metadata: Metadata = {
   title: "fact_checker_ke",
   description:
-    "Kenyan fact-checking: submit a link or text, get an AI-assisted draft analysis, human-approved before publish.",
+    "Kenyan fact-checking: we catch trending claims or you submit one. AI weighs the evidence and publishes a confidence-weighted assessment, sources cited — people audit it afterward.",
   manifest: "/manifest.webmanifest",
 };
 

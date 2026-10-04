@@ -89,6 +89,16 @@ export async function CheckCard({ check }: { check: Check }): Promise<React.JSX.
         </p>
       )}
 
+      {/* ADR-0031/0033: claim-attributed framing, spelled out as a label
+          next to the confidence weight (not just implied by the absence
+          of a person's name) — "we assess the claim, not the person...
+          you decide" is the reader-facing restatement of the ADR-0023
+          framing rule, rendered on every published check regardless of
+          tier. */}
+      {!check.isDraft && (
+        <p className="checkcard-rationale">{t("guidance.claimAttributedNote")}</p>
+      )}
+
       {!check.isDraft && check.evidence.length > 0 && (
         <section aria-labelledby="evidence-h">
           <h2 id="evidence-h" className="sr-only">

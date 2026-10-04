@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
-import { PRIVACY_SECTIONS } from "@fact-checker-ke/core";
+import { ADVOCATE_SIGNOFF_COMPLETE, PRIVACY_SECTIONS } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
 import { TrainingConsentToggle } from "./training-consent-toggle";
 
+// ADR-0033 AT-0033-2 deploy gate — see the matching comment in
+// ../terms/page.tsx: not publicly indexed until advocate sign-off.
 export const metadata: Metadata = {
   title: "Privacy Policy (draft) — fact_checker_ke",
   description:
     "DRAFT Privacy Policy, pending a Kenyan advocate's review. Not yet legally binding.",
+  robots: ADVOCATE_SIGNOFF_COMPLETE ? undefined : { index: false, follow: false },
 };
 
 /**
