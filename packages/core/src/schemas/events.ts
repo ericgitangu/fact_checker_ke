@@ -87,9 +87,61 @@ export const CheckPublishedEventSchema = EventEnvelopeSchema.extend({
   payload: z.object({
     check_id: z.string().uuid(),
     rating: RatingSchema,
+    // ADR-0032 (two-engine pivot) / AT-0032-6: "every published fetched
+    // assessment carries ingest_source: 'fetch' provenance". `.default
+    // ("submission")` keeps every existing producer (the submission
+    // engine's enactment path, which never sets this field) parsing
+    // unchanged — additive, not a breaking schema change.
+    ingest_source: z.enum(["submission", "fetch"]).default("submission"),
   }),
 });
 export type CheckPublishedEvent = z.infer<typeof CheckPublishedEventSchema>;
+
+/**
+ * ADR-0032 §2 / ADR-0017 amendment AT-0017-C: the three `fetch.*` events
+ * the autonomous fetch engine emits alongside (never instead of) the
+ * existing `submission.received` conversion. Each carries the same
+ * envelope as every other outbox event; `submission_id` is the
+ * CANDIDATE's eventual/would-be submission id (ADR-0032 §2: "a surviving
+ * novel candidate converts to the existing submission.received.v1"), so a
+ * `fetch.candidate` row and the `submission.received` row it produces
+ * share one id and can be joined without a second lookup.
+ */
+export const FetchPollScheduledEventSchema = EventEnvelopeSchema.extend({
+  event_type: z.literal("fetch.poll.scheduled"),
+  schema_version: z.literal("v1"),
+  payload: z.object({
+    platform: z.string().min(1),
+  }),
+});
+export type FetchPollScheduledEvent = z.infer<typeof FetchPollScheduledEventSchema>;
+
+export const FetchCandidateEventSchema = EventEnvelopeSchema.extend({
+  event_type: z.literal("fetch.candidate"),
+  schema_version: z.literal("v1"),
+  payload: z.object({
+    platform: z.string().min(1),
+    source_id: z.string().min(1),
+    content_hash: z.string().min(1),
+    observed_at: z.string().datetime(),
+    engagement_snapshot: z.record(z.string(), z.number()),
+    score: z.number(),
+  }),
+});
+export type FetchCandidateEvent = z.infer<typeof FetchCandidateEventSchema>;
+
+export const FetchObservationEventSchema = EventEnvelopeSchema.extend({
+  event_type: z.literal("fetch.observation"),
+  schema_version: z.literal("v1"),
+  payload: z.object({
+    platform: z.string().min(1),
+    source_id: z.string().min(1),
+    content_hash: z.string().min(1),
+    observed_at: z.string().datetime(),
+    engagement_snapshot: z.record(z.string(), z.number()),
+  }),
+});
+export type FetchObservationEvent = z.infer<typeof FetchObservationEventSchema>;
 
 /**
  * Discriminated union over every known outbox event, keyed on
@@ -120,6 +172,9 @@ export const OutboxEventSchema = z.discriminatedUnion("event_type", [
   CheckFailedEventSchema,
   CheckPublishedEventSchema,
   CheckCorrectedEventSchema,
+  FetchPollScheduledEventSchema,
+  FetchCandidateEventSchema,
+  FetchObservationEventSchema,
 ]);
 export type OutboxEvent = z.infer<typeof OutboxEventSchema>;
 
@@ -130,5 +185,8 @@ export const EVENT_TYPES = [
   "check.failed",
   "check.published",
   "check.corrected",
+  "fetch.poll.scheduled",
+  "fetch.candidate",
+  "fetch.observation",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
