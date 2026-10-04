@@ -33,6 +33,11 @@ module "api_service" {
     REVALIDATE_SECRET = {
       secret = module.secret_revalidate_secret.secret_id
     }
+    # REQUIRED in production (services/api/src/config.ts fails fast at boot
+    # without it) -- HMAC for the SSE capability JWT (ADR-0018/0020).
+    CAPABILITY_TOKEN_SECRET = {
+      secret = module.secret_capability_token_secret.secret_id
+    }
   }
   # Go-live plumbing (docs/runbooks/activate-on-keys-audit.md gap +
   # ADR-0015 AT-0015-2): the production CORS allow-list. Previously
@@ -43,6 +48,15 @@ module "api_service" {
   # is no second origin to add here -- just the one live web origin.
   plain_env = {
     CORS_ORIGINS = "https://fact-checker-ke-web.vercel.app"
+    # api -> pipeline hop target (submission-orchestrator.ts posts
+    # ${PIPELINE_BASE_URL}/hops/analyze + /hops/verify). Without this it
+    # defaults to localhost:8000 (config.ts) and every cross-service hop
+    # fails. API_SELF_BASE_URL is deliberately left at its localhost:8080
+    # default: the outbox relay's POST to /internal/hops/orchestrate is a
+    # same-container self-call, so localhost is correct (and avoids a
+    # self-referential Cloud Run URL cycle — the URL carries a random hash
+    # not known until after creation).
+    PIPELINE_BASE_URL = module.pipeline_service[0].url
   }
 }
 

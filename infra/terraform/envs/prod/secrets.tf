@@ -113,6 +113,20 @@ module "secret_revalidate_secret" {
   ]
 }
 
+module "secret_capability_token_secret" {
+  source     = "../../modules/secret"
+  project_id = var.project_id
+  secret_id  = "fact-checker-ke-capability-token-secret"
+  accessors = [
+    # services/api/src/config.ts REQUIRES CAPABILITY_TOKEN_SECRET when
+    # NODE_ENV=production (HMAC that signs the SSE capability JWT, ADR-0018/
+    # 0020) -- the api container exits(1) at boot without it. A self-
+    # generated random value (openssl rand -hex 32), api-only; the pipeline
+    # never mints or verifies these tokens.
+    google_service_account.api_runtime.email,
+  ]
+}
+
 module "secret_x_api_bearer_token" {
   source     = "../../modules/secret"
   project_id = var.project_id
