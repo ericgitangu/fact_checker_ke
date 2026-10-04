@@ -62,3 +62,45 @@ export function assertClaimAndEvidenceFraming(summary: string): void {
     throw new FramingViolationError(summary);
   }
 }
+
+/**
+ * ADR-0031 amendment (two-engine pivot) / AT-0031-7/8: Tier C's
+ * configurable spectrum of handling modes.
+ *  - "a" (open-question + async audit): the DEFAULT. Auto-publishes as a
+ *    claim-attributed open question, never a declarative person-directed
+ *    statement; always carries confidence + sources + the standing
+ *    caveat; queued for async audit.
+ *  - "b" (fast-track human tap): a pre-publish human confirm, STRICTER
+ *    than (a) -- selecting it is never a "relaxation".
+ *  - "c" (plain caveat): the Tier-A/B floor applied to Tier C. This IS a
+ *    relaxation below mode (a)'s protection.
+ *
+ * Mirrored in app/stages/publish_policy.py's `TierCMode` (same three
+ * values, same ordering semantics) -- the pipeline service does not
+ * share a runtime with this package, so it is a deliberate, documented
+ * mirror rather than a shared import.
+ */
+export const TierCModeSchema = z.enum(["a", "b", "c"]);
+export type TierCMode = z.infer<typeof TierCModeSchema>;
+
+/**
+ * Higher = more protective of the named person. Mirrors
+ * app/stages/publish_policy.py's `TIER_C_MODE_PROTECTION_RANK` exactly.
+ */
+export const TIER_C_MODE_PROTECTION_RANK: Record<TierCMode, number> = {
+  b: 2,
+  a: 1,
+  c: 0,
+};
+
+/**
+ * AT-0031-8: true exactly for a mode LESS protective than the mode-(a)
+ * default (i.e. only "c" today). A config write that would set
+ * `tier_c_mode` to such a value MUST go through services/api/src/lib/
+ * policy-audit.ts's `updatePolicyFlag` with `relaxesTierC: true`, which
+ * refuses the write without an `advocateSignoffRef` (ADR-0031 hard
+ * constraint 2).
+ */
+export function tierCModeRelaxesBelowDefault(mode: TierCMode): boolean {
+  return TIER_C_MODE_PROTECTION_RANK[mode] < TIER_C_MODE_PROTECTION_RANK.a;
+}
