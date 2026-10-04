@@ -77,6 +77,13 @@ class SubmissionReceivedPayload(BaseModel):
     submitted_by: str | None = None
     quote: str | None = None
     timestamp_sec: int | None = None
+    # ADR-0032 provenance (packages/core SubmissionReceivedEventSchema's
+    # new `ingest_source` field, additive/defaulted there too): carried
+    # through for completeness, not yet consumed by run_analyze_hop
+    # itself (API-side persistence/attribution of fetch-sourced
+    # submissions is a later-wave concern — see app/stages/fetch_hop.py's
+    # module docstring).
+    ingest_source: str = "submission"
 
 
 class AnalyzeHopEnvelope(BaseModel):

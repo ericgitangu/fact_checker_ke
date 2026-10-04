@@ -41,6 +41,13 @@ export const SubmissionReceivedEventSchema = EventEnvelopeSchema.extend({
     // verifies an empty quote (code-review blocker #2).
     quote: z.string().nullable(),
     timestamp_sec: z.number().int().nonnegative().nullable(),
+    // ADR-0032 (two-engine pivot): provenance of this submission.received
+    // emission. `.default("submission")` keeps every existing producer
+    // (services/api's submission-service.ts, which never sets this field)
+    // parsing unchanged — the new value is additive, not a breaking
+    // schema change. The fetch engine (services/pipeline's fetch hop) is
+    // the only producer that sets "fetch" explicitly.
+    ingest_source: z.enum(["submission", "fetch"]).default("submission"),
   }),
 });
 export type SubmissionReceivedEvent = z.infer<typeof SubmissionReceivedEventSchema>;
