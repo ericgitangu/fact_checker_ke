@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { TwoEngineFlow } from "@fact-checker-ke/brand";
-import type { Rating } from "@fact-checker-ke/core";
+import { TwoEngineFlow, VerdictScale } from "@fact-checker-ke/brand";
 
 export const metadata: Metadata = {
   title: "Methodology — fact_checker_ke",
@@ -8,26 +7,13 @@ export const metadata: Metadata = {
     "How fact_checker_ke finds claims, weighs evidence, and publishes confidence-weighted assessments — the rating scale, editorial principles, corrections policy, and how we handle third-party video.",
 };
 
-const RATING_DEFINITIONS: Record<Rating, string> = {
-  True: "The claim is accurate and not missing material context.",
-  MostlyTrue: "The claim is largely accurate, but needs clarification or is missing minor context.",
-  Misleading: "The claim contains accurate elements but is framed or presented in a way that is likely to create a false impression.",
-  False: "The claim is contradicted by the evidence we reviewed.",
-  Unproven: "There isn't enough publicly available, credible evidence to confirm or deny the claim.",
-  NotCheckable: "The statement is an opinion, prediction, or rhetoric rather than a checkable factual claim.",
-};
-
-// Fixed display order for the rating scale — RatingSchema.options preserves
-// declaration order already, but spelling it out keeps this page's order
-// stable even if the schema's enum order ever changes.
-const RATING_ORDER: Rating[] = [
-  "True",
-  "MostlyTrue",
-  "Misleading",
-  "False",
-  "Unproven",
-  "NotCheckable",
-];
+// The six-verdict scale itself is now the shared <VerdictScale> set piece
+// (packages/brand) — the bespoke stamped-seal centrepiece that replaced the
+// old flat bordered `<dl>` rows here and the coloured-dot list on apps/site,
+// so both surfaces render the identical scale, icons, colours and motion.
+// Its verdict copy is canonical brand English carried in the component
+// (same contract as <TwoEngineFlow>), which is why this page no longer
+// keeps its own RATING_DEFINITIONS/RATING_ORDER.
 
 // NOTE (i18n gap, honestly flagged per ADR-0028 scope note): this page's
 // prose stays English-only in this wave — it is long-form editorial
@@ -75,16 +61,7 @@ export default function MethodologyPage(): React.JSX.Element {
           calibrated confidence weight (below). Each rating applies to the{" "}
           <strong>claim</strong>, not to the person who made it.
         </p>
-        <dl className="flex flex-col gap-3">
-          {RATING_ORDER.map((rating) => (
-            <div key={rating} style={{ border: "1px solid var(--rule)", borderRadius: 10, padding: 14 }}>
-              <dt style={{ fontWeight: 600, color: "var(--ink)" }}>{rating}</dt>
-              <dd style={{ fontSize: "0.92rem", color: "var(--ink-2)" }}>
-                {RATING_DEFINITIONS[rating]}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <VerdictScale ariaLabel="The six-verdict rating scale and what each verdict means" />
       </section>
 
       <section className="flex flex-col gap-3">
