@@ -1,4 +1,5 @@
 import { schema, type Database } from "@fact-checker-ke/db";
+import type { AuditAction } from "@fact-checker-ke/core";
 import { writeAuditLog } from "./audit.js";
 
 export type PolicyAuditResult<T> = { ok: true; value: T } | { ok: false; error: { kind: string; message: string } };
@@ -33,6 +34,14 @@ export async function updatePolicyFlag(
      * MENTIONS "tier_c" without actually relaxing it isn't over-gated.
      */
     relaxesTierC?: boolean;
+    /**
+     * Overrides the derived `policy.threshold_changed` /
+     * `policy.tier_c_relaxed` audit action with a more specific one for
+     * callers whose flag isn't an ordinary tier threshold (e.g. the
+     * ADR-0007 kill switch uses `policy.kill_switch_flipped`). Additive:
+     * omitting it preserves the original two-action behaviour exactly.
+     */
+    auditAction?: AuditAction;
   },
 ): Promise<PolicyAuditResult<{ key: string }>> {
   const isTierCRelaxation = args.relaxesTierC === true;
@@ -68,7 +77,7 @@ export async function updatePolicyFlag(
 
     await writeAuditLog(tx, {
       actorId: args.actorId,
-      action: isTierCRelaxation ? "policy.tier_c_relaxed" : "policy.threshold_changed",
+      action: args.auditAction ?? (isTierCRelaxation ? "policy.tier_c_relaxed" : "policy.threshold_changed"),
       targetType: "policy_flag",
       targetId: args.key,
       metadata: {

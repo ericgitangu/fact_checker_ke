@@ -54,6 +54,13 @@ export const AuditActionSchema = z.enum([
   // ADR-0030 AT-0030-1: the creator-funnel conflict-of-interest firewall
   // audit trail — a founder-channel post referencing a published check.
   "funnel.post_recorded",
+  // ADR-0007 kill-switch mechanism (AT-0007-A): a flip of the
+  // `maandamano_kill_switch` policy flag, admin-only (see
+  // services/api/src/lib/maandamano.ts, docs/runbooks/nc4-kill-switch.md).
+  // Distinct from "policy.threshold_changed" so an incident responder
+  // scanning audit_log for this action name doesn't have to also
+  // disambiguate it from an ordinary ADR-0031 threshold tweak.
+  "policy.kill_switch_flipped",
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;
 

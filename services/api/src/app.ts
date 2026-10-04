@@ -12,6 +12,7 @@ import { authRoutes } from "./routes/auth.js";
 import { editorRoutes } from "./routes/editor.js";
 import { funnelRoutes } from "./routes/funnel.js";
 import { commentRoutes } from "./routes/comments.js";
+import { maandamanoRoutes } from "./routes/maandamano.js";
 import { AuthService } from "./lib/auth/service.js";
 import {
   InMemoryCheckRepository,
@@ -221,8 +222,15 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     await app.register((instance) => editorRoutes(instance, { db, auth: authService }));
     await app.register((instance) => funnelRoutes(instance, { db, auth: authService }));
     await app.register((instance) => commentRoutes(instance, { db, auth: authService }));
+    await app.register((instance) =>
+      maandamanoRoutes(instance, {
+        db,
+        auth: authService,
+        revalidate: { webBaseUrl: config.webBaseUrl ?? null, revalidateSecret: config.revalidateSecret ?? null },
+      }),
+    );
   } else {
-    warn("DATABASE_URL unset — auth/editor/comment routes not registered (require Postgres).");
+    warn("DATABASE_URL unset — auth/editor/comment/maandamano routes not registered (require Postgres).");
   }
 
   return app;
