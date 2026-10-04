@@ -91,6 +91,24 @@ class DraftVerdictOutput(BaseModel):
     translation_en: str = Field(min_length=0, max_length=20000)
 
 
+class PublishDecisionPayload(BaseModel):
+    """JSON-safe mirror of app.stages.publish_policy.PublishDecision +
+    app.stages.publish.PublishOutcome.risk_tier, carried on the wire so
+    services/api (TS) can act on the policy decision without importing
+    Python. Produced by app.stages.publish.finalize_publish, which is
+    the ONE real (non-test) caller of decide_publish_policy (ADR-0031
+    amendment, closing the "C1 gap")."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    risk_tier: str
+    auto_publish: bool
+    reason: str
+    publish_mode: str | None = None
+    queued_for_async_audit: bool = False
+    requires_human_tap: bool = False
+
+
 class VerifyResult(BaseModel):
     """Final /hops/verify response: the citation-checked, gated verdict."""
 
@@ -102,6 +120,14 @@ class VerifyResult(BaseModel):
     reused_existing_check: bool = False
     valid_as_of: str | None = None
     usage: UsageRecord | None = None
+    # None only for the `reused_existing_check=True` short-circuit in
+    # run_verify_hop (that path returns a prior check's rating directly
+    # and never runs a fresh publish decision) or when an exception
+    # pre-empts the hop (see run_verify_hop's try/except is scoped so
+    # this is populated on every non-reused, non-exceptional return,
+    # including `rejected=True`, where it fail-closes to
+    # auto_publish=False — see app/stages/publish.py).
+    publish: PublishDecisionPayload | None = None
 
 
 class MediaProcessResult(BaseModel):
