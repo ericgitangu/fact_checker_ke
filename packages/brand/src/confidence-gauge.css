@@ -21,7 +21,17 @@
   line-height: 1;
 }
 
-.fck-gauge-dark {
+/*
+ * Dark tokens also apply automatically under the host's manual light/dark
+ * toggle (`:root[data-theme="dark"]`), not only via an explicit
+ * variant="dark" prop -- every apps/web usage (feed cards, the check
+ * page, the landing hero sample) renders <ConfidenceGauge> at the default
+ * variant="light", so without this selector the dial stayed a washed-out
+ * light gauge on dark cards. Same fix/mechanism as two-engine-flow.css /
+ * verdict-scale.css.
+ */
+.fck-gauge-dark,
+:root[data-theme="dark"] .fck-gauge {
   --fck-gauge-track: #263029;
   --fck-gauge-ink: #f1f3ef;
   --fck-gauge-ink-2: #b7c0ba;
@@ -69,7 +79,8 @@
     cy 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s;
 }
 
-.fck-gauge-dark .fck-gauge-tick {
+.fck-gauge-dark .fck-gauge-tick,
+:root[data-theme="dark"] .fck-gauge .fck-gauge-tick {
   stroke: #0c100e;
 }
 

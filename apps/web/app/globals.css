@@ -185,6 +185,23 @@
   color: #06130c;
 }
 
+/* `.btn-primary:hover` darkens the brand green for a light-mode press
+   effect (#0b7343); in dark mode the base is already a bright green with
+   dark ink text (above), so darkening the hover state the same way would
+   drag text-vs-background contrast down instead of signalling "hovered" —
+   brighten instead, same ink stays legible. */
+:root[data-theme="dark"] .btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand) 85%, #fff 15%);
+}
+
+/* `.pipeline-step[data-state="active"] .pipeline-step-icon` is white text
+   on `var(--brand)`, same bug class as `.btn-primary` above: --brand
+   brightens in dark mode and white-on-bright-green fails AA, so flip to
+   the same dark-ink-on-bright-green pairing. */
+:root[data-theme="dark"] .pipeline-step[data-state="active"] .pipeline-step-icon {
+  color: #06130c;
+}
+
 @theme inline {
   --color-paper: var(--paper);
   --color-ink: var(--ink);
@@ -405,7 +422,12 @@ a:hover {
 
 .app-main {
   min-height: calc(100vh - 140px);
-  padding: clamp(32px, 6vw, 64px) 0 clamp(56px, 8vw, 96px);
+  /* Bottom padding was clamp(56px, 8vw, 96px) -- stacked on top of
+     .app-footer's own 32px top padding that's a lot of textureless space
+     before the footer line, and it reads as a stray empty gap on the
+     landing page in particular (owner-flagged, worst in dark mode where
+     there's no colour change to break it up). Trimmed to match the top. */
+  padding: clamp(32px, 6vw, 64px) 0;
 }
 
 /* ---------- buttons ---------- */
@@ -503,13 +525,18 @@ a:hover {
   border-radius: 8px;
 }
 
+/* Text colour is the shared, AA-verified --true/--false pair (see the
+   verdict-system token comment up top: each clears 4.5:1 against its own
+   -tint in BOTH themes) rather than a one-off hardcoded hex, so this note
+   flips correctly with the theme instead of staying a light-only dark
+   green/red on a tint that itself goes translucent-dark at night. */
 .form-note-success {
-  color: #0b5d34;
+  color: var(--true);
   background: var(--true-tint);
 }
 
 .form-note-error {
-  color: #8a0f24;
+  color: var(--false);
   background: var(--false-tint);
 }
 
@@ -1389,7 +1416,10 @@ a:hover {
   padding: 10px 14px;
   border-radius: 8px;
   background: var(--misleading-tint);
-  color: #6b4400;
+  /* Same AA-verified token pair as .form-note-* above (was a hardcoded
+     #6b4400 that stayed a light-only amber on a tint that goes
+     translucent-dark at night). */
+  color: var(--misleading);
   border: 1px solid color-mix(in srgb, var(--misleading) 35%, transparent);
 }
 
