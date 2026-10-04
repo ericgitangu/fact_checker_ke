@@ -30,11 +30,14 @@ import "./verdict-scale.css";
  * refracted line) and Not checkable (a speech mark) break the ring because
  * they sit off the true↔false axis.
  *
- * Copy is canonical brand English, carried in the component — same contract
- * as <TwoEngineFlow>, so the two apps can never drift into two different
- * descriptions of the same scale. (Localisation of this editorial copy is a
- * known, shared gap with TwoEngineFlow, tracked separately — not this
- * component's drift.)
+ * Copy is canonical brand English BY DEFAULT, carried in the component so a
+ * host that passes nothing (apps/site, the marketing surface) renders the
+ * same English the two apps have always shared and can never drift apart.
+ * A localised host (apps/web, which knows the request locale) passes its
+ * own `verdicts` copy map — same contract as <TwoEngineFlow> — so the scale
+ * renders in Swahili when the web locale is SW, without apps/site taking on
+ * an i18n dependency. The icon system, order, colour and motion stay owned
+ * by this component; only the words are overridable.
  *
  * Reduced-motion-safe twice over: `useReveal` starts revealed (final state,
  * no stamp) under prefers-reduced-motion or without IntersectionObserver,
@@ -43,15 +46,36 @@ import "./verdict-scale.css";
 
 export type VerdictScaleVariant = "light" | "dark";
 
+/** The six verdict keys, in canonical display order. */
+export type VerdictKey =
+  | "true"
+  | "mostly"
+  | "misleading"
+  | "false"
+  | "unproven"
+  | "notcheckable";
+
+/** User-facing copy for one verdict row. */
+export type VerdictCopy = { name: string; description: string };
+
+/**
+ * Overridable copy, keyed by verdict. Partial: any key the host omits falls
+ * back to the canonical English default, so a host can localise all six or
+ * none.
+ */
+export type VerdictScaleCopy = Partial<Record<VerdictKey, VerdictCopy>>;
+
 type VerdictScaleProps = {
   variant?: VerdictScaleVariant;
   /** Accessible label for the list. */
   ariaLabel?: string;
+  /** Localised verdict names/descriptions; English defaults where omitted. */
+  verdicts?: VerdictScaleCopy;
   className?: string;
 };
 
 type VerdictDef = {
-  key: string;
+  key: VerdictKey;
   name: string;
   description: string;
   Icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -100,6 +124,7 @@ const VERDICTS: VerdictDef[] = [
 export function VerdictScale({
   variant = "light",
   ariaLabel = "The six-verdict rating scale",
+  verdicts,
   className,
 }: VerdictScaleProps): React.JSX.Element {
   const { ref, revealed } = useReveal<HTMLUListElement>({ threshold: 0.15 });
@@ -115,21 +140,24 @@ export function VerdictScale({
 
   return (
     <ul className={classes} aria-label={ariaLabel} ref={ref}>
-      {VERDICTS.map(({ key, name, description, Icon }, i) => (
-        <li
-          key={key}
-          className={`fck-scale-item fck-scale-${key}`}
-          style={{ "--fck-scale-i": i } as React.CSSProperties}
-        >
-          <span className="fck-scale-seal" aria-hidden="true">
-            <Icon size={24} className="fck-scale-glyph" />
-          </span>
-          <span className="fck-scale-body">
-            <span className="fck-scale-name">{name}</span>
-            <span className="fck-scale-desc">{description}</span>
-          </span>
-        </li>
-      ))}
+      {VERDICTS.map(({ key, name, description, Icon }, i) => {
+        const override = verdicts?.[key];
+        return (
+          <li
+            key={key}
+            className={`fck-scale-item fck-scale-${key}`}
+            style={{ "--fck-scale-i": i } as React.CSSProperties}
+          >
+            <span className="fck-scale-seal" aria-hidden="true">
+              <Icon size={24} className="fck-scale-glyph" />
+            </span>
+            <span className="fck-scale-body">
+              <span className="fck-scale-name">{override?.name ?? name}</span>
+              <span className="fck-scale-desc">{override?.description ?? description}</span>
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }

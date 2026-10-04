@@ -9,7 +9,8 @@
       "feed": "Mtiririko",
       "language": "Lugha",
       "terms": "Masharti",
-      "privacy": "Faragha"
+      "privacy": "Faragha",
+      "menu": "Menyu"
     },
     "footer": {
       "tagline": "Mradi huru, wa chanzo-wazi wa kuhakiki habari nchini Kenya.",
@@ -221,5 +222,71 @@
       "publishing": "Inachapisha…"
     },
     "noRatingToSubmitter": "Uamuzi umefichwa kwa mtumaji hadi uchapishwe (AT-0004-B)."
+  },
+  "brand": {
+    "scale": {
+      "ariaLabel": "Kipimo cha uamuzi sita na maana ya kila mmoja",
+      "true": {
+        "name": "Kweli",
+        "description": "Inaungwa mkono na ushahidi wa kuaminika, bila dosari ya msingi."
+      },
+      "mostly": {
+        "name": "Kwa kiasi kikubwa kweli",
+        "description": "Sahihi kwa ujumla — lakini muktadha uliokosekana unabadilisha taswira."
+      },
+      "misleading": {
+        "name": "Inapotosha",
+        "description": "Ina vyanzo, lakini imeundwa kudokeza kile ambacho ushahidi haukithibitishi."
+      },
+      "false": {
+        "name": "Uongo",
+        "description": "Inapingwa na ushahidi wa kuaminika tunaoweza kupata."
+      },
+      "unproven": {
+        "name": "Haijathibitishwa",
+        "description": "Hakuna ushahidi wa kuaminika upande wowote — bado."
+      },
+      "notcheckable": {
+        "name": "Haiwezi kuhakikiwa",
+        "description": "Ni maoni, utabiri, au suala la imani — si ukweli."
+      }
+    },
+    "flow": {
+      "ariaLabel": "Jinsi dai linavyohakikiwa, kutoka kuingia hadi ukaguzi wa kuchapishwa",
+      "entriesLabel": "Jinsi dai linavyoingia — injini mbili",
+      "stepsLabel": "Kinachotokea mara dai linapoingia",
+      "fetch": {
+        "tag": "Injini kuu",
+        "title": "Tunatafuta",
+        "body": "Tunaendelea kugundua madai yanayovuma na kusambaa kutoka YouTube, X, na mikondo ya ukaguzi wa ukweli kama PesaCheck na Africa Check — ni majaribio; TikTok ni ya kupachika pekee, haifuatiliwi kwa kujiendesha."
+      },
+      "submit": {
+        "tag": "Injini ya pili",
+        "title": "Unawasilisha",
+        "body": "Mtu yeyote anaweza kuwasilisha kiungo au nukuu. Mfumo ule ule unaihakiki baadaye."
+      },
+      "steps": {
+        "extract": {
+          "title": "Kutoa",
+          "body": "Tunatoa madai yanayoweza kuhakikiwa na kuyatafsiri, tukihifadhi maneno asilia."
+        },
+        "ground": {
+          "title": "Kuthibitisha",
+          "body": "Kila dai linalinganishwa na vyanzo vya kuaminika — KNBS, Kenya Law, Hansard, vyumba vya habari."
+        },
+        "assess": {
+          "title": "Kutathmini",
+          "body": "AI inapima ushahidi na kutoa tathmini yenye uzito wa uhakika, iliyohusishwa na dai. Tunatathmini madai, si watu."
+        },
+        "publish": {
+          "title": "Kuchapisha",
+          "body": "Linachapishwa na vyanzo vyake, uzito wa uhakika, na tahadhari ya kudumu."
+        },
+        "audit": {
+          "title": "Kukagua",
+          "body": "Mtu hukagua sampuli inayopungua baadaye, na anaweza kuisahihisha."
+        }
+      }
+    }
   }
 }

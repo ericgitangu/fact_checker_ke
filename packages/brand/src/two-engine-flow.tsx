@@ -14,16 +14,39 @@ import "./two-engine-flow.css";
 
 export type TwoEngineFlowVariant = "light" | "dark";
 
+/** The five pipeline-step keys, in canonical sequence. */
+export type FlowStepKey = "extract" | "ground" | "assess" | "publish" | "audit";
+
+/**
+ * Overridable user-facing copy for the whole diagram. Every field is
+ * optional and falls back to the canonical English default below, so a host
+ * that knows its locale (apps/web) can localise the flow while a host that
+ * doesn't (apps/site, marketing) renders the shared English unchanged —
+ * same contract as <VerdictScale>. Structure, icons, order and motion stay
+ * owned by this component; only the words are overridable.
+ */
+export type TwoEngineFlowCopy = {
+  entriesLabel?: string;
+  stepsLabel?: string;
+  entries?: {
+    fetch?: { tag?: string; title?: string; body?: string };
+    submit?: { tag?: string; title?: string; body?: string };
+  };
+  steps?: Partial<Record<FlowStepKey, { title?: string; body?: string }>>;
+};
+
 type TwoEngineFlowProps = {
   /** Colour variant. Default "light" (apps/web has no dark theme yet). */
   variant?: TwoEngineFlowVariant;
   /** Accessible label for the whole process region. */
   ariaLabel?: string;
+  /** Localised copy; English defaults where omitted. */
+  copy?: TwoEngineFlowCopy;
   className?: string;
 };
 
 type StepNode = {
-  key: string;
+  key: FlowStepKey;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   title: string;
   body: string;
@@ -88,11 +111,34 @@ const STEPS: StepNode[] = [
  * Wordmark — drops into a Next.js Server Component tree via "use client"
  * and into the Vite SPA unchanged.
  */
+/** Canonical English defaults for the two entry engines. */
+const ENTRY_DEFAULTS = {
+  fetch: {
+    tag: "Primary engine",
+    title: "We fetch",
+    body:
+      "We continuously surface viral, trending claims from YouTube, X, and fact-check feeds like PesaCheck and Africa Check — a pilot; TikTok is embed-only, not autonomously monitored.",
+  },
+  submit: {
+    tag: "Secondary engine",
+    title: "You submit",
+    body: "Anyone can submit a link or a quote. The same pipeline checks it next.",
+  },
+} as const;
+
+const ENTRIES_LABEL_DEFAULT = "How a claim enters — two engines";
+const STEPS_LABEL_DEFAULT = "What happens once a claim is in";
+
 export function TwoEngineFlow({
   variant = "light",
   ariaLabel = "How a claim gets checked",
+  copy,
   className,
 }: TwoEngineFlowProps): React.JSX.Element {
+  const fetchCopy = { ...ENTRY_DEFAULTS.fetch, ...copy?.entries?.fetch };
+  const submitCopy = { ...ENTRY_DEFAULTS.submit, ...copy?.entries?.submit };
+  const entriesLabel = copy?.entriesLabel ?? ENTRIES_LABEL_DEFAULT;
+  const stepsLabel = copy?.stepsLabel ?? STEPS_LABEL_DEFAULT;
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -138,26 +184,22 @@ export function TwoEngineFlow({
 
   return (
     <div className={classes} ref={rootRef} role="group" aria-label={ariaLabel}>
-      <ul className="fck-flow-entries" aria-label="How a claim enters — two engines">
+      <ul className="fck-flow-entries" aria-label={entriesLabel}>
         <li className="fck-flow-node fck-flow-entry fck-flow-entry-primary">
           <span className="fck-flow-icon" aria-hidden="true">
             <RadarIcon size={20} />
           </span>
-          <span className="fck-flow-tag">Primary engine</span>
-          <h3>We fetch</h3>
-          <p>
-            We continuously surface viral, trending claims from YouTube, X, and
-            fact-check feeds like PesaCheck and Africa Check — a pilot; TikTok is
-            embed-only, not autonomously monitored.
-          </p>
+          <span className="fck-flow-tag">{fetchCopy.tag}</span>
+          <h3>{fetchCopy.title}</h3>
+          <p>{fetchCopy.body}</p>
         </li>
         <li className="fck-flow-node fck-flow-entry fck-flow-entry-secondary">
           <span className="fck-flow-icon" aria-hidden="true">
             <PenLineIcon size={20} />
           </span>
-          <span className="fck-flow-tag">Secondary engine</span>
-          <h3>You submit</h3>
-          <p>Anyone can submit a link or a quote. The same pipeline checks it next.</p>
+          <span className="fck-flow-tag">{submitCopy.tag}</span>
+          <h3>{submitCopy.title}</h3>
+          <p>{submitCopy.body}</p>
         </li>
       </ul>
 
@@ -172,18 +214,21 @@ export function TwoEngineFlow({
         <path className="fck-flow-merge-path" d="M180 2 C180 28, 100 28, 100 46" />
       </svg>
 
-      <ol className="fck-flow-steps" aria-label="What happens once a claim is in">
-        {STEPS.map(({ key, icon: Icon, title, body }) => (
-          <li className="fck-flow-node fck-flow-step" key={key}>
-            <span className="fck-flow-icon" aria-hidden="true">
-              <Icon size={20} />
-            </span>
-            <div className="fck-flow-step-text">
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </div>
-          </li>
-        ))}
+      <ol className="fck-flow-steps" aria-label={stepsLabel}>
+        {STEPS.map(({ key, icon: Icon, title, body }) => {
+          const override = copy?.steps?.[key];
+          return (
+            <li className="fck-flow-node fck-flow-step" key={key}>
+              <span className="fck-flow-icon" aria-hidden="true">
+                <Icon size={20} />
+              </span>
+              <div className="fck-flow-step-text">
+                <h3>{override?.title ?? title}</h3>
+                <p>{override?.body ?? body}</p>
+              </div>
+            </li>
+          );
+        })}
       </ol>
     </div>
   );

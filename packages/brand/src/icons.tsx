@@ -143,6 +143,84 @@ export function EyeIcon({ size = 18, className, ...rest }: IconProps): React.JSX
   );
 }
 
+/** Menu — the mobile nav disclosure (hamburger). */
+export function MenuIcon({ size = 22, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <path d="M4 12h16" />
+      <path d="M4 6h16" />
+      <path d="M4 18h16" />
+    </svg>
+  );
+}
+
+/** Close — dismisses the mobile nav disclosure. */
+export function XIcon({ size = 22, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
+/*
+ * Maandamano advisory-status glyphs (see apps/web components/status-chip).
+ * Same inlined lucide path data / no-dependency rationale as above. These
+ * are DELIBERATELY not verdict glyphs — a protest status is not a rating —
+ * so they draw from lucide's general set, iconed to read at a glance.
+ */
+
+/** Rumoured — unverified hearsay: a question in a circle. */
+export function CircleHelpIcon({ size = 16, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+/** Confirmed — verified: a check in a circle. */
+export function CircleCheckIcon({ size = 16, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+/** Ongoing — live right now: a pulse/activity line. */
+export function ActivityIcon({ size = 16, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" />
+    </svg>
+  );
+}
+
+/** Ended — wound down: a planted flag. */
+export function FlagIcon({ size = 16, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <path d="M4 22v-7" />
+    </svg>
+  );
+}
+
+/** Cancelled — called off: a circle with a slash. */
+export function BanIcon({ size = 16, className, ...rest }: IconProps): React.JSX.Element {
+  return (
+    <svg {...base} width={size} height={size} className={className} aria-hidden="true" {...rest}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m4.9 4.9 14.2 14.2" />
+    </svg>
+  );
+}
+
 /*
  * ---- Verdict glyphs (see verdict-scale.tsx) -------------------------------
  *

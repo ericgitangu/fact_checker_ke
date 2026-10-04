@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { ADVOCATE_SIGNOFF_COMPLETE } from "@fact-checker-ke/core";
 import { Wordmark } from "@fact-checker-ke/brand";
 import { LocaleSwitcher } from "./locale-switcher";
+import { PrimaryNav } from "./primary-nav";
 
 export async function AppHeader(): Promise<React.JSX.Element> {
   const t = await getTranslations("common");
@@ -26,13 +27,13 @@ export async function AppHeader(): Promise<React.JSX.Element> {
       <Link className="wordmark" href="/" aria-label={`${t("appName")} home`}>
         <Wordmark size="md" variant="light" />
       </Link>
-      <nav className="nav-links" aria-label="Primary">
+      <PrimaryNav menuLabel={t("nav.menu")}>
         <Link href="/feed">{t("nav.feed")}</Link>
         <Link href="/methodology">{t("nav.methodology")}</Link>
         <Link href="/maandamano">{t("nav.tracker")}</Link>
         <Link href="/editor">{t("nav.editor")}</Link>
         <LocaleSwitcher />
-      </nav>
+      </PrimaryNav>
     </header>
   );
 }
