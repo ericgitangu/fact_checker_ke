@@ -60,6 +60,45 @@ Revisit if Meta App Review is approved, or if TikTok opens a commercial or non-p
 - **Net effect on the matrix:** text platforms (X, Threads) are fully workable per URL. **Video platforms are embed plus user-supplied quote until a licensed transcript path exists.** This moves ADR-0005 (STT) toward live streams *we* are permitted to capture, our own uploads, and partner content.
 
 ---
+## Amendment (two-engine pivot, 2026-10-04) — the autonomous fetch engine becomes the PRIMARY ingestion source
+
+**Status of this amendment:** Accepted direction (owner-approved product pivot 2026-10-04). It is **additive**: the user-submission path (the original Decision above) is unchanged and becomes the *secondary* engine. Nothing above is deleted — the compliance boundaries (blockers #5/#8, the audio-download prohibition, `attribution: unverified`) carry forward **unchanged** and now bind the fetch engine too.
+
+### What changed
+The product is no longer primarily a user-submission fact-checker. It is a **self-sufficient, near-real-time** fact-checker with **two co-equal, event-driven ingestion engines feeding one verification+publish pipeline**:
+1. **FETCH ENGINE (primary, "bait the hook and catch").** Autonomously ingests viral/trending political claims from YouTube/X/TikTok via **official platform APIs first**, using the **owner's own developer accounts**, with a **fakes/fixtures fallback** so the engine runs offline until keys land ("activate on owner's keys"). It detects virality → extracts the claim → verifies → auto-publishes a confidence-weighted, AI-caveated assessment (ADR-0031), with **no user required**. The "how it decides what to check" + EDA topology + dedup + backpressure is **ADR-0032**.
+2. **SUBMISSION ENGINE (secondary).** The existing "Check this URL/text" path (the original Decision), now a *second front door* into the same pipeline.
+
+Both emit the same `submission.received.v1` event after ingest; downstream analyze/verify/assess (ADR-0004/0031) is identical. Events gain `ingest_source: "fetch" | "submission"` provenance (ADR-0017 amendment).
+
+### Revised Options (feasibility-driven, KE-landscape research 2026-10-04)
+The headless-scraping option (original #1) stays rejected. The recommended intake is now **two engines**, and the fetch engine's *per-platform* feasibility is **not uniform** — this changes what is buildable:
+- **YouTube Data API v3 — PRIMARY fetch source.** Cheapest and most ToS-compliant: 10,000 units/day, `search.list`=100 units (~100 searches/day free), `videos.list`=1 unit. Discovery + metadata are lawful; **audio download/isolation remains prohibited (blocker #8).**
+- **PesaCheck / Africa Check — first-class triage feed AND check-against source.** They debunk viral KE claims fastest and publish open data via **openAFRICA/CKAN**; poll via **RSS/CKAN [GAP: confirm no realtime API]**. A claim they've already rated is both a top virality signal and an authoritative reuse/attribution hit (ADR-0004 step 4).
+- **X/Twitter API v2 — secondary, metered, sampled.** Free tier discontinued (Feb 2026); pay-per-use (~$0.005/read, ~2M/mo cap). Sustained hashtag monitoring now **costs real money** — so X is **sampled and budgeted, never a firehose** (named trade-off; see ADR-0032 §4).
+- **TikTok — explicit compliance decision point, NOT an assumed capability.** The Research API is gated to academic/public-interest institutions in US/EEA/UK/CH; a **Kenya-based commercial pilot almost certainly cannot qualify** (blocker #2, reconfirmed). TikTok is **embed-plus-metadata only** (public oEmbed per a surfaced URL), entering via cross-platform spread detected elsewhere — autonomous TikTok *discovery* is unavailable unless a public-interest partnership lands. Unofficial access is **rejected** (ban risk, "irreversible" below).
+- **Authoritative check-against sources** for the KE-political focus: Parliament **Hansard** (searchable), **Judiciary causelist/e-filing** (case-status claims), **KNBS** (stats), plus the PesaCheck/Africa Check corpus. **Verify-before-building:** stable public **IEBC/KNBS APIs are [GAP]** — confirm the access path before depending on it.
+
+### Revised Decision (additive)
+- Keep the submission engine exactly as the original Decision specifies (secondary).
+- Add the fetch engine as primary, per ADR-0032, bound by: **no third-party audio download/isolation** (blockers #5/#8); **official APIs + open data + lawful metadata only**; **scale-to-zero, cron-triggered** (no resident poller); **per-engine cost breaker** (ADR-0011/0032 §4); **kill-switch** (`FETCH_ENGINE_ENABLED`).
+- The `SourceAdapter` interface (original Decision) is extended with a *discovery* capability for the fetch engine (`discover() -> ContentRef[]`) alongside the existing `resolve(url)`; gaining/losing a platform stays a config change.
+- **Reverse-image/frame search becomes a named capability** (ADR-0032 §1b): the dominant KE tactic is recycled/misattributed old protest footage, so matching footage to an earlier-dated appearance is a first-class check, not an afterthought.
+
+### Trade-offs accepted (additive to the originals)
+- **Coverage is now proactive, but bounded by the ToS boundary.** Third-party viral *video audio* is still off-limits; some viral clips are checkable only from metadata/cross-posted text or not at all until a licensed/partner path exists. We keep this limit rather than risk the account bans that would kill the channel (irreversible, below).
+- **X monitoring costs real money.** Accepting X as a sampled/budgeted secondary (not the near-real-time firehose the brief imagined) keeps cost-to-near-zero; YouTube (free quota) + PesaCheck/Africa Check (free open data) carry the primary load.
+- **TikTok autonomous discovery is effectively unavailable** without a partnership — accepted over ban risk.
+- **Autonomy raises stakes, not just throughput.** Auto-published named-person assessments are a defamation vector with no human in the submit loop — governed by ADR-0031 tiers + ADR-0033 caveat; virality is a *selection* signal, never a *publishing* authorization.
+
+### Acceptance tests (fetch-engine ingestion; detailed topology ATs live in ADR-0032)
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0002-1 | With no platform keys set, the fetch engine runs end-to-end on fakes/fixtures and makes zero outbound platform-API and zero billable LLM/STT calls ("activate on owner's keys"). | RED |
+| AT-0002-2 | A fetched item and a user-submitted item converge on the same `submission.received.v1` → analyze/verify/assess pipeline, distinguished only by `ingest_source` provenance. | RED |
+| AT-0002-3 | No fetch path downloads or isolates third-party YouTube/TikTok audio (blockers #5/#8 hold for the autonomous engine); YouTube Data API v3 is primary, X is budget-capped+sampled, TikTok has no autonomous-discovery path. | RED |
+
+---
 ## Decision update (2026-10-03): ACCEPTED, video transcript path
 
 Option **(a)** was accepted by the product owner. For third-party YouTube and TikTok videos, the user supplies the quoted text and timestamp. We fact-check that text and show the official embed for context. No audio is downloaded. Options (b) (apply to YouTube for written approval) and (c) (partner broadcasters via owner OAuth) remain the scaling path and are tracked separately.

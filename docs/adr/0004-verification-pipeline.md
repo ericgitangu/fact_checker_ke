@@ -139,3 +139,18 @@ Landing AT-0004-A/AT-0004-B closes the services/api half of the gap the original
 
 ---
 **See ADR-0031:** the binary-verdict + always-human-gate model here is refined to calibrated confidence-weighted guidance with risk-tiered auto-publish (the human gate shrinks as calibration proves out; named-person hard-negatives stay gated).
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — human gate → async auditor; one pipeline, two front doors
+
+**Status:** Accepted direction (owner-approved pivot 2026-10-04). Additive; the pipeline stages (1–8), the red-team amendments, and the citation/dedup/injection guards (shared with ADR-0023) are all retained unchanged.
+
+- **Two ingestion front doors, one pipeline.** The **fetch engine** (ADR-0002/0032) and the **submission engine** both emit `submission.received.v1`; stages 1–8 are identical afterward. Events carry `ingest_source: "fetch" | "submission"` (ADR-0017 amendment). Fetched items carry `attribution: unverified` by default exactly as user-supplied quotes do (step 1 / amendment #6) — autonomy does not grant trust.
+- **Step 7 (human review gate) is superseded as a *blocking* gate** by ADR-0031's amendment: for Tier A/B and Tier-C mode (a), a draft **auto-publishes** (caveated, claim-attributed) and a human **audits a shrinking sample asynchronously**; the editor is no longer the pre-publish approver for the majority of output. Tier-C mode (b) retains a pre-publish human tap (ADR-0031). The *technical* gates in step 6/7 (schema validation, citation integrity, framing enforcement, the `needs_quote` short-circuit) **still run before auto-publish** — only the *human approval* moves from blocking to async.
+- **Step 1 (normalize) for the fetch engine** obeys the ADR-0002/0005 compliance boundary: no third-party audio download; STT runs only on the compliant subset (ADR-0005 amendment). A fetched third-party video with no lawful transcript text hits the SEC-4 `needs_quote`/no-LLM short-circuit — the fetch engine never fabricates a transcript.
+- **Reverse-image/frame search (ADR-0032 §1b)** feeds the retrieve/verify stages for fetched items: an earlier-dated footage match is carried in as evidence for the dominant "recycled protest footage" tactic.
+
+### Acceptance tests (additive)
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0004-F | For Tier A/B and Tier-C mode (a), a draft auto-publishes after the technical gates (schema/citation/framing/`needs_quote`) pass, with no pre-publish human approval, and is recorded for async audit sampling; Tier-C mode (b) still blocks on a human tap. | RED |

@@ -93,3 +93,17 @@ Source: fact_checker_ke ADR set red-team report, Section D #2, #3 (blocker sever
 - `check.published.v1`'s `check_id` in the dev simulator is a synthetic UUID with no backing `checks` row (checks pipeline is out of scope for this wave); fine for exercising the event/SSE machinery, not a real check.
 - The relay (`drainOutbox`/`publishOutboxRowInline`) deliberately holds a Postgres transaction across the QStash HTTP publish call — the one place in this codebase that does so. This is intentional (SKIP LOCKED needs the lock held to prevent double-publish, and the call is a fast single HTTP POST, not an LLM/Fact-Check-API call), but is called out explicitly because ADR-0017 §3's "never hold a transaction open across an external call" rule is otherwise a hard line.
 - `drizzle-orm`'s postgres-js `.execute()` resolves to the row array directly (`RowList`), not a node-postgres-style `{rows: [...]}` wrapper, and `DELETE`'s affected-row count is `.count`, not `.rowCount`. An initial implementation assumed the node-postgres shape, which typechecked (cast via `as unknown as`) but would have thrown "not iterable" at runtime; caught empirically against a real Postgres before merge, not by the type checker. Left as a documented landmine for the next person reaching for `.execute()`.
+
+---
+## Amendment (two-engine pivot, 2026-10-04) — fetch-engine events and a re-sized QStash quota ledger
+
+**Status:** Accepted direction (owner-approved pivot 2026-10-04). Additive; the outbox/inbox/idempotency pattern, the three idempotency layers, the state machine and the red-team amendments (hourly sweeper, publish-before-response) are all retained unchanged.
+
+- **New events (versioned, in `packages/core`):** `fetch.poll.scheduled.v1` (QStash cron fires a poll), `fetch.candidate.v1` (a scored, above-`τ_fetch` item survives, ADR-0032 §1), and `fetch.observation.v1` (a dedup-hit observation that only bumps trend counters, no new verification). A surviving novel candidate converts to the existing `submission.received.v1` so the rest of the state machine is unchanged. Every event payload gains `ingest_source: "fetch" | "submission"` and, for fetch, `{platform, source_id, observed_at, engagement_snapshot}`.
+- **The QStash quota ledger (AT-0017-A) must be re-sized.** The projection `2×subs + retries + sweeps + callbacks ≤ 800/day` now adds **fetch polls**: `+ Σ(per-source poll cadence)`. Conservative cron intervals (ADR-0032 §4: hourly for high-signal sources, daily for the long tail) keep the total under the free-tier budget, but the ledger test must include the fetch-poll term explicitly rather than silently overrunning. **This supersedes AT-0017-A's formula.**
+- **Scale-to-zero preserved:** the fetch poller is a QStash-woken Cloud Run endpoint, no resident worker, no min-instances>0 (global cost policy) — the same posture as the outbox sweeper.
+
+### Acceptance tests (additive)
+| ID | Behaviour | Status |
+|---|---|---|
+| AT-0017-C | The quota-ledger test includes a fetch-poll term (`2×subs + retries + sweeps + callbacks + fetch_polls ≤ budget`) and fails if fetch cadence config would breach the free-tier daily message budget; fetch events carry `ingest_source` provenance and dedup-hit observations emit no new `submission.received.v1`. | RED |
