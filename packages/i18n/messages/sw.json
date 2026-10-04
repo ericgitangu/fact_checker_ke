@@ -13,7 +13,8 @@
     "footer": {
       "tagline": "Mradi huru, wa chanzo-wazi wa kuhakiki habari nchini Kenya.",
       "languages": "Kiingereza, Kiswahili na Sheng",
-      "builtIn": "Imetengenezwa Nairobi"
+      "builtIn": "Imetengenezwa Nairobi",
+      "legalPending": "Masharti na Faragha (yanasubiri ukaguzi wa kisheria)"
     },
     "action": {
       "submit": "Hakiki hili",
@@ -27,10 +28,10 @@
     }
   },
   "check": {
-    "aiAssisted": "Uchambuzi wa AI — si uamuzi wa mwisho",
+    "aiAssisted": "Uchambuzi wa AI wenye uzito wa uhakika — si uamuzi wa mwisho",
     "draft": {
-      "pending": "Inasubiri ukaguzi wa binadamu",
-      "awaitingEditor": "Inasubiri ukaguzi wa mhariri. Ushahidi na vyanzo vimeonyeshwa hapa chini, lakini hakuna uamuzi utakaochapishwa hadi mhariri athibitishe."
+      "pending": "Inasubiri kuchapishwa",
+      "awaitingEditor": "Bado inatathminiwa. Ushahidi na vyanzo vimeonyeshwa hapa chini; hakiki nyingi huchapishwa moja kwa moja baada ya ushahidi kupimwa, lakini hii imezuiwa kwa ukaguzi zaidi kabla ya kuchapishwa."
     },
     "rating": {
       "label": "Uamuzi",
@@ -47,11 +48,12 @@
     "sources": {
       "heading": "Vyanzo"
     },
-    "reviewedBy": "Imekaguliwa na mhariri kabla ya kuchapishwa",
+    "reviewedBy": "Imekaguliwa na mhariri",
     "guidance": {
-      "confidenceLabel": "Uhakika",
+      "confidenceLabel": "Uzito wa uhakika",
       "evidenceHeading": "Ushahidi uliotajwa",
-      "whatWouldChangeThisHeading": "Ni nini kingebadilisha hili"
+      "whatWouldChangeThisHeading": "Ni nini kingebadilisha hili",
+      "claimAttributedNote": "Tunatathmini dai, si mtu — ushahidi unahusu kilichosemwa; wewe unaamua."
     },
     "notFound": {
       "title": "Hakiki haipatikani",
@@ -92,7 +94,7 @@
   },
   "submit": {
     "heading": "fact_checker_ke",
-    "lede": "Tuma kiungo au bandika maandishi. Tunanakili, tunatoa madai, tunalinganisha na vyanzo vinavyojulikana, na kuandaa uamuzi — daima hukaguliwa na binadamu kabla ya kuchapishwa.",
+    "lede": "Njia mbili za kuhakiki dai: tunashika yanayosambaa, au wewe unatuma moja. Kwa njia yoyote, AI hupima ushahidi na kuchapisha tathmini yenye uzito wa uhakika, vyanzo vikitajwa — wewe unaamua. Binadamu hukagua matokeo baadaye na wanaweza kuyasahihisha.",
     "smartInput": {
       "placeholder": "Bandika kiungo, au andika walichosema…",
       "label": "Bandika kiungo au andika dai"
@@ -128,10 +130,10 @@
       "heading": "Kinachofuata",
       "received": "Tunapokea dai lako",
       "analyzing": "AI inaandaa uchambuzi",
-      "verifying": "Mhariri wa binadamu anakagua",
-      "ready": "Uamuzi unachapishwa"
+      "verifying": "AI inapima ushahidi na kuweka uhakika",
+      "ready": "Inachapishwa kama tathmini yenye uzito wa uhakika, vyanzo vikitajwa — binadamu anakagua baadaye"
     },
-    "awaitingReview": "Inasubiri ukaguzi — si uamuzi bado",
+    "awaitingReview": "Inasubiri tathmini — si uamuzi bado",
     "success": "Imetumwa. Fuatilia inavyopitia mchakato.",
     "error": {
       "network": "Hitilafu ya mtandao — tafadhali jaribu tena.",
@@ -153,8 +155,8 @@
       "received": "Dai lako liko kwenye foleni ya uchambuzi.",
       "analyzing": "Tunatoa madai na kutafsiri, tukihifadhi maneno asili.",
       "analyzed": "Madai yametolewa. Yanalinganishwa na vyanzo vinavyoaminika.",
-      "verifying": "Mhariri wa binadamu anakagua ushahidi na uamuzi wa awali.",
-      "ready": "Imechapishwa. Angalia hakiki hapa chini.",
+      "verifying": "Tunapima ushahidi na kuweka kiwango cha uhakika kwa tathmini.",
+      "ready": "Imechapishwa kama tathmini yenye uzito wa uhakika. Angalia hapa chini.",
       "failed": "Hitilafu imetokea wakati wa kuchakata dai hili."
     },
     "viewCheck": "Angalia hakiki iliyochapishwa",

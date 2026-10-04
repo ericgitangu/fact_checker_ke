@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { ADVOCATE_SIGNOFF_COMPLETE } from "@fact-checker-ke/core";
 import { Wordmark } from "@fact-checker-ke/brand";
 import { LocaleSwitcher } from "./locale-switcher";
 
@@ -43,8 +44,23 @@ export async function AppFooter(): Promise<React.JSX.Element> {
       <div style={{ display: "flex", gap: 24 }}>
         <span>{t("footer.languages")}</span>
         <span>{t("footer.builtIn")}</span>
-        <Link href="/terms">{t("nav.terms")}</Link>
-        <Link href="/privacy">{t("nav.privacy")}</Link>
+        {/* ADR-0033 AT-0033-2 deploy gate: the Terms/Privacy pages are
+            draft legal copy pending a Kenyan advocate's sign-off
+            (`ADVOCATE_SIGNOFF_COMPLETE`, @fact-checker-ke/core). Until
+            that flips, they're removed from this primary discovery path
+            (and noindex'd — see app/terms|privacy/page.tsx) rather than
+            linked as if they were finished policy; a plain-text
+            "pending review" stub replaces the links so the footer stays
+            honest about why they're missing instead of silently
+            dropping the row. */}
+        {ADVOCATE_SIGNOFF_COMPLETE ? (
+          <>
+            <Link href="/terms">{t("nav.terms")}</Link>
+            <Link href="/privacy">{t("nav.privacy")}</Link>
+          </>
+        ) : (
+          <span className="legal-draft-badge">{t("footer.legalPending")}</span>
+        )}
       </div>
     </footer>
   );
