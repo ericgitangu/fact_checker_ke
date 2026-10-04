@@ -7,6 +7,7 @@ import {
   MoonIcon,
   ShieldCheckIcon,
   SunIcon,
+  TwoEngineFlow,
   useTheme,
 } from "@fact-checker-ke/brand";
 import { ADVOCATE_SIGNOFF_COMPLETE, STANDING_CAVEAT_SHORT } from "@fact-checker-ke/core";
@@ -172,32 +173,12 @@ function App(): React.JSX.Element {
         </section>
 
         <section className="pipeline" aria-labelledby="pipeline-h">
-          <h2 id="pipeline-h">From a link to a verdict</h2>
-          <ol className="pipeline-steps">
-            <li>
-              <span className="step-no" aria-hidden="true">1</span>
-              <h3>Submit</h3>
-              <p>Paste a link or a quote from X, TikTok, YouTube, or a news site.</p>
-            </li>
-            <li>
-              <span className="step-no" aria-hidden="true">2</span>
-              <h3>Extract</h3>
-              <p>We pull out the checkable claims and translate them, keeping the original words.</p>
-            </li>
-            <li>
-              <span className="step-no" aria-hidden="true">3</span>
-              <h3>Ground</h3>
-              <p>Each claim is matched against credible sources &mdash; KNBS, Kenya Law, the Hansard, newsrooms.</p>
-            </li>
-            <li>
-              <span className="step-no" aria-hidden="true">4</span>
-              <h3>Publish &amp; audit</h3>
-              <p>
-                The confidence-weighted assessment goes live with its sources; a person
-                audits a sample afterwards and can correct it.
-              </p>
-            </li>
-          </ol>
+          <h2 id="pipeline-h">Two engines, one pipeline</h2>
+          <p className="pipeline-lede">
+            Most claims we check, we go looking for &mdash; the rest, you bring to us.
+            Either way, the same pipeline checks it.
+          </p>
+          <TwoEngineFlow variant={theme} />
         </section>
 
         <section className="street" aria-labelledby="street-h">
