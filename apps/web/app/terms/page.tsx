@@ -1,0 +1,52 @@
+import type { Metadata } from "next";
+import { TERMS_SECTIONS } from "@fact-checker-ke/core";
+import { getTranslations } from "next-intl/server";
+
+export const metadata: Metadata = {
+  title: "Terms & Conditions (draft) — fact_checker_ke",
+  description:
+    "DRAFT Terms & Conditions, pending a Kenyan advocate's review. Not yet legally binding.",
+};
+
+/**
+ * ADR-0033 §B / AT-0033-2: Terms & Conditions, rendered from the
+ * `TERMS_SECTIONS` starter-draft data (`@fact-checker-ke/core`), gated as
+ * visibly DRAFT. Every `[ADVOCATE: ...]` open question from the ADR
+ * renders as a visible "pending legal review" marker (never silently
+ * resolved into normal prose) — see the `legal.advocateMarker` label.
+ *
+ * Like `methodology/page.tsx`, the long-form legal body copy itself stays
+ * English-only in this wave (editorial/legal translation review, not a
+ * mechanical catalog entry); the page title, DRAFT badge, and the
+ * advocate-marker label are translated via the `legal` i18n namespace.
+ */
+export default async function TermsPage(): Promise<React.JSX.Element> {
+  const t = await getTranslations("legal");
+
+  return (
+    <div className="shell-narrow flex flex-col gap-10">
+      <div>
+        <p className="legal-draft-badge">{t("pages.draftBadge")}</p>
+        <h1>{t("pages.terms.title")}</h1>
+        <p className="mt-3" style={{ color: "var(--ink-2)" }}>
+          {t("pages.terms.intro")}
+        </p>
+      </div>
+
+      {TERMS_SECTIONS.map((section, index) => (
+        <section key={section.id} className="flex flex-col gap-3">
+          <h2 style={{ fontSize: "1.2rem" }}>
+            {index + 1}. {section.heading}
+          </h2>
+          <p style={{ fontSize: "0.92rem", color: "var(--ink-2)" }}>{section.body}</p>
+          {"advocateMarker" in section && (
+            <p className="legal-advocate-marker">
+              <span className="sr-only">{t("advocateMarker")}: </span>
+              {section.advocateMarker}
+            </p>
+          )}
+        </section>
+      ))}
+    </div>
+  );
+}

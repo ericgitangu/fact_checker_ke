@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ADR-0033 AT-0033-1: standing caveat (short form) > matches the ADR-0033 §A snapshot 1`] = `
+{
+  "body": "We assess the claim, not the person. This is a confidence-weighted, AI-generated analysis for research and educational purposes, published in a pilot stage. It is not a statement of fact about any individual, not legal or professional advice, and carries no warranty of accuracy or completeness. Sources are cited; confidence is shown. If you are named here, you have a right of reply and correction.",
+  "heading": "AI-assisted assessment · pilot · not a verdict on any person.",
+}
+`;
+
+exports[`ADR-0033 §A: standing caveat (long form) > matches the ADR-0033 snapshot 1`] = `
+[
+  {
+    "body": "Produced by automated analysis; the confidence figure is the published weight (ADR-0031), not a guarantee; “what would change this” is shown.",
+    "heading": "AI-generated & confidence-weighted",
+    "id": "ai-generated",
+  },
+  {
+    "body": "Framing per ADR-0023/0031 (Tier C = open-question). We follow an Africa-Check-style process and a PesaCheck-style “[VERDICT]: [claim] — [why]” headline; we rate claims, not people (ADR-0008 §4).",
+    "heading": "Claim-attributed, never person-indicting",
+    "id": "claim-attributed",
+  },
+  {
+    "advocateMarker": "[ADVOCATE: confirm this framing does not itself defeat the product's credibility while still limiting liability — the ADR-0031 tension.]",
+    "body": "",
+    "heading": "Research/educational purpose, no reliance warranty",
+    "id": "research-educational",
+  },
+  {
+    "body": "Methods and calibration are still being proven (ADR-0031 quality ramp); error rates are non-zero and disclosed.",
+    "heading": "Pilot stage",
+    "id": "pilot-stage",
+  },
+  {
+    "body": "Every assessment links its sources and an archived evidence file (ADR-0008); named persons get a right-of-reply and correction path (async for auto-published Tier A/B, pre-publish for stricter Tier C modes).",
+    "heading": "Sources & right of reply",
+    "id": "sources-right-of-reply",
+  },
+]
+`;
