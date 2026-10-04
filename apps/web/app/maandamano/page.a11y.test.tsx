@@ -20,12 +20,50 @@ vi.mock("next/navigation", () => ({
 const { default: MaandamanoPage } = await import("./page");
 const { AppShellHarness } = await import("../../test/app-shell-harness");
 
+/**
+ * ADR-0007 kill-switch: the page now gets `frozen`/`demonstrations` from
+ * `GET /v1/maandamano` (via `ApiClient.getMaandamano`), not a
+ * `MAANDAMANO_FROZEN` env var or a bundled fixture. Stubbing `fetch`
+ * exercises the real page -> ApiClient -> fetch path end to end, with
+ * only the network boundary faked.
+ */
+function mockMaandamanoFetch(body: unknown): void {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    ),
+  );
+}
+
 afterEach(() => {
-  delete process.env.MAANDAMANO_FROZEN;
+  vi.unstubAllGlobals();
 });
 
 describe("Maandamano tracker page a11y (AT-0028-2)", () => {
   it("live advisories view: zero WCAG 2.2 AA violations", async () => {
+    mockMaandamanoFetch({
+      frozen: false,
+      demonstrations: [
+        {
+          id: "d1a1f1a0-0000-4000-8000-000000000001",
+          title: "Planned march along Moi Avenue",
+          area: "Nairobi Central Ward",
+          county: "Nairobi",
+          status: "announced",
+          date: "2026-10-10",
+          summary:
+            "Organisers announced a planned march; the county has not yet confirmed a route or permit status.",
+          sourceUrl: "https://example.com/advisory/1",
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    });
+
     const pageJsx = await MaandamanoPage();
     const page = await AppShellHarness({ children: pageJsx });
     const { container } = render(<IntlProviderHarness>{page}</IntlProviderHarness>);
@@ -34,7 +72,8 @@ describe("Maandamano tracker page a11y (AT-0028-2)", () => {
   });
 
   it("frozen/kill-switch view: zero WCAG 2.2 AA violations", async () => {
-    process.env.MAANDAMANO_FROZEN = "true";
+    mockMaandamanoFetch({ frozen: true, demonstrations: [] });
+
     const pageJsx = await MaandamanoPage();
     const page = await AppShellHarness({ children: pageJsx });
     const { container } = render(<IntlProviderHarness>{page}</IntlProviderHarness>);

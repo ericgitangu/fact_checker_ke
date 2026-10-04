@@ -24,6 +24,27 @@ export interface ResolvedConfig {
   capabilityTokenSecret: string;
   /** ADR-0018: Upstash Redis TCP (SUBSCRIBE/PUBLISH) endpoint, `rediss://...`. */
   redisTcpUrl: string | null;
+  /**
+   * ADR-0007 kill-switch mechanism (AT-0007-A): the apps/web origin and
+   * shared secret for the `/api/revalidate` webhook (see
+   * apps/web/app/api/revalidate/route.ts) that the kill-switch route
+   * calls after a flip, to purge the ISR tag for `/maandamano` so the
+   * CDN stops serving stale pages without waiting for a redeploy. Both
+   * optional: when either is unset, the flip still succeeds and is
+   * still audit-logged (see lib/maandamano.ts) — the flip just can't
+   * also trigger CDN propagation, which is logged as a warning rather
+   * than failing the request (see lib/maandamano-revalidate.ts). This
+   * gap, if it ever surfaces in prod, is the exact thing
+   * docs/runbooks/nc4-kill-switch.md Step 2.2 asks an operator to watch
+   * for and treat as a defect.
+   */
+  // Optional (not just nullable): several existing tests construct a
+  // `ResolvedConfig` object literal directly, predating this field, and
+  // CLAUDE.md's "edit additively" rule means those call sites shouldn't
+  // all need touching just to add two fields they don't exercise.
+  // `app.ts` treats an omitted value the same as an explicit `null`.
+  webBaseUrl?: string | null;
+  revalidateSecret?: string | null;
 }
 
 const DEFAULT_DEV_CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"];
@@ -67,5 +88,7 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     qstashNextSigningKey: env.QSTASH_NEXT_SIGNING_KEY ?? null,
     capabilityTokenSecret: capabilityTokenSecret ?? "dev-only-insecure-capability-secret",
     redisTcpUrl: env.REDIS_TCP_URL ?? null,
+    webBaseUrl: env.WEB_BASE_URL ?? null,
+    revalidateSecret: env.REVALIDATE_SECRET ?? null,
   };
 }

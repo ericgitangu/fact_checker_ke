@@ -1,5 +1,6 @@
 import { SubmissionInputSchema, type SubmissionInput } from "../schemas/submission.js";
 import { CheckSchema, type Check } from "../schemas/check.js";
+import { MaandamanoResponseSchema, type MaandamanoResponse } from "../schemas/demonstration.js";
 import { z } from "zod";
 
 export class ApiClientError extends Error {
@@ -57,5 +58,24 @@ export class ApiClient {
     }
     const body: unknown = await res.json();
     return CheckSchema.parse(body);
+  }
+
+  /**
+   * ADR-0007 kill-switch mechanism (AT-0007-A): `GET /v1/maandamano`.
+   * `fetchOptions` is passed through verbatim to the underlying fetch
+   * call so a Next.js caller can attach `next: { tags: ["maandamano"],
+   * revalidate: ... }` for ISR (see apps/web/app/maandamano/page.tsx)
+   * without this package taking a dependency on Next's types -- the
+   * `next` property is a valid extra field on `RequestInit` only once
+   * Next's own ambient type augmentation is in scope at the CALL site,
+   * which is true for every app/** caller.
+   */
+  async getMaandamano(fetchOptions?: RequestInit): Promise<MaandamanoResponse> {
+    const res = await this.fetchImpl(`${this.baseUrl}/v1/maandamano`, fetchOptions);
+    if (!res.ok) {
+      throw new ApiClientError(`Unexpected status fetching maandamano advisories: ${res.status}`, res.status);
+    }
+    const body: unknown = await res.json();
+    return MaandamanoResponseSchema.parse(body);
   }
 }

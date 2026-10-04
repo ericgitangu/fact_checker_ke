@@ -173,7 +173,7 @@ Evidence-based state of every ADR after the weekend build merged to `main`. "Imp
 | 0004 verification pipeline | Implemented | Human review gate live (AT-0004-A/B green); RAG/citation guards in pipeline; quote-less video URLs short-circuit before any LLM call (`needs_quote`), no fabricated empty analysis |
 | 0005 speech & language | Partial | ASR Round A done (Chirp_2 7.8%); Round B needs human Sheng clips; STT not wired to live |
 | 0006 synthetic media | Implemented | Triage (C2PA + detector-as-triage), never "deepfake" on score alone |
-| 0007 maandamano | Partial | Tracker UI + night band live; kill-switch *mechanism* (flag+ISR purge) RED |
+| 0007 maandamano | Partial | Tracker UI + night band live; kill-switch *mechanism* now GREEN (AT-0007-A: audited `maandamano_kill_switch` policy flag, `GET /v1/maandamano` server-side enforcement, ISR revalidation webhook — see docs/runbooks/nc4-kill-switch.md); AT-0007-B (log redaction, EXIF stripping, ongoing-event comment gating) remains RED/not implemented |
 | 0008 legal compliance | Proposed | Blocked: Kenyan advocate sign-off; 7 questions logged |
 | 0009 runtime topology | Accepted/Implemented | Two-runtime + polyglot roadmap; moon graph live |
 | 0010 client strategy | Partial | PWA + Expo decision; mobile app not started (D-U-N-S gated) |

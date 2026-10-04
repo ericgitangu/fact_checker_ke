@@ -1,23 +1,34 @@
 import { getTranslations } from "next-intl/server";
-import { demonstrations } from "../../fixtures/demonstrations";
+import { ApiClient, type MaandamanoResponse } from "@fact-checker-ke/core";
 import { DemonstrationStatusChip } from "../../components/status-chip";
 import { NightBand } from "../../components/night-band";
 
-export const dynamic = "force-dynamic";
-
 /**
- * ADR-0007/ADR-0028 AT-0007-A kill switch, mocked as an env var for this
- * skeleton (no live operator flag/DB in Phase 0-1 client scope). Flip
- * `MAANDAMANO_FROZEN=true` to see the frozen-notice view instead of
- * advisories. A real kill switch (per the ADR) is a runtime DB/edge-config
- * flag the API exposes, purges CDN tags, and flips the SW to
- * network-first — this env var only covers the apps/web-side rendering
- * half of that contract; the SW network-first policy itself is wired in
- * app/sw.ts regardless of this flag's value, since that must hold even
- * when NOT frozen (a stale cached advisory is unsafe at any time).
+ * ADR-0007/ADR-0028 AT-0007-A kill switch. `/maandamano` is ISR-cached
+ * (tag `"maandamano"`) rather than force-dynamic: advisories change
+ * rarely enough that re-rendering on every request would be wasteful
+ * CDN-bypass traffic during exactly the high-traffic moments (an active
+ * protest) this page exists for. The 60s window bounds ordinary
+ * staleness; the kill switch bypasses it entirely by purging the tag
+ * (see app/api/revalidate/route.ts, called from
+ * services/api/src/lib/maandamano-revalidate.ts right after an admin
+ * flips `maandamano_kill_switch` via `POST
+ * /v1/admin/maandamano/kill-switch`) so a freeze/unfreeze reaches the
+ * CDN fast, without a redeploy.
+ *
+ * The frozen state itself is NOT a client-side decision: `frozen` comes
+ * straight from `GET /v1/maandamano`'s response body
+ * (services/api/src/lib/maandamano.ts#getMaandamanoAdvisories), which
+ * returns `demonstrations: []` server-side whenever the switch is ON.
+ * This component never receives live advisory data to hide while
+ * frozen — there is nothing in this render's payload to hide.
  */
-function isFrozen(): boolean {
-  return process.env.MAANDAMANO_FROZEN === "true";
+export const revalidate = 60;
+
+async function getMaandamanoData(): Promise<MaandamanoResponse> {
+  const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:8080";
+  const client = new ApiClient({ baseUrl: apiBaseUrl });
+  return client.getMaandamano({ next: { revalidate: 60, tags: ["maandamano"] } });
 }
 
 /**
@@ -32,7 +43,7 @@ function isStale(updatedAt: string): boolean {
 
 export default async function MaandamanoPage(): Promise<React.JSX.Element> {
   const t = await getTranslations("tracker");
-  const frozen = isFrozen();
+  const { frozen, demonstrations } = await getMaandamanoData();
 
   return (
     <div className="shell flex flex-col gap-10">
