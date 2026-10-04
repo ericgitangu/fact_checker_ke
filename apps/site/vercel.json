@@ -5,8 +5,13 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "redirects": [
     {
-      "source": "/:path*",
-      "destination": "https://fact-checker-ke-web.vercel.app/:path*",
+      "source": "/",
+      "destination": "https://fact-checker-ke-web.vercel.app/",
+      "permanent": true
+    },
+    {
+      "source": "/:path+",
+      "destination": "https://fact-checker-ke-web.vercel.app/:path+",
       "permanent": true
     }
   ]
