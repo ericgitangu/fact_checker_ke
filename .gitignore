@@ -66,3 +66,6 @@ infra/terraform/**/.token
 infra/terraform/**/.envrc
 .vercel
 .env*
+
+# Advocate legal-review drafts — sensitive, delivered privately, never commit to the public repo
+docs/legal/advocate-review/
