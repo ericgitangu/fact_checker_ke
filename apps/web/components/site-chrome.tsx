@@ -27,6 +27,7 @@ export async function AppHeader(): Promise<React.JSX.Element> {
         <Wordmark size="md" variant="light" />
       </Link>
       <nav className="nav-links" aria-label="Primary">
+        <Link href="/feed">{t("nav.feed")}</Link>
         <Link href="/methodology">{t("nav.methodology")}</Link>
         <Link href="/maandamano">{t("nav.tracker")}</Link>
         <Link href="/editor">{t("nav.editor")}</Link>

@@ -6,6 +6,7 @@
       "methodology": "Methodology",
       "tracker": "Maandamano",
       "editor": "Editor",
+      "feed": "Feed",
       "language": "Language",
       "terms": "Terms",
       "privacy": "Privacy"
@@ -188,6 +189,23 @@
       "body": "We never show a cached advisory as current. Reconnect to see the latest status."
     },
     "staleWarning": "Not re-verified in over 2 hours — status may be out of date."
+  },
+  "feed": {
+    "heading": "What we're checking now",
+    "intro": "A live stream of recently published assessments — claims we caught trending, and claims readers submitted. Each carries a confidence weight and cited sources; none is a verdict on a person.",
+    "viewAll": "View the full feed",
+    "backHome": "Back home",
+    "source": {
+      "fetch": "Auto-surfaced",
+      "submission": "Submitted"
+    },
+    "empty": {
+      "heading": "The feed fills as we publish — nothing yet",
+      "body": "We haven't published an assessment yet. This is an honest empty state, not placeholder data — check back shortly, or submit a claim yourself."
+    },
+    "mockNotice": "Demo data — the live feed isn't reachable right now, so these are example assessments, not real published checks.",
+    "loadOlder": "Load older checks",
+    "viewCheck": "Read the full assessment"
   },
   "editorial": {
     "heading": "Editor review",

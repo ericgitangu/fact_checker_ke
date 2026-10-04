@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { Check, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
+import type {
+  Check,
+  FeedItem,
+  IngestSource,
+  Submission,
+  WaitlistSignupInput,
+  WaitlistSignupResult,
+} from "@fact-checker-ke/core";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import type {
   CheckRepository,
@@ -58,9 +65,16 @@ export class InMemorySubmissionRepository implements SubmissionRepository {
 
 export class InMemoryCheckRepository implements CheckRepository {
   private readonly store = new Map<string, Check>();
+  // Not on the shared `Check` type (see packages/core/src/schemas/feed.ts
+  // docblock on `IngestSourceSchema`) — tracked alongside the store only
+  // so `seed()` callers (tests, dev fallback) can exercise `listPublished`
+  // without every other `Check` literal in the codebase needing a new
+  // required field.
+  private readonly ingestSourceByCheckId = new Map<string, IngestSource>();
 
-  seed(check: Check): void {
+  seed(check: Check, ingestSource: IngestSource = "submission"): void {
     this.store.set(check.id, check);
+    this.ingestSourceByCheckId.set(check.id, ingestSource);
   }
 
   async getById(id: string): Promise<RepoResult<Check>> {
@@ -69,6 +83,41 @@ export class InMemoryCheckRepository implements CheckRepository {
       return { ok: false, error: { kind: "not_found", message: `Check ${id} not found` } };
     }
     return { ok: true, value: found };
+  }
+
+  async listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItem[]> {
+    const published = [...this.store.values()]
+      .filter((c) => !c.isDraft && c.publishedAt !== null)
+      .sort((a, b) => (b.publishedAt as string).localeCompare(a.publishedAt as string));
+
+    const afterCursor = opts.cursor
+      ? published.filter((c) => (c.publishedAt as string) < (opts.cursor as string))
+      : published;
+
+    return afterCursor.slice(0, opts.limit).map((check) => ({
+      id: check.id,
+      claim: check.summary,
+      rating: check.rating as FeedItem["rating"],
+      calibratedConfidence: check.calibratedConfidence,
+      ingestSource: this.ingestSourceByCheckId.get(check.id) ?? "submission",
+      riskTier: check.riskTier,
+      whatWouldChangeThis: check.whatWouldChangeThis,
+      publishedAt: check.publishedAt as string,
+      sources: check.evidence
+        .map((item) => {
+          const source = check.sources.find((s) => s.id === item.sourceId);
+          if (!source) return null;
+          return {
+            sourceId: item.sourceId,
+            quote: item.quote,
+            url: source.url,
+            title: source.title,
+            publisher: source.publisher,
+            credibilityTier: source.credibilityTier,
+          };
+        })
+        .filter((s): s is FeedItem["sources"][number] => s !== null),
+    }));
   }
 }
 

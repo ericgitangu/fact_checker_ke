@@ -1,6 +1,6 @@
-import type { Check, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
+import type { Check, FeedItem, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
 import { createDb, schema, type Database } from "@fact-checker-ke/db";
-import { eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import type {
   CheckRepository,
@@ -160,6 +160,82 @@ export class PostgresCheckRepository implements CheckRepository {
         })),
       },
     };
+  }
+
+  /**
+   * ADR-0032 payoff: the "what we're checking now" feed. Two queries
+   * (checks page, then the check_evidence<->sources join for that page's
+   * ids) rather than one big join — a join would duplicate the check row
+   * once per cited source, which is wasted work to de-duplicate back out
+   * in JS; two queries bounded by `limit` is the clearer, well-indexed
+   * (`checks_org_id_idx` aside, `publishedAt` ordering is scanned —
+   * flagged as tech debt below) read pattern for a list endpoint.
+   *
+   * // TODO(tech-debt): no index on `checks(published_at)` /
+   * // `checks(is_draft, published_at)` yet — this scans/sorts without
+   * // one. Fine at current row counts; add a migration
+   * // (`checks_published_at_idx` partial on `is_draft = false`) once the
+   * // feed is real traffic, not before — a new migration was explicitly
+   * // out of scope for this change per the task brief ("NO new migration
+   * // unless truly required").
+   */
+  async listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItem[]> {
+    const whereClauses = [eq(schema.checks.isDraft, false), isNotNull(schema.checks.publishedAt)];
+    if (opts.cursor) {
+      whereClauses.push(lt(schema.checks.publishedAt, new Date(opts.cursor)));
+    }
+
+    const checkRows = await this.db
+      .select()
+      .from(schema.checks)
+      .where(and(...whereClauses))
+      .orderBy(desc(schema.checks.publishedAt))
+      .limit(opts.limit);
+
+    if (checkRows.length === 0) return [];
+
+    const checkIds = checkRows.map((c) => c.id);
+    const evidenceRows = await this.db
+      .select({
+        checkId: schema.checkEvidence.checkId,
+        quote: schema.checkEvidence.quote,
+        sourceId: schema.sources.id,
+        url: schema.sources.url,
+        title: schema.sources.title,
+        publisher: schema.sources.publisher,
+        credibilityTier: schema.sources.credibilityTier,
+      })
+      .from(schema.checkEvidence)
+      .innerJoin(schema.sources, eq(schema.checkEvidence.sourceId, schema.sources.id))
+      .where(inArray(schema.checkEvidence.checkId, checkIds));
+
+    const sourcesByCheckId = new Map<string, FeedItem["sources"]>();
+    for (const row of evidenceRows) {
+      const list = sourcesByCheckId.get(row.checkId) ?? [];
+      list.push({
+        sourceId: row.sourceId,
+        quote: row.quote,
+        url: row.url,
+        title: row.title,
+        publisher: row.publisher,
+        credibilityTier: row.credibilityTier,
+      });
+      sourcesByCheckId.set(row.checkId, list);
+    }
+
+    return checkRows.map((row) => ({
+      id: row.id,
+      claim: row.summary,
+      // Published checks always carry a rating (`checks_published_requires_rating`
+      // DB constraint) — the cast is backed by that invariant, not an assumption.
+      rating: row.rating as FeedItem["rating"],
+      calibratedConfidence: row.calibratedConfidence === null ? null : Number(row.calibratedConfidence),
+      ingestSource: row.ingestSource,
+      riskTier: row.riskTier,
+      whatWouldChangeThis: row.whatWouldChangeThis,
+      publishedAt: toIsoString(row.publishedAt as Date),
+      sources: sourcesByCheckId.get(row.id) ?? [],
+    }));
   }
 }
 
