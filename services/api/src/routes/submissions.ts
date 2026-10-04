@@ -6,6 +6,7 @@ import type { SubmissionService } from "../lib/submission-service.js";
 import { hashRequestBody } from "../lib/idempotency.js";
 import { submissionEtag, NO_STORE_CACHE_CONTROL } from "../lib/cache-headers.js";
 import type { DeviceQuotaGuard } from "../lib/device-quota.js";
+import { hashDeviceToken } from "../lib/device-token.js";
 
 const IdempotencyKeySchema = z.string().uuid();
 
@@ -57,8 +58,20 @@ export async function submissionRoutes(
       submittedBy: input.submittedBy ?? null,
       quote: input.quote ?? null,
       timestampSec: input.timestampSec ?? null,
+      // ADR-0021 AT-0021-4: not included in `requestHash` below —
+      // deliberately excluded from the idempotency hash so re-sending
+      // the exact same submission body with a different device token
+      // (e.g. app reinstall) still matches the idempotency-key replay
+      // path on content, not on device identity.
+      deviceTokenHash: hashDeviceToken(deviceToken),
     };
-    const requestHash = hashRequestBody(submission);
+    const requestHash = hashRequestBody({
+      url: submission.url,
+      text: submission.text,
+      submittedBy: submission.submittedBy,
+      quote: submission.quote,
+      timestampSec: submission.timestampSec,
+    });
 
     const outcome = await deps.submissionService.createWithIdempotency({
       idempotencyKey: keyParse.data,

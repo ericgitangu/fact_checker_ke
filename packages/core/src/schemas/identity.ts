@@ -51,6 +51,9 @@ export const AuditActionSchema = z.enum([
   // sign-off reference (see services/api/src/lib/policy-audit.ts).
   "policy.threshold_changed",
   "policy.tier_c_relaxed",
+  // ADR-0030 AT-0030-1: the creator-funnel conflict-of-interest firewall
+  // audit trail — a founder-channel post referencing a published check.
+  "funnel.post_recorded",
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;
 

@@ -41,7 +41,7 @@ Revisit if a second editor joins (upgrades the "process rule" to a code-enforced
 ## Acceptance tests
 | ID | Behaviour | Status |
 |---|---|---|
-| AT-0030-1 | Every row in the funnel-content audit table references a `check_id` whose `published_at` timestamp is earlier than the funnel post's `posted_at` | RED |
+| AT-0030-1 | Every row in the funnel-content audit table references a `check_id` whose `published_at` timestamp is earlier than the funnel post's `posted_at` | GREEN (data-lifecycle hardening pass, 2026-10-04 — see implementation notes below) |
 | AT-0030-2 | The editor queue's priority-ordering function accepts no parameter whose source is funnel analytics; a static-analysis/lint check enforces this on the queue module | RED |
 | AT-0030-3 | Any funnel post flagged `ai_disclosed: true` in the audit table has a corresponding on-platform disclosure (description-panel text for YouTube, label metadata for TikTok) verified by a manual spot-check before each posting batch | RED |
 | AT-0030-4 | The funding-transparency page's rendered output includes a funnel-revenue line item whenever the funnel audit table has any row with non-zero attributed revenue | RED |
@@ -62,3 +62,39 @@ lint/static-analysis check (AT-0030-2), and the funding-transparency page
 line item (AT-0030-4) are code/data changes out of scope for this pass —
 all five acceptance tests (AT-0030-1 through AT-0030-5) remain **RED**,
 unclaimed here. This ADR's status is left as `Proposed`.
+
+## Implementation notes ("data-lifecycle + flywheel-integrity hardening" pass, 2026-10-04)
+
+**AT-0030-1 closed.** The audit-table schema exists as `funnel_audit_log`
+(migration 0011, `packages/db/src/schema.ts`), matching this ADR's/the
+firewall doc's row shape: `{ check_id, published_at, funnel_post_url,
+posted_at, ai_disclosed }`, plus a `platform` discriminator and an
+unused-for-now nullable `revenue_cents` column (present so AT-0030-4's
+future web change doesn't need another migration just to add it).
+
+The write path, `services/api/src/lib/creator-funnel.ts#recordFunnelPost`
+(exposed as `POST /v1/editor/funnel-posts`, admin-only — this records the
+founder's own conflict-of-interest-adjacent activity, deliberately not
+exposed to `editor`), enforces the "source restriction" rule at write
+time: a post is rejected (`not_published`) if the referenced check has no
+`publishedAt`, and rejected (`invalid_timing`) if the proposed `postedAt`
+predates the check's `publishedAt`. Migration 0011 also adds a database
+CHECK constraint (`funnel_audit_log_posted_after_published`) as a second,
+independent line of defense for the same invariant. Verified empirically
+against real Postgres (`services/api/src/__tests__/
+creator-funnel.integration.test.ts`): a post against a published check
+with `postedAt` after `publishedAt` is recorded; a post predating
+publication is rejected and no row is written; a post against an
+unpublished draft is rejected and no row is written.
+
+This remains a firewall/audit record, not a feature (rule 2's "editorial
+independence from funnel metrics" is satisfied by the simple fact that no
+code path anywhere reads `funnel_audit_log` to influence editorial
+ordering — nothing in `services/api/src/lib/editorial.ts` references it).
+
+**Still RED, out of this pass's `services/api`/`packages/db` ownership:**
+AT-0030-2 (a lint/static-analysis check on the editor-queue module — a
+tooling/CI change), AT-0030-3 (a manual spot-check process before each
+posting batch — not a code artifact), AT-0030-4 (the funding-transparency
+page's rendered line item — apps/web), AT-0030-5 (a snapshot/regex test
+over rendered check/funnel-post templates — apps/web).

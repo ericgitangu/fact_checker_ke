@@ -20,6 +20,12 @@ export type SubmissionCreateInput = {
     submittedBy: string | null;
     quote: string | null;
     timestampSec: number | null;
+    // ADR-0021 AT-0021-4: hashed device token, so a later DSAR export
+    // can find this caller's own submissions (see retention.ts#runDsarExport).
+    // Optional (not required) so existing callers/tests that predate
+    // this column keep compiling without a hand-added `null` — defaults
+    // to null, same as any other row written before this column existed.
+    deviceTokenHash?: string | null;
   };
 };
 
@@ -83,6 +89,7 @@ export class PostgresSubmissionService implements SubmissionService {
             submittedBy: input.submission.submittedBy,
             quote: input.submission.quote,
             timestampSec: input.submission.timestampSec,
+            deviceTokenHash: input.submission.deviceTokenHash ?? null,
           })
           .returning();
         if (!submissionRow) throw new Error("Insert into submissions returned no row");
