@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { TwoEngineFlow } from "@fact-checker-ke/brand";
 import type { Rating } from "@fact-checker-ke/core";
 
 export const metadata: Metadata = {
@@ -55,20 +56,16 @@ export default function MethodologyPage(): React.JSX.Element {
         </p>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 style={{ fontSize: "1.3rem" }}>Two ways a claim gets checked</h2>
-        <p style={{ fontSize: "0.92rem", color: "var(--ink-2)" }}>
-          Most claims we check, we go looking for: we watch for claims that are
-          trending or spreading on YouTube and X, cross-checked against
-          debunking already published by partners like PesaCheck and Africa Check. TikTok
-          is embed-only in this pilot — we don&rsquo;t run autonomous discovery there; a TikTok
-          clip enters only when it has already spread to a platform we do monitor.
-        </p>
-        <p style={{ fontSize: "0.92rem", color: "var(--ink-2)" }}>
-          You can also submit a claim directly — paste a link or type what someone said.
-          Either way, the same pipeline checks it: no submitted claim gets special
-          treatment, and no claim we find ourselves skips review.
-        </p>
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 style={{ fontSize: "1.3rem" }}>From a link to a verdict</h2>
+          <p className="mt-2" style={{ fontSize: "0.92rem", color: "var(--ink-2)" }}>
+            Most claims we check, we go looking for — the rest, you bring to us.
+            No submitted claim gets special treatment, and no claim we find ourselves
+            skips review: either way, the same pipeline below checks it.
+          </p>
+        </div>
+        <TwoEngineFlow ariaLabel="How a claim gets checked, from entry to published audit" />
       </section>
 
       <section className="flex flex-col gap-4">

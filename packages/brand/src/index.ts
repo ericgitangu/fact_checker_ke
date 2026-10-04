@@ -7,6 +7,20 @@ export { BrandMark } from "./brand-mark";
 export { Wordmark } from "./wordmark";
 export type { WordmarkSize, WordmarkVariant } from "./wordmark";
 export { WavingFlag } from "./waving-flag";
-export { SunIcon, MoonIcon, ExternalLinkIcon, ShieldCheckIcon } from "./icons";
+export {
+  SunIcon,
+  MoonIcon,
+  ExternalLinkIcon,
+  ShieldCheckIcon,
+  RadarIcon,
+  PenLineIcon,
+  ScissorsIcon,
+  ScaleIcon,
+  GaugeIcon,
+  MegaphoneIcon,
+  EyeIcon,
+} from "./icons";
 export { useTheme } from "./use-theme";
 export type { Theme } from "./use-theme";
+export { TwoEngineFlow } from "./two-engine-flow";
+export type { TwoEngineFlowVariant } from "./two-engine-flow";
