@@ -28,3 +28,12 @@ export function publishedCheckEtag(checkId: string, version: number): string {
   return etagFor([checkId, version]);
 }
 export const PUBLISHED_CHECK_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=86400";
+
+/**
+ * ADR-0032 payoff: the "what we're checking now" feed. Shorter
+ * `s-maxage` than a single published check (30s, not 300s) — it's a
+ * list that grows as new checks publish, and the brief asks for a
+ * "light live touch" (poll/revalidate), not a 5-minute-stale front page.
+ * Still CDN-cacheable (public), unlike the per-check NO_STORE draft case.
+ */
+export const FEED_CACHE_CONTROL = "public, s-maxage=30, stale-while-revalidate=300";

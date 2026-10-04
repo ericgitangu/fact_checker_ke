@@ -514,6 +514,108 @@ a:hover {
   text-transform: capitalize;
 }
 
+/* ---------- ADR-0032 payoff: "what we're checking now" feed ---------- */
+.feed-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.feed-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feed-section-intro {
+  max-width: 62ch;
+  color: var(--ink-2);
+}
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.feed-section-footer {
+  padding-top: 4px;
+}
+
+/* Deliberately NOT the verdict stamp's register (no rotation, no
+   saturated verdict colour) -- a feed card is a compact list row, the
+   full-size `.checkcard` stamp stays reserved for the check's own page. */
+.feedcard {
+  margin: 0;
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 20px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.feedcard-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.feedcard-claim {
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.feedcard-meta {
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+
+/* Ingest-source provenance badge (AT-0032-6, made visible): "Auto-
+   surfaced" (the fetch engine) gets the brand/verdict-adjacent green so
+   it reads as the product's own, confident discovery; "Submitted" gets
+   the neutral slate used elsewhere for non-verdict status chips
+   (globals.css header comment) -- NEITHER is a verdict colour choice,
+   this is provenance, not a rating. */
+.ingest-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ingest-badge-fetch {
+  color: var(--true);
+  background: var(--true-tint);
+}
+
+.ingest-badge-submission {
+  color: var(--status-slate);
+  background: var(--status-slate-tint);
+}
+
+.feed-empty {
+  padding: 24px 22px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 12px;
+  background: var(--paper-2);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
 /* ---------- verdict stamp + list-view chip ---------- */
 .verdict {
   margin: 20px 0 16px;
@@ -1209,5 +1311,8 @@ a:hover {
   }
   .checkcard {
     padding: 20px 18px 18px;
+  }
+  .feedcard {
+    padding: 16px 16px 14px;
   }
 }

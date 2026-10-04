@@ -4,6 +4,7 @@ import { Redis as UpstashRedis } from "@upstash/redis";
 import { healthRoutes } from "./routes/health.js";
 import { submissionRoutes } from "./routes/submissions.js";
 import { checkRoutes } from "./routes/checks.js";
+import { feedRoutes } from "./routes/feed.js";
 import { waitlistRoutes } from "./routes/waitlist.js";
 import { deviceRoutes } from "./routes/device.js";
 import { internalRoutes } from "./routes/internal.js";
@@ -185,6 +186,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     submissionRoutes(instance, { submissions: submissions!, submissionService, deviceQuotaGuard }),
   );
   await app.register((instance) => checkRoutes(instance, { checks: checks!, db }));
+  await app.register((instance) => feedRoutes(instance, { checks: checks! }));
   await app.register((instance) => waitlistRoutes(instance, { waitlist: waitlist!, rateLimiter }));
   await app.register((instance) => deviceRoutes(instance, { deviceTokens: deviceTokens! }));
   await app.register((instance) =>
