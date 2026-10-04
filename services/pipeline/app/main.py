@@ -13,9 +13,9 @@ from app.clients.factcheck_api import make_factcheck_client
 from app.clients.fetch_source_factory import make_fetch_sources
 from app.clients.llm_anthropic import make_llm_client
 from app.clients.provenance_factory import make_provenance_checker
+from app.clients.reverse_image_factory import make_reverse_image_search
 from app.config import UnpaidGeminiUsageError, assert_no_unpaid_gemini_usage
 from app.fakes.fake_abuse_scan import FakeAbuseScan
-from app.fakes.fake_reverse_image import FakeReverseImageSearch
 from app.fakes.fake_synthetic_media import FakeSyntheticMediaDetector
 from app.fakes.fake_transcriber import FakeTranscriber
 from app.models.hop_requests import (
@@ -76,15 +76,19 @@ _embedder = make_embedder()
 _factcheck_client = make_factcheck_client()
 _check_store = InMemoryCheckStore()
 _hop_idempotency_store = InMemoryIdempotencyStore()
-# ADR-0006/0027: no vendor keys wired for any of these (HARD RULE: no
-# billable/live calls). _provenance_checker is the one real, local-only
-# implementation (C2PA manifest parsing, no network) — see
-# app/clients/provenance_factory.py. The other three stay deterministic
-# fakes/heuristics by design, not by missing-credential accident; see each
-# Protocol module's docstring for the "why" and the future real-vendor
-# swap point.
+# ADR-0006/0027/0032: no vendor keys are set in this environment (HARD
+# RULE: no billable/live calls), so _reverse_image_search resolves to
+# FakeReverseImageSearch via make_reverse_image_search() below -- same
+# env-gated selection as every other real/fake client pair in this file
+# (REVERSE_IMAGE_API_KEY activates RealReverseImageSearch; see
+# app/clients/reverse_image_factory.py). _provenance_checker is the one
+# real, local-only implementation (C2PA manifest parsing, no network) —
+# see app/clients/provenance_factory.py. _synthetic_media_detector/
+# _abuse_scan stay deterministic fakes/heuristics by design, not by
+# missing-credential accident; see each Protocol module's docstring for
+# the "why" and the future real-vendor swap point.
 _provenance_checker = make_provenance_checker()
-_reverse_image_search = FakeReverseImageSearch()
+_reverse_image_search = make_reverse_image_search()
 _synthetic_media_detector = FakeSyntheticMediaDetector()
 _abuse_scan = FakeAbuseScan()
 # ADR-0032: the autonomous fetch engine's sources + dedup store. Sources
@@ -171,6 +175,7 @@ async def hop_verify(payload: VerifyHopRequest) -> VerifyResult:
         check_store=_check_store,
         factcheck_client=_factcheck_client,
         store=_hop_idempotency_store,
+        reverse_image_search=_reverse_image_search,
     )
 
 

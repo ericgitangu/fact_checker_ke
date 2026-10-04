@@ -33,6 +33,14 @@ _INJECTION_MARKERS = (
 # auto-publish through the real pipeline hops, not a seeded decision.
 _AUTO_PUBLISH_FIXTURE_MARKER = "AUTO_PUBLISH_FIXTURE_HIGH_CONFIDENCE"
 
+# ADR-0031 risk-tier wiring fixture: lets an integration test deterministically
+# drive the REAL /hops/verify path to a hard-negative (Rating.false) draft
+# verdict without a real LLM call, to prove app/stages/risk_tier.py's
+# imputation_severity_from_rating + app/stages/publish.py's finalize_publish
+# wiring produce a real Tier C for a named-person hard-negative claim through
+# the actual hop, not a hand-built VerifyResult.
+_HARD_NEGATIVE_FIXTURE_MARKER = "HARD_NEGATIVE_FIXTURE_NAMED_PERSON"
+
 
 def _looks_like_injection(prompt: str) -> bool:
     lowered = prompt.lower()
@@ -153,6 +161,22 @@ class FakeLlmClient(LlmClient):
                     "citations": [],
                     "confidence": 0.97,
                     "what_would_change_this": "A revised official schedule.",
+                    "language": _detect_language(claim_text),
+                    "translation_en": claim_text,
+                }
+            )
+
+        if _HARD_NEGATIVE_FIXTURE_MARKER in claim_text:
+            return json.dumps(
+                {
+                    "rating": "False",
+                    "rationale": (
+                        "The claim is contradicted by the official record; the "
+                        "named individual did not do what is claimed."
+                    ),
+                    "citations": [],
+                    "confidence": 0.9,
+                    "what_would_change_this": "A primary-source record corroborating the claim.",
                     "language": _detect_language(claim_text),
                     "translation_en": claim_text,
                 }

@@ -33,9 +33,15 @@ from app.eval.calibrate import (
     calibration_artifact_exists,
     load_calibration_artifact,
 )
+from app.models.generated import Attribution
 from app.models.pipeline_io import VerifyResult
 from app.stages.publish_policy import PublishDecision, PublishPolicyFlags, decide_publish_policy
-from app.stages.risk_tier import ImputationSeverity, RiskTier, classify_risk_tier
+from app.stages.risk_tier import (
+    ImputationSeverity,
+    RiskTier,
+    classify_risk_tier,
+    imputation_severity_from_rating,
+)
 
 # Where a fitted calibration artifact would live in production. No file is
 # written here by this build (no calibration harness run against
@@ -78,18 +84,40 @@ def finalize_publish(
     verify_result: VerifyResult,
     *,
     named_person_involved: bool,
-    imputation_severity: ImputationSeverity = ImputationSeverity.INACCURACY,
-    attribution: str = "verified",
+    imputation_severity: ImputationSeverity | None = None,
+    attribution: str = Attribution.not_applicable.value,
     flags: PublishPolicyFlags | None = None,
     calibration_artifact_path: Path = CALIBRATION_ARTIFACT_PATH,
 ) -> PublishOutcome:
     """The ONE call site for `decide_publish_policy` in the real pipeline.
     Called by `run_verify_hop` for every successful draft -- see
-    app/stages/verify.py."""
+    app/stages/verify.py.
+
+    ADR-0031 follow-up (risk_tier wiring gap): `imputation_severity`
+    defaults to `None`, meaning "derive it from this verify_result's own
+    draft rating" via `imputation_severity_from_rating` -- a real,
+    per-claim tier rather than the previous hardcoded
+    `ImputationSeverity.INACCURACY` default, which silently capped every
+    named-person claim at Tier B regardless of how hard-negative the
+    actual finding was. A caller may still pass `imputation_severity`
+    explicitly to override this derivation (existing unit tests that
+    construct a VerifyResult directly and assert a specific tier rely on
+    this). `attribution` is likewise real caller-supplied data now (the
+    claim's wire `Attribution`, ADR-0004) rather than the literal string
+    `"verified"`, which was never a valid `Attribution` member to begin
+    with -- `classify_risk_tier` doesn't yet use it to change the
+    decision (see that function's own docstring), but it is no longer a
+    nonsense placeholder sitting on the wire.
+    """
+    resolved_severity = (
+        imputation_severity
+        if imputation_severity is not None
+        else imputation_severity_from_rating(verify_result.verdict.rating if verify_result.verdict else None)
+    )
     tier = classify_risk_tier(
         named_person=named_person_involved,
         attribution=attribution,
-        imputation_severity=imputation_severity,
+        imputation_severity=resolved_severity,
     )
 
     summary = _rendered_summary(verify_result)

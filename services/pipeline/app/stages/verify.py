@@ -1,8 +1,20 @@
-"""The `verify` hop (POST /hops/verify): embed -> dedup gate -> retrieve ->
-draft verdict, with ADR-0023's citation-integrity gate enforced before any
-result is returned as publishable.
+"""The `verify` hop (POST /hops/verify): embed -> dedup gate -> reverse-
+image check -> retrieve -> draft verdict, with ADR-0023's citation-
+integrity gate enforced before any result is returned as publishable.
 
 Idempotent on content hash, same pattern as analyze.py.
+
+ADR-0032 AT-0032-8 (reverse-image as a first-class check): when the
+request carries a `media_hash` (the claim's image/video-thumbnail
+fingerprint), this hop asks the ReverseImageSearch Protocol for an
+earlier-dated copy BEFORE drafting. A hit is injected into the retrieved-
+document set as a citable evidence item -- never a hardcoded verdict:
+the draft-verdict LLM call still decides what the evidence means
+(recycled/misattributed footage is the dominant KE misinformation tactic
+per docs/research/ke-misinformation-landscape-2026.md, so this is
+deliberately surfaced as strong evidence rather than buried, but the
+rating itself stays the model's call, citation-integrity-checked same as
+any other source).
 """
 
 from __future__ import annotations
@@ -25,6 +37,7 @@ from app.protocols.check_store import CheckStore
 from app.protocols.embedder import Embedder
 from app.protocols.factcheck_client import FactCheckClient
 from app.protocols.llm_client import LlmClient, LlmCompletionError
+from app.protocols.reverse_image import ReverseImageSearch, ReverseImageSearchError
 from app.registry.credibility import render_registry_as_prompt_context
 from app.stages.citation_guard import CitationIntegrityError, RetrievedDoc, verify_citations
 from app.stages.dedup_guard import may_reuse
@@ -76,8 +89,18 @@ async def run_verify_hop(
     check_store: CheckStore,
     factcheck_client: FactCheckClient,
     store: InMemoryIdempotencyStore | None = None,
+    reverse_image_search: ReverseImageSearch | None = None,
 ) -> VerifyResult:
     store = store or InMemoryIdempotencyStore()
+    if reverse_image_search is None:
+        # Fakes-first default, same convention as `store` above: a
+        # caller that doesn't wire a ReverseImageSearch (most existing
+        # tests, pre-ADR-0032-8) gets the deterministic fake rather than
+        # a hard failure. app/main.py always passes the real
+        # env-selected instance (app/clients/reverse_image_factory.py).
+        from app.fakes.fake_reverse_image import FakeReverseImageSearch
+
+        reverse_image_search = FakeReverseImageSearch()
     cache_key = f"verify:{request.submission_id}:{content_hash(request.claim_text)}"
     cached = store.get(cache_key)
     if cached is not None:
@@ -112,13 +135,53 @@ async def run_verify_hop(
             store.set(cache_key, result)
             return result
 
+    # --- reverse-image check (ADR-0032 AT-0032-8): only runs when this
+    # claim carries an image/video-thumbnail fingerprint. A hit on an
+    # earlier-dated copy is strong evidence of recycled/misattributed
+    # footage -- the dominant KE misinformation tactic -- so it is
+    # surfaced FIRST in the retrieved set, ahead of the Fact Check Tools
+    # API hits below, but purely as citable evidence: the draft-verdict
+    # LLM call decides what it means, never a hardcoded verdict here. ---
+    retrieved: list[RetrievedDoc] = []
+    if request.media_hash:
+        try:
+            earlier_copy = reverse_image_search.find_earlier_copy(request.media_hash)
+        except ReverseImageSearchError:
+            # Best-effort evidence, not a hard dependency: a reverse-
+            # image backend outage shouldn't fail the whole verify hop
+            # (unlike citation integrity, which is non-negotiable) --
+            # degrade to "no earlier-copy evidence available" rather
+            # than rejecting the draft.
+            #
+            # TECH DEBT (flagged, not hidden): this swallows the typed
+            # error without logging it anywhere -- no logger is wired in
+            # this module today (app/main.py's module-level `logger` is
+            # the hop-boundary caller, not this stage). A future pass
+            # should propagate this as a structured warning rather than
+            # a silent None, so a flaky/misconfigured reverse-image
+            # vendor is observable instead of just "no evidence found".
+            earlier_copy = None
+        if earlier_copy is not None:
+            retrieved.append(
+                RetrievedDoc(
+                    doc_id=f"reverse-image-earlier-copy:{request.media_hash}",
+                    text=(
+                        f"Reverse-image search found an earlier copy of this media at "
+                        f"{earlier_copy.source_url}, first seen {earlier_copy.found_at} — "
+                        "earlier than this submission. This is consistent with "
+                        "recycled/misattributed footage rather than new, original "
+                        "footage of a current event."
+                    ),
+                )
+            )
+
     # --- retrieve (ADR-0004 step 4): our prior checks already queried
     # above via check_store; Fact Check Tools API is the second source. ---
     factcheck_hits = await factcheck_client.search(request.claim_text, language_code=request.language[:2])
-    retrieved = [
+    retrieved.extend(
         RetrievedDoc(doc_id=hit.doc_id, text=f"{hit.text} — {hit.publisher} ({hit.review_date})")
         for hit in factcheck_hits
-    ]
+    )
 
     # --- draft verdict + citation integrity, retry once then fail ---
     last_error: Exception | None = None
@@ -147,7 +210,11 @@ async def run_verify_hop(
             # finalize_publish), for every completed draft on either
             # engine (submission today; the ADR-0032 fetch engine once
             # it converges on this same hop).
-            outcome = finalize_publish(result, named_person_involved=request.named_person_involved)
+            outcome = finalize_publish(
+                result,
+                named_person_involved=request.named_person_involved,
+                attribution=request.attribution.value,
+            )
             result = result.model_copy(
                 update={
                     "publish": PublishDecisionPayload(
@@ -180,7 +247,11 @@ async def run_verify_hop(
     # finalize_publish's `_rendered_summary` returns None and this
     # NEVER reaches decide_publish_policy's auto_publish=True path (the
     # RED->GREEN "no-summary draft never auto-publishes" case).
-    rejected_outcome = finalize_publish(rejected_result, named_person_involved=request.named_person_involved)
+    rejected_outcome = finalize_publish(
+        rejected_result,
+        named_person_involved=request.named_person_involved,
+        attribution=request.attribution.value,
+    )
     rejected_result = rejected_result.model_copy(
         update={
             "publish": PublishDecisionPayload(
