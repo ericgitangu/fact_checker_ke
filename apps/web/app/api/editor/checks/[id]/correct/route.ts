@@ -10,7 +10,8 @@ const CorrectBodySchema = z.object({
 
 /**
  * BFF proxy for the NOT-YET-IMPLEMENTED `POST /v1/editor/checks/:id/correct`.
- * See app/api/editor/drafts/route.ts for the mock-fallback pattern.
+ * Honest 501 when the backend isn't reachable/implemented — never a faked
+ * success. See app/api/editor/drafts/route.ts (ADR-0020).
  */
 export async function POST(
   request: Request,
@@ -28,8 +29,11 @@ export async function POST(
 
   try {
     await client.correct(id, parsed.data);
-    return NextResponse.json({ ok: true, _mock: false });
+    return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ ok: true, _mock: true });
+    return NextResponse.json(
+      { error: "editor_backend_unavailable", detail: "Editor corrections are not available yet (ADR-0020)." },
+      { status: 501 },
+    );
   }
 }
