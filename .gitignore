@@ -20,9 +20,14 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 
-# Env files — never commit real secrets
+# Env files — never commit real secrets. Every dotenv variant is ignored,
+# including .env.prod (holds real prod secrets); the *.env glob also catches
+# non-dotted names (prod.env / secrets.env). Only the committed, value-less
+# .env.example is allowed through (negation is kept last so nothing re-ignores
+# it).
 .env
 .env.*
+*.env
 !.env.example
 
 # Editor / OS
@@ -65,7 +70,6 @@ infra/terraform/**/*.tfplan
 infra/terraform/**/.token
 infra/terraform/**/.envrc
 .vercel
-.env*
 
 # Advocate legal-review drafts — sensitive, delivered privately, never commit to the public repo
 docs/legal/advocate-review/
