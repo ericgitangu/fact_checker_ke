@@ -1,0 +1,91 @@
+/*
+ * The house motion language, as CSS utilities (see reveal.tsx). Transform +
+ * opacity only (GPU-friendly, no layout thrash), short distances, a single
+ * settle — "the press", not a carousel of effects. Everything keys off the
+ * `.is-revealed` class the React wrappers add once the element scrolls into
+ * view; before that the start state holds.
+ *
+ * Belt-and-braces reduced motion (same pattern as waving-flag.css /
+ * two-engine-flow.css): useReveal also starts `revealed` under
+ * prefers-reduced-motion, but the media query at the foot of this file
+ * force-settles the final state even if JS is slow or absent.
+ */
+
+.fck-reveal,
+.fck-stagger-item {
+  --fck-reveal-delay: 0s;
+  will-change: transform, opacity;
+  transition:
+    opacity 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition-delay: var(--fck-reveal-delay);
+}
+
+/* ---- single reveal: start states per motion ---- */
+.fck-reveal-rise .fck-stagger-item,
+.fck-reveal.fck-reveal-rise {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+}
+
+.fck-reveal-fade .fck-stagger-item,
+.fck-reveal.fck-reveal-fade {
+  opacity: 0;
+  transform: none;
+}
+
+.fck-reveal-press .fck-stagger-item,
+.fck-reveal.fck-reveal-press {
+  opacity: 0;
+  transform: translate3d(0, 6px, 0) scale(0.96);
+}
+
+/* ---- revealed: settle to rest ---- */
+.fck-reveal.is-revealed,
+.fck-stagger.is-revealed .fck-stagger-item {
+  opacity: 1;
+  transform: none;
+}
+
+/* "press" settles with a soft overshoot, echoing the verdict stamp. */
+.fck-reveal-press.is-revealed,
+.fck-stagger.fck-reveal-press.is-revealed .fck-stagger-item {
+  animation: fck-press-settle 0.5s cubic-bezier(0.22, 1.1, 0.36, 1) var(--fck-reveal-delay, 0s) both;
+}
+
+/* ---- stagger: each child inherits a computed delay ----
+   The wrapper is a plain block by default so it can double as a layout
+   column (e.g. the hero copy). Pass a className to make it a flex/grid
+   container where a row of children should stagger horizontally. */
+.fck-stagger.is-revealed .fck-stagger-item {
+  transition-delay: calc(var(--fck-reveal-delay, 0s) + var(--fck-reveal-i, 0) * var(--fck-reveal-step, 0.08s));
+}
+
+.fck-stagger.fck-reveal-press.is-revealed .fck-stagger-item {
+  animation-delay: calc(var(--fck-reveal-delay, 0s) + var(--fck-reveal-i, 0) * var(--fck-reveal-step, 0.08s));
+}
+
+@keyframes fck-press-settle {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1.012);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fck-reveal,
+  .fck-stagger-item {
+    transition: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
