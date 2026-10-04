@@ -25,7 +25,20 @@
   gap: 28px;
 }
 
-.fck-flow-dark {
+/*
+ * Dark tokens apply both to an explicit variant="dark" prop (the
+ * `.fck-flow-dark` class) AND automatically under the host's manual
+ * light/dark toggle (`:root[data-theme="dark"]`, apps/web globals.css) --
+ * apps/web renders this component server-side with the default
+ * variant="light" always (there is no client boundary here to read the
+ * toggle's state), so without the second selector the primary "We fetch"
+ * card stayed light-green-on-dark forever and its heading text (which
+ * inherits the host's `--ink`, already flipped to near-white by the page
+ * toggle) went unreadable. Same mechanism as globals.css's
+ * `:root[data-theme="dark"] .wordmark .fck-wordmark-text`.
+ */
+.fck-flow-dark,
+:root[data-theme="dark"] .fck-flow {
   --fck-flow-paper-2: #151b18;
   --fck-flow-ink: #f1f3ef;
   --fck-flow-ink-2: #b7c0ba;
@@ -72,9 +85,11 @@
   padding: 0;
 }
 
+/* Equal, generous padding on BOTH entries (primary + secondary share this
+   rule, so they stay balanced) -- owner-flagged as cramped at 16px. */
 .fck-flow-entry {
   position: relative;
-  padding: 16px;
+  padding: 22px;
   border: 1px solid var(--fck-flow-rule);
   border-radius: 12px;
 }
@@ -97,7 +112,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--fck-flow-ink-2);
-  margin: 10px 0 2px;
+  margin: 14px 0 4px;
 }
 
 .fck-flow-entry-primary .fck-flow-tag {

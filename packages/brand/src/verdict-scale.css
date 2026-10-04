@@ -29,7 +29,16 @@
   gap: 14px;
 }
 
-.fck-scale-dark {
+/*
+ * Dark tokens also apply automatically under the host's manual light/dark
+ * toggle (`:root[data-theme="dark"]`), not only via an explicit
+ * variant="dark" prop -- apps/web renders <VerdictScale> server-side at
+ * the default variant="light" everywhere it's used, so without this
+ * selector the six seals stayed light-card regardless of the toggle. Same
+ * fix/mechanism as two-engine-flow.css.
+ */
+.fck-scale-dark,
+:root[data-theme="dark"] .fck-scale {
   --fck-scale-paper: #141a17;
   --fck-scale-ink: #f1f3ef;
   --fck-scale-ink-2: #b7c0ba;
@@ -63,27 +72,33 @@
   --v-tint: #efecf5;
 }
 
-.fck-scale-dark .fck-scale-true {
+.fck-scale-dark .fck-scale-true,
+:root[data-theme="dark"] .fck-scale .fck-scale-true {
   --v: #30cf84;
   --v-tint: rgba(48, 207, 132, 0.15);
 }
-.fck-scale-dark .fck-scale-mostly {
+.fck-scale-dark .fck-scale-mostly,
+:root[data-theme="dark"] .fck-scale .fck-scale-mostly {
   --v: #a9d53f;
   --v-tint: rgba(169, 213, 63, 0.15);
 }
-.fck-scale-dark .fck-scale-misleading {
+.fck-scale-dark .fck-scale-misleading,
+:root[data-theme="dark"] .fck-scale .fck-scale-misleading {
   --v: #f0a93f;
   --v-tint: rgba(240, 169, 63, 0.15);
 }
-.fck-scale-dark .fck-scale-false {
+.fck-scale-dark .fck-scale-false,
+:root[data-theme="dark"] .fck-scale .fck-scale-false {
   --v: #ff6b7f;
   --v-tint: rgba(255, 107, 127, 0.15);
 }
-.fck-scale-dark .fck-scale-unproven {
+.fck-scale-dark .fck-scale-unproven,
+:root[data-theme="dark"] .fck-scale .fck-scale-unproven {
   --v: #9aa6ae;
   --v-tint: rgba(154, 166, 174, 0.15);
 }
-.fck-scale-dark .fck-scale-notcheckable {
+.fck-scale-dark .fck-scale-notcheckable,
+:root[data-theme="dark"] .fck-scale .fck-scale-notcheckable {
   --v: #c4a9f5;
   --v-tint: rgba(196, 169, 245, 0.15);
 }
@@ -151,7 +166,8 @@
   z-index: -1;
 }
 
-.fck-scale-dark .fck-scale-seal::before {
+.fck-scale-dark .fck-scale-seal::before,
+:root[data-theme="dark"] .fck-scale .fck-scale-seal::before {
   mix-blend-mode: screen;
   opacity: 0.18;
 }
