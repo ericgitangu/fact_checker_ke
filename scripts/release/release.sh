@@ -135,7 +135,11 @@ if billable_gate "image build/push"; then
     fi
     echo "api image by digest: ${API_DIGEST:-<unavailable>}"
 
-    run docker build -t "$AR_PATH/pipeline:candidate" -f services/pipeline/Dockerfile .
+    # Context = services/pipeline (NOT repo root): the pipeline Dockerfile's
+    # COPY paths (pyproject.toml, uv.lock, app/) are relative to that dir —
+    # a repo-root context fails with "/pyproject.toml: not found". The api
+    # build above DOES need repo-root context (moon workspace scaffold).
+    run docker build -t "$AR_PATH/pipeline:candidate" -f services/pipeline/Dockerfile services/pipeline
     run docker push "$AR_PATH/pipeline:candidate"
     if [[ "$DRY_RUN" -eq 1 ]]; then
       PIPELINE_DIGEST="$AR_PATH/pipeline@sha256:<resolved-after-real-push>"
