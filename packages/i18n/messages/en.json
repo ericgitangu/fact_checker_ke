@@ -10,7 +10,8 @@
       "language": "Language",
       "terms": "Terms",
       "privacy": "Privacy",
-      "menu": "Menu"
+      "menu": "Menu",
+      "submit": "Submit"
     },
     "footer": {
       "tagline": "An independent, open-source fact-checking project for Kenya.",
@@ -286,6 +287,82 @@
           "title": "Audit",
           "body": "A person audits a shrinking sample afterwards, and can correct it."
         }
+      }
+    }
+  },
+  "landing": {
+    "hero": {
+      "titleLine1": "Kenya's loudest claims,",
+      "titleLine2": "checked against the evidence.",
+      "lede": "fact_checker_ke checks claims we spot trending and claims you submit — in English, Swahili, and Sheng. AI weighs each one against the evidence and cites every source; a shrinking sample is audited by a person after publishing. We rate claims, not people.",
+      "ctaPrimary": "Submit a claim",
+      "ctaSecondary": "Read the methodology",
+      "ctaWaitlist": "Join the waitlist"
+    },
+    "sample": {
+      "tag": "Sample fact-check",
+      "claim": "“Unemployment in Kenya fell to 2% last year.”",
+      "sourceClaim": "viral on TikTok — 1.2M views",
+      "verdict": "Misleading",
+      "confidenceLabel": "Confidence",
+      "rationale": "KNBS puts the 2024 unemployment rate near 5.6%. The 2% figure counts only the strictest definition and drops discouraged workers who have stopped looking.",
+      "sourcesLabel": "Sources",
+      "sourcesValue": "knbs.or.ke, worldbank.org",
+      "checkedInLabel": "Checked in",
+      "caveat": "We rate claims, not people — this is an AI assessment, for research purposes; you decide."
+    },
+    "scale": {
+      "heading": "Six verdicts. No opinions.",
+      "body": "Every claim lands on one of six ratings, each tied to what the evidence actually supports — never to who said it."
+    },
+    "pipeline": {
+      "heading": "Two engines, one pipeline",
+      "body": "Most claims we check, we go looking for — the rest, you bring to us. Either way, the same pipeline checks it."
+    },
+    "street": {
+      "heading": "When the streets move, the rumours move faster.",
+      "body": "During maandamano, fact_checker_ke tracks confirmed advisories at the ward level — road closures, safety notices, and the claims going viral about them. We show what's happening and where, never who is where.",
+      "note": "Protester safety comes before engagement. Locations stay coarse, and anything that could put people at risk is held or dropped.",
+      "cta": "Open the Maandamano tracker"
+    },
+    "principles": {
+      "heading": "How we keep it honest",
+      "independent": {
+        "title": "Independent and open-source.",
+        "body": "The code is public, and the funding will be too."
+      },
+      "cite": {
+        "title": "We cite everything.",
+        "body": "No verdict ships without the sources it rests on."
+      },
+      "audit": {
+        "title": "People audit the AI.",
+        "body": "A shrinking sample of published assessments is reviewed and corrected after the fact — not gated before every claim goes out."
+      },
+      "reply": {
+        "title": "Right of reply.",
+        "body": "Named people get a correction path and a chance to respond; a claim-level flag is never read as an indictment of a person."
+      },
+      "link": "Read the full methodology"
+    },
+    "waitlist": {
+      "heading": "Be there when it launches.",
+      "body": "We're building in the open. Leave your email and we'll tell you the day it goes live — no other mail.",
+      "emailLabel": "Email address",
+      "placeholder": "you@example.com",
+      "join": "Join",
+      "joining": "Joining…",
+      "joined": "You're on the list",
+      "status": {
+        "joined": "You're on the waitlist — thanks!",
+        "alreadyJoined": "You're already on the waitlist.",
+        "invalid": "Enter a valid email address.",
+        "rateLimited": "Too many attempts — please try again in {seconds} seconds.",
+        "rateLimitedGeneric": "Too many attempts — please try again in a moment.",
+        "serverError": "The waitlist is temporarily unavailable — please try again shortly.",
+        "unexpected": "Something unexpected happened on our side — we couldn't add you. Please try again later.",
+        "misconfigured": "The waitlist isn't available right now. Please check back soon.",
+        "networkError": "We couldn't reach the server — check your connection and try again."
       }
     }
   }

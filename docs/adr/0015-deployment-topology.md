@@ -62,3 +62,56 @@ deploys (owner-authorised autopilot; full detail in
 - **Flags verified** (ADR-0016's `[to verify at implementation]`): `vercel deploy --prebuilt --prod --skip-domain`, then `vercel promote <url> --yes`. Both exist and behave as named in CLI v59.5.0 — **with one correction**: with no custom domain configured, `--skip-domain` does not defer the project's own stable `<project>-<team>.vercel.app` alias, only additional/custom domains. The deployment-specific hash URL is the genuinely-unlinked one to smoke before promoting; the scripts smoke that URL (`.deployment.url` from `vercel deploy --format json`), not the stable alias. Full detail and the root cause of a related monorepo file-tracing failure (fixed via `vercel project update --root-directory` + running commands from the repo root, plus a `buildCommand` in each app's `vercel.json` that builds `packages/core` first) are in the runbook.
 - **AT-0015-1 (partial — config-level evidence, not yet the full e2e trace capture):** Neither project's deployed configuration routes any mobile or SSE path through Vercel. `apps/web`'s only server-side routes are `app/api/submissions/route.ts` (same-origin BFF POST proxy, not SSE) and `app/checks/[id]/page.tsx` (SSR fetch, not SSE); `apps/site` has no server-side routes at all (static SPA). Still RED pending the actual e2e smoke with request-log assertions the acceptance test calls for.
 - **Deferred:** `API_BASE_URL` / `VITE_API_URL` are set to a documented placeholder (`https://api.fact-checker-ke.pending.invalid`) since `services/api` has no Cloud Run URL yet (out of scope for this work — owned by a concurrent agent). The flip procedure (update env → rebuild → promote) is recorded in the runbook as the exact step to run once that URL exists. `services/api`'s CORS allow-list (AT-0015-2) was not touched or verified here.
+
+## Consolidation amendment (2026-10-04): one app project + a redirect stub
+
+The two-frontend rows in the Decision summary are amended: the marketing SPA
+`apps/site` is folded into `apps/web` (see ADR-0010 amendment), so the
+deployment topology is now **one frontend Vercel project plus a redirect
+stub**, not two peer frontends.
+
+| Surface | Host | Status |
+|---|---|---|
+| `apps/web` (Next.js PWA + landing + BFF) | **Vercel** (`fact-checker-ke-web`) | The single frontend. Now also serves the marketing landing `/`, `/submit`, the waitlist BFF `/api/waitlist`, and `/sitemap.xml` + `/robots.txt` (Next Metadata routes). Deploy rail unchanged (ADR-0016). |
+| `apps/site` | **Vercel** (`fact-checker-ke-site`) | **Retired to a redirect-only stub.** |
+
+**The redirect (non-destructive).** `apps/site` keeps its Vercel project and
+its git history — retiring the project itself is the owner's call. Its
+`vercel.json` now carries a single 308 rule that forwards every path to the
+web app, preserving path/query/hash:
+
+```json
+"redirects": [
+  { "source": "/:path*",
+    "destination": "https://fact-checker-ke-web.vercel.app/:path*",
+    "permanent": true }
+]
+```
+
+The build output is reduced to a tiny `index.html` meta-refresh + a client
+`window.location.replace` fallback (`src/redirect.ts`), so a direct document
+load still forwards even if the hosting redirect were ever absent. The
+marketing React source, its tests, and the duplicated `public/` OG/icon
+assets were removed (the OG/icons now live in `apps/web/public`); the Vercel
+project, its env and its domain aliases are untouched.
+
+**Deploy script.** `scripts/deploy/vercel-site.sh` still runs the full
+pull → build → deploy → smoke → promote rail, but the smoke now asserts a
+**308** on `/` whose `Location` points at the web app (it previously asserted
+a 200 and grepped the JS bundle for the waitlist markup — neither exists in a
+redirect stub). `scripts/deploy/vercel-web.sh` is unchanged.
+
+**Canonical origin.** The redirect target and `apps/web`'s `metadataBase` /
+sitemap / robots all use `https://fact-checker-ke-web.vercel.app`. NB: the
+"Implementation notes" above record the longer per-project alias
+`fact-checker-ke-web-eric-gitangus-projects.vercel.app`; the shorter
+`fact-checker-ke-web.vercel.app` is the canonical alias used here. If only the
+long alias is configured on the project, add the short one (or repoint these
+constants) before cutover — flagged as the one deploy-time check for this
+change.
+
+**AT-0015-2 (CORS) note.** The web waitlist now posts same-origin to its own
+BFF, which calls `services/api` server-side (no browser CORS), consistent with
+`app/api/submissions`. `services/api`'s CORS allow-list can drop the retired
+`apps/site` origin once this ships; that is a `services/` change, out of scope
+for this frontend consolidation and left to the API owner.

@@ -25,8 +25,8 @@ const RATING_ICON: Record<Rating, React.ComponentType<{ size?: number; className
 
 /**
  * The verdict stamp is the ONE saturated-colour object on any page (see
- * apps/web/app/globals.css header comment, and apps/site/src/index.css for
- * the original design rationale) — every other UI element stays ink-on-
+ * the apps/web/app/globals.css header comment for the design rationale) —
+ * every other UI element stays ink-on-
  * paper. Never reused for anything that isn't a published fact-check
  * rating (the Maandamano status chips use a deliberately separate
  * neutral/amber/grey scale — see components/status-chip.tsx).

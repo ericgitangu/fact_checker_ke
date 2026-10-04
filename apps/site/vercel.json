@@ -1,6 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "buildCommand": "pnpm --filter @fact-checker-ke/core run build && pnpm --filter @fact-checker-ke/brand run build && pnpm run build",
-  "installCommand": "pnpm install --frozen-lockfile"
+  "buildCommand": "pnpm run build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "destination": "https://fact-checker-ke-web.vercel.app/:path*",
+      "permanent": true
+    }
+  ]
 }

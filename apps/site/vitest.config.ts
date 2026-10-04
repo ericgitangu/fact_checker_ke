@@ -5,14 +5,11 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "jsdom",
-    include: ["src/**/*.test.tsx"],
+    // {ts,tsx}: the redirect stub's only test is a pure-function .test.ts
+    // (no DOM/JSX), the marketing-component .test.tsx files were removed
+    // with the app they covered.
+    include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./vitest.setup.ts"],
     globals: true,
-    // Available on `import.meta.env` in tests (mirrors .env.example; no
-    // real .env file is loaded in CI/test runs).
-    env: {
-      VITE_API_URL: "http://localhost:8080",
-      VITE_WEB_URL: "http://localhost:3000",
-    },
   },
 });
