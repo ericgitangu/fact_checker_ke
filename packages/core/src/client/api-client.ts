@@ -1,6 +1,7 @@
 import { SubmissionInputSchema, type SubmissionInput } from "../schemas/submission.js";
 import { CheckSchema, type Check } from "../schemas/check.js";
 import { MaandamanoResponseSchema, type MaandamanoResponse } from "../schemas/demonstration.js";
+import { FeedResponseSchema, type FeedResponse } from "../schemas/feed.js";
 import { z } from "zod";
 
 export class ApiClientError extends Error {
@@ -77,5 +78,24 @@ export class ApiClient {
     }
     const body: unknown = await res.json();
     return MaandamanoResponseSchema.parse(body);
+  }
+
+  /**
+   * ADR-0032 payoff: `GET /v1/feed` — recently PUBLISHED checks (fetch-
+   * or submission-sourced), newest first, keyset-paginated. `fetchOptions`
+   * is passed through verbatim (same rationale as `getMaandamano`) so a
+   * Next.js Server Component caller can attach `next: { revalidate }`.
+   */
+  async getFeed(options?: { limit?: number; cursor?: string | null }, fetchOptions?: RequestInit): Promise<FeedResponse> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set("limit", String(options.limit));
+    if (options?.cursor) params.set("cursor", options.cursor);
+    const qs = params.toString();
+    const res = await this.fetchImpl(`${this.baseUrl}/v1/feed${qs ? `?${qs}` : ""}`, fetchOptions);
+    if (!res.ok) {
+      throw new ApiClientError(`Unexpected status fetching feed: ${res.status}`, res.status);
+    }
+    const body: unknown = await res.json();
+    return FeedResponseSchema.parse(body);
   }
 }

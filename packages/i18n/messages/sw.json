@@ -6,6 +6,7 @@
       "methodology": "Mbinu",
       "tracker": "Maandamano",
       "editor": "Mhariri",
+      "feed": "Mtiririko",
       "language": "Lugha",
       "terms": "Masharti",
       "privacy": "Faragha"
@@ -188,6 +189,23 @@
       "body": "Hatuonyeshi kamwe taarifa iliyohifadhiwa kama ya sasa. Unganisha tena ili kuona hali ya hivi karibuni."
     },
     "staleWarning": "Haijathibitishwa tena kwa zaidi ya saa 2 — hali inaweza kuwa si ya hivi karibuni."
+  },
+  "feed": {
+    "heading": "Tunachokihakiki sasa",
+    "intro": "Mtiririko wa moja kwa moja wa tathmini zilizochapishwa hivi karibuni — madai tuliyoyapata yakienea, na madai yaliyotumwa na wasomaji. Kila moja lina uzito wa uhakika na vyanzo vilivyotajwa; hakuna hata moja linaloamua kuhusu mtu.",
+    "viewAll": "Tazama mtiririko kamili",
+    "backHome": "Rudi nyumbani",
+    "source": {
+      "fetch": "Imepatikana moja kwa moja",
+      "submission": "Imetumwa"
+    },
+    "empty": {
+      "heading": "Mtiririko hujaa tunapochapisha — bado hakuna",
+      "body": "Hatujachapisha tathmini bado. Hii ni hali ya kweli ya kutokuwa na data, si data ya kujazia — rudi hivi karibuni, au tuma dai lako."
+    },
+    "mockNotice": "Data ya mfano — mtiririko halisi hauwezi kufikiwa kwa sasa, hivyo hizi ni tathmini za mfano, si hakiki halisi zilizochapishwa.",
+    "loadOlder": "Pakia hakiki za zamani",
+    "viewCheck": "Soma tathmini kamili"
   },
   "editorial": {
     "heading": "Ukaguzi wa mhariri",
