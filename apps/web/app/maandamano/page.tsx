@@ -1,7 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import { ApiClient, type MaandamanoResponse } from "@fact-checker-ke/core";
-import { Reveal } from "@fact-checker-ke/brand";
+import { Reveal, MegaphoneIcon } from "@fact-checker-ke/brand";
 import { DemonstrationStatusChip } from "../../components/status-chip";
+import { EmptyState } from "../../components/empty-state";
 import { NightBand } from "../../components/night-band";
 
 /**
@@ -100,21 +101,11 @@ export default async function MaandamanoPage(): Promise<React.JSX.Element> {
         </p>
       ) : unavailable ? (
         <Reveal motion="rise" threshold={0.05}>
-          <div className="advisory-card" role="status">
-            <div className="advisory-card-head">
-              <h3>{t("offline.title")}</h3>
-            </div>
-            <p style={{ color: "var(--ink-2)" }}>{t("offline.body")}</p>
-          </div>
+          <EmptyState icon={<MegaphoneIcon size={22} />} title={t("offline.title")} description={t("offline.body")} />
         </Reveal>
       ) : demonstrations.length === 0 ? (
         <Reveal motion="rise" threshold={0.05}>
-          <div className="advisory-card" role="status">
-            <div className="advisory-card-head">
-              <h3>{t("empty.title")}</h3>
-            </div>
-            <p style={{ color: "var(--ink-2)" }}>{t("empty.body")}</p>
-          </div>
+          <EmptyState icon={<MegaphoneIcon size={22} />} title={t("empty.title")} description={t("empty.body")} />
         </Reveal>
       ) : (
         <Reveal motion="rise" threshold={0.05}>
