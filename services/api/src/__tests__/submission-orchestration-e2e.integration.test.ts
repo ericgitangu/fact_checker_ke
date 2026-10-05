@@ -284,7 +284,13 @@ describe.skipIf(!connectionString)(
       const checkRes = await getApp.inject({ method: "GET", url: `/v1/checks/${check!.id}` });
       await getApp.close();
       expect(checkRes.statusCode).toBe(200);
-      expect(() => CheckSchema.parse(checkRes.json())).not.toThrow();
+      const parsedCheck = CheckSchema.parse(checkRes.json());
+      // getById resolves the cited sources via the check_evidence<->sources
+      // join, so every evidence item's sourceId is displayable (url/publisher).
+      expect(parsedCheck.sources.length).toBeGreaterThanOrEqual(1);
+      for (const ev of parsedCheck.evidence) {
+        expect(parsedCheck.sources.some((s) => s.id === ev.sourceId)).toBe(true);
+      }
     }, 30_000);
 
     it("holds an un-cited verdict as a DRAFT even when the pipeline says auto_publish (ADR-0031 evidence guard)", async () => {
