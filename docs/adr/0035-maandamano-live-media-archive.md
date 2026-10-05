@@ -1,6 +1,6 @@
 # ADR-0035: Maandamano tracker — live media embeds, misinfo-checked, with an archive
 
-**Status:** Proposed · **Date:** 2026-10-05
+**Status:** Accepted · **Date:** 2026-10-05
 **Amends (additive):** ADR-0007 (maandamano tracker: safety, legal posture, data model). Additive — it adds embed-only media, a misinfo check on every embed, a status-history table and an archive read model. It does **not** change the `demonstrations` table's existing columns, the `MaandamanoResponse` shape, the `GET /v1/maandamano` contract, or the kill-switch premise. ADR-0007's safety rule ("show what's happening and where, never who is where; protester safety before engagement; locations stay ward-coarse") and its kill-switch (AT-0007-A) bind everything here unchanged.
 
 ## Problem

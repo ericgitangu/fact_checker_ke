@@ -30,6 +30,7 @@ describe("GET /v1/checks/:id", () => {
       publishedAt: null,
       calibratedConfidence: null,
       whatWouldChangeThis: null,
+      context: null,
       evidence: [],
       riskTier: null,
     });
@@ -57,6 +58,7 @@ describe("GET /v1/checks/:id", () => {
       publishedAt: new Date().toISOString(),
       calibratedConfidence: 0.9,
       whatWouldChangeThis: "A material correction to the underlying published figures.",
+      context: "The claim restates a published figure; the underlying release shows a different value, so the number misleads.",
       evidence: [{ sourceId: randomUUID(), quote: "Published figures excerpt." }],
       riskTier: "A",
     });

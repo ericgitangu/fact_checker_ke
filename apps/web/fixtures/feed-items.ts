@@ -27,6 +27,8 @@ export const mockFeedItems: FeedItem[] = [
     calibratedConfidence: 0.88,
     ingestSource: "fetch",
     riskTier: "A",
+    context:
+      "The claim predicts a specific 10% fuel-price drop from the new EPRA formula. The formula sets a cap, not a guaranteed cut, so the figure overstates what the circular actually commits to.",
     whatWouldChangeThis: "A revised EPRA pricing circular superseding the one cited, or a landed-cost spike (FX/crude) after publication.",
     publishedAt: "2026-09-29T07:12:00.000Z",
     sources: [
@@ -47,6 +49,8 @@ export const mockFeedItems: FeedItem[] = [
     calibratedConfidence: 0.93,
     ingestSource: "fetch",
     riskTier: "A",
+    context:
+      "The claim asserts KCSE results leaked two weeks early. No verified leak matching the official release has surfaced; viral 'leaks' each year routinely fail to match, which is the pattern here.",
     whatWouldChangeThis: "Verified leaked result slips matching the eventual official release, from a source KNEC itself confirms as genuine.",
     publishedAt: "2026-09-28T15:40:00.000Z",
     sources: [
@@ -67,6 +71,8 @@ export const mockFeedItems: FeedItem[] = [
     calibratedConfidence: 0.74,
     ingestSource: "submission",
     riskTier: "A",
+    context:
+      "The claim says youth unemployment 'doubled' in a year. KNBS labour-force figures show a rise, not a doubling; the word 'doubled' misstates the magnitude of a real trend.",
     whatWouldChangeThis: "A KNBS revision to the underlying labour force survey figures, or a differently-defined unemployment series showing the doubling.",
     publishedAt: "2026-09-27T09:05:00.000Z",
     sources: [
@@ -88,6 +94,8 @@ export const mockFeedItems: FeedItem[] = [
     calibratedConfidence: 0.52,
     ingestSource: "fetch",
     riskTier: "C",
+    context:
+      "The claim attributes a Treasury policy to a rally speech. No full transcript or on-record Treasury statement confirms the quoted policy, so the attribution is unverified.",
     whatWouldChangeThis: "A verified full transcript or video of the rally speech, or an on-record Treasury statement confirming or denying the policy.",
     publishedAt: "2026-09-26T18:20:00.000Z",
     sources: [
@@ -108,6 +116,8 @@ export const mockFeedItems: FeedItem[] = [
     calibratedConfidence: 0.95,
     ingestSource: "fetch",
     riskTier: "A",
+    context:
+      "The claim states the CBK held its base rate steady at the latest MPC meeting. The official MPC communique confirms this, so the claim is accurate as stated.",
     whatWouldChangeThis: "A subsequent CBK communique revising the rate retroactively (not expected under current MPC procedure).",
     publishedAt: "2026-09-25T12:00:00.000Z",
     sources: [
@@ -136,6 +146,8 @@ export const mockFeedItems: FeedItem[] = [
     calibratedConfidence: 0.61,
     ingestSource: "submission",
     riskTier: "A",
+    context:
+      "The graphic claims a county will be 'cut off the grid' with no county, date, or utility named. With nothing attributable to check against a published schedule, it can't be substantiated.",
     whatWouldChangeThis: "A concrete, attributable claim (which county, which utility, which date) that can actually be checked against a published outage schedule.",
     publishedAt: "2026-09-24T21:15:00.000Z",
     sources: [

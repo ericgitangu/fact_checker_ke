@@ -52,6 +52,15 @@ export async function CheckCard({ check }: { check: Check }): Promise<React.JSX.
           <MarkdownText content={check.summary} inline />
         </h1>
 
+        {/* ADR-0034: the context LEADS — what the claim asserts, how it
+            misleads, the actual context + any kernel of truth — before the
+            rating badge below, so the reader understands *why* before *what*. */}
+        {check.context && (
+          <div className="checkcard-context">
+            <MarkdownText content={check.context} />
+          </div>
+        )}
+
         {/* The focal "record" row: the pressed verdict stamp, and — for a
             published check — the calibrated confidence dial beside it. A
             confidence weight is NOT a verdict (ADR-0031), so the gauge

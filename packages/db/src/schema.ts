@@ -303,6 +303,9 @@ export const checks = pgTable(
     // present before a Check is treated as published.
     calibratedConfidence: numeric("calibrated_confidence", { precision: 5, scale: 4 }),
     whatWouldChangeThis: text("what_would_change_this"),
+    // ADR-0034: reader-facing context that leads the artifact (nullable at
+    // rest; required-on-publish is enforced in CheckSchema, not the DB).
+    context: text("context"),
     riskTier: riskTierEnum("risk_tier"),
     // ADR-0032 (two-engine pivot) / AT-0032-6: "every published fetched
     // assessment carries ingest_source: 'fetch' provenance" — carried

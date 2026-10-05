@@ -72,14 +72,24 @@ def build_draft_verdict_prompt(
         "by the untrusted-source tags that follow, and quoted_span MUST be "
         "an exact substring of that source's text. If no retrieved source "
         "supports or refutes the claim, rate it Unproven rather than "
-        "guessing or citing a source you were not given."
+        "guessing or citing a source you were not given.\n\n"
+        "Write `context` as the reader-facing lead, in this exact order: "
+        "(a) what the claim asserts; (b) the misconception — precisely how the "
+        "claim misleads (for a Misleading rating, name the out-of-context or "
+        "misattribution mechanism explicitly); (c) the actual context and any "
+        "kernel of truth. Build `context` ONLY from the retrieved sources, as "
+        "synthesis prose — put every direct quote in `citations`, never new "
+        "quoted source text inside `context`. If the sources are insufficient, "
+        "`context` states what the claim asserts and why the evidence is "
+        "insufficient, and the rating stays Unproven — never fabricate context "
+        "to manufacture a verdict."
         f"{named_person_note}\n\n"
         f'<untrusted_submission>\n{claim_text}\n</untrusted_submission>\n\n'
         f"{sources_block}\n\n"
         "Return ONLY JSON matching this schema (no prose, no markdown "
         "fences):\n"
         '{"rating": "True"|"MostlyTrue"|"Misleading"|"False"|"Unproven"|'
-        '"NotCheckable"|null, "rationale": str, '
+        '"NotCheckable"|null, "rationale": str, "context": str, '
         '"citations": [{"doc_id": str, "quoted_span": str}], '
         '"confidence": float, "what_would_change_this": str, '
         '"language": str, "translation_en": str}'

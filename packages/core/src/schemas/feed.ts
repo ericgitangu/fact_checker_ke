@@ -52,6 +52,9 @@ export const FeedItemSchema = z.object({
   ingestSource: IngestSourceSchema,
   riskTier: RiskTierSchema.nullable(),
   whatWouldChangeThis: z.string().nullable(),
+  /** ADR-0034: the reader-facing context that leads the card (what the claim
+   * asserts, how it misleads, the actual context). Nullable defensively. */
+  context: z.string().nullable(),
   sources: z.array(FeedCitedSourceSchema),
   publishedAt: z.string().datetime(),
 });
