@@ -54,6 +54,8 @@ const publishedCheck: Check = {
   sources: [baseSource],
   calibratedConfidence: 0.91,
   whatWouldChangeThis: "A revised EPRA pricing circular superseding the Sept 2026 guidance.",
+  context:
+    "The claim predicts a 10% fuel-price drop from the new EPRA formula; the Sept 2026 guidance sets a cap, not a guaranteed cut, so the figure overstates it.",
   evidence: [{ sourceId: baseSource.id, quote: "EPRA pricing guidance, Sept 2026" }],
   riskTier: "A",
 };

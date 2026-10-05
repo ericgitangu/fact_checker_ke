@@ -27,6 +27,8 @@ const baseCheck: Check = {
   publishedAt: "2026-10-02T00:00:00.000Z",
   calibratedConfidence: 0.95,
   whatWouldChangeThis: "A corrected 2025 subsidy ledger from the Treasury.",
+  context:
+    "The claim asserts a specific 2025 fuel-subsidy figure; the Treasury ledger shows a different amount, so the figure, not the existence of a subsidy, is what misleads.",
   evidence: [{ sourceId: "33333333-3333-3333-3333-333333333333", quote: "Treasury 2025 subsidy ledger." }],
   riskTier: "A",
 };
