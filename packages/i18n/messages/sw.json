@@ -352,11 +352,52 @@
       },
       "link": "Soma mbinu kamili"
     },
+    "premium": {
+      "eyebrow": "Inakuja wakati wa uzinduzi",
+      "heading": "Premium: saidia kazi hii, ondoa matangazo.",
+      "body": "Kiwango cha malipo kwa wasomaji, watafiti, na vyumba vya habari wanaotaka zaidi ya mlisho wa bila malipo — kamwe si kiwango kinachobadilisha kinachokaguliwa au jinsi kinavyokaguliwa. Hukumu ya kila dai inabaki sawa ulipe au usilipe.",
+      "features": {
+        "adFree": {
+          "title": "Hakuna matangazo, popote",
+          "body": "Uzoefu wa kusoma bila matangazo kabisa katika ukaguzi na kurasa zote."
+        },
+        "alerts": {
+          "title": "Arifa za wakati halisi",
+          "body": "Arifa za kipaumbele, za wakati halisi mara dai unalolifuatilia linapopata hukumu iliyochapishwa."
+        },
+        "api": {
+          "title": "Ufikiaji wa API na data",
+          "body": "Pata hukumu, vyanzo, na alama za uhakika kwa njia ya kiprogramu — iliyojengwa kwa vyumba vya habari na watafiti."
+        },
+        "earlyAccess": {
+          "title": "Ufikiaji wa mapema",
+          "body": "Maeneo mapya, lugha, na vipengele kabla ya kufika kwenye kiwango cha bila malipo."
+        }
+      },
+      "cta": "Nijulishe kuhusu Premium",
+      "note": "Hakuna malipo leo — hii inatujulisha tu una nia."
+    },
+    "sponsor": {
+      "eyebrow": "Fadhili uhuru, si hukumu",
+      "heading": "Saidia ukaguzi wa ukweli ulio huru.",
+      "body": "Vyumba vya habari, wafadhili, na washirika wa teknolojia ya kiraia wanaweza kusaidia fact_checker_ke ili kuendelea kuwa huru na wazi — kama vile msimbo wake tayari ulivyo.",
+      "firewall": "Ukuta wa kihariri: wafadhili hufadhili kazi, si matokeo. Hakuna mfadhili anayeona hukumu kabla ya umma, na hakuna anayepata kura juu yake. Kila mfadhili na ruzuku huorodheshwa kwenye ukurasa wetu wa uwazi wa ufadhili.",
+      "cta": "Shirikiana nasi"
+    },
     "waitlist": {
       "heading": "Kuwepo itakapozinduliwa.",
       "body": "Tunajenga hadharani. Acha barua pepe yako na tutakuambia siku itakapoanza kufanya kazi — hakuna barua nyingine.",
       "emailLabel": "Anwani ya barua pepe",
       "placeholder": "wewe@mfano.com",
+      "interest": {
+        "label": "Ni maelezo gani yanayokufaa zaidi? (hiari)",
+        "placeholder": "Sipendi kusema",
+        "options": {
+          "premium": "Ningependa kulipia Premium",
+          "sponsor": "Ninawakilisha shirika lenye nia ya ufadhili",
+          "free": "Kiwango cha bila malipo kinanifaa"
+        }
+      },
       "join": "Jiunge",
       "joining": "Inajiunga…",
       "joined": "Uko kwenye orodha",

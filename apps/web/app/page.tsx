@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Stagger, Reveal, VerdictScale, TwoEngineFlow } from "@fact-checker-ke/brand";
 import { HeroSample } from "../components/landing/hero-sample";
+import { PremiumTeaser } from "../components/landing/premium-teaser";
+import { SponsorCta } from "../components/landing/sponsor-cta";
 import { WaitlistForm } from "../components/waitlist-form";
 import { FeedSection } from "../components/feed-section";
 import { getFeedPage } from "../lib/get-feed";
@@ -27,6 +29,12 @@ const HOME_PREVIEW_LIMIT = 4;
  * <Reveal>/<Stagger>) rendered with the localised `brand` copy — the same
  * components the methodology page and the check page use — so there is no
  * duplicated design language, only page-level layout here.
+ *
+ * ADR-0012 monetization surface (2026-10-05): <PremiumTeaser> and
+ * <SponsorCta> sit between the trust-building "principles" section and the
+ * waitlist — pre-launch signal only, no checkout. Both CTAs anchor to
+ * `#waitlist`, whose "which best describes you?" select is the actual
+ * capture mechanism for willingness-to-pay / sponsorship interest.
  */
 export default async function Home(): Promise<React.JSX.Element> {
   const t = await getTranslations("landing");
@@ -111,6 +119,10 @@ export default async function Home(): Promise<React.JSX.Element> {
           {t("principles.link")}
         </Link>
       </section>
+
+      <PremiumTeaser />
+
+      <SponsorCta />
 
       <section id="waitlist" className="landing-waitlist" aria-labelledby="landing-waitlist-h">
         <div className="landing-section-intro">
