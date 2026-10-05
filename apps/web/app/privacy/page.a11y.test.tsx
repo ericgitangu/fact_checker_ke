@@ -12,6 +12,7 @@ vi.mock("next-intl/server", async () => {
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/",
 }));
 
 // The privacy page mounts a client component (TrainingConsentToggle) that

@@ -31,7 +31,11 @@ export default async function FeedPage({
 
   return (
     <div className="shell-narrow flex flex-col gap-6">
-      <FeedSection items={feed.items} isMock={feed.isMock} />
+      <FeedSection
+        items={feed.items}
+        isMock={feed.isMock}
+        emptyAction={!feed.isMock ? { href: "/submit", label: t("empty.cta") } : undefined}
+      />
 
       {!feed.isMock && feed.nextCursor && (
         <p>
@@ -39,9 +43,15 @@ export default async function FeedPage({
         </p>
       )}
 
-      <p>
-        <Link href="/">{t("backHome")}</Link>
-      </p>
+      {/* The empty state above already carries its own "submit a claim"
+          action — a second bare "Back home" link under it would be the
+          same tacky duplicate link the owner originally flagged. Keep it
+          only once the feed actually has rows to come back from. */}
+      {feed.items.length > 0 && (
+        <p>
+          <Link href="/">{t("backHome")}</Link>
+        </p>
+      )}
     </div>
   );
 }

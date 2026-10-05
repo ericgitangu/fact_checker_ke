@@ -328,11 +328,33 @@ a:hover {
 .nav-links a {
   text-decoration: none;
   color: var(--ink-2);
+  padding: 7px 12px;
+  border-radius: 999px;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
-.nav-links a[aria-current="page"],
 .nav-links a:hover {
   color: var(--ink);
+  background: var(--paper-2);
+}
+
+/* The current route: a filled pill (not just a colour change) so "where
+   am I" reads at a glance, not only on hover. `aria-current="page"` is the
+   real a11y signal (screen readers announce it); this just carries the
+   same state visually. Deliberately the brand green at low opacity, not
+   --paper-2 (which .nav-links a:hover already uses) -- active and hover
+   need to stay visually distinct from each other. */
+.nav-links a[aria-current="page"] {
+  color: var(--brand);
+  background: var(--true-tint);
+  font-weight: 600;
+}
+
+.nav-links a[aria-current="page"]:hover {
+  color: var(--brand);
+  background: var(--true-tint);
 }
 
 /* The hamburger toggle is desktop-hidden; the inline menu row shows there.
@@ -947,6 +969,51 @@ a:hover {
   line-height: 1.5;
 }
 
+/* ---------- reusable EmptyState (components/empty-state.tsx) ---------- */
+/* Same dashed/`--paper-2` register `.feed-empty` and `.advisory-card`'s
+   empty/unavailable states already use -- this consolidates that look
+   into one shared primitive with an icon slot and a real action button,
+   replacing the bare "Back home" text link the owner flagged as tacky. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: clamp(32px, 6vw, 48px) 24px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 14px;
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+
+.empty-state-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  color: var(--ink-3);
+}
+
+.empty-state-title {
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.empty-state-body {
+  max-width: 44ch;
+  line-height: 1.55;
+}
+
+.empty-state-action {
+  margin-top: 8px;
+}
+
 /* ---------- verdict stamp + list-view chip ---------- */
 .verdict {
   margin: 20px 0 16px;
@@ -1208,6 +1275,72 @@ a:hover {
 
 .checkcard-change {
   margin-top: 16px;
+}
+
+.checkcard-change-body {
+  margin-top: 4px;
+}
+
+/* ---------- MarkdownText (components/markdown-text.tsx) ---------- */
+/* Clean typographic rendering for AI-generated check/assessment text
+   (verdict summary, the whatWouldChangeThis falsifiability note, a feed
+   row's claim) -- these fields come out of the LLM pipeline and may
+   contain `**bold**`, lists, links, etc. that must never reach the
+   reader as raw markdown syntax. Deliberately minimal: inherits the host
+   element's own font/color (checkcard-claim, checkcard-rationale,
+   feedcard-claim, ...), this only adds the spacing/weight a *block* of
+   rendered markdown needs that a plain string never did. */
+.markdown-text-block :where(p) {
+  margin: 0 0 0.6em;
+}
+
+.markdown-text-block :where(p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-text-block :where(ul, ol) {
+  margin: 0.4em 0 0.6em;
+  padding-left: 1.3em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.markdown-text-block :where(li) {
+  margin: 0;
+}
+
+.markdown-text-block :where(strong),
+.markdown-text-inline :where(strong) {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.markdown-text-block :where(code) {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  background: var(--paper-2);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.markdown-text-block :where(blockquote) {
+  margin: 0.5em 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--rule-strong);
+  color: var(--ink-2);
+}
+
+.markdown-text-block :where(a),
+.markdown-text-inline :where(a) {
+  color: inherit;
+  text-decoration-color: var(--rule-strong);
+  text-underline-offset: 3px;
+}
+
+.markdown-text-block :where(a):hover,
+.markdown-text-inline :where(a):hover {
+  text-decoration-color: var(--brand);
 }
 
 @media (prefers-reduced-motion: reduce) {
