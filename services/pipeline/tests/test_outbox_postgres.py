@@ -97,3 +97,58 @@ def test_emit_keeps_caller_supplied_submission_id(pg_conn, cleanup_submission) -
     returned_id = emit_fetch_submission_received(pg_conn, org_id=ORG_ID, text="x", submission_id=fixed_id)
     cleanup_submission.append(fixed_id)
     assert returned_id == fixed_id
+
+
+def test_emit_persists_discovery_metadata_on_the_submissions_row(pg_conn, cleanup_submission) -> None:
+    """Trending / under-review stream: a fetch-DISCOVERED viral item must be
+    queryable from the `submissions` row itself (title/url/platform/virality/
+    status) BEFORE/without a published check — so the source video link,
+    platform, raw engagement and the derived virality score are now persisted
+    as columns, not only inside the event payload JSON. The claim's `url`
+    column stays NULL (the fetch path is a `text` submission — the
+    `submissions_url_or_text` XOR constraint is untouched); the video link
+    lives in the dedicated `source_url` column."""
+    submission_id = emit_fetch_submission_received(
+        pg_conn,
+        org_id=ORG_ID,
+        text="a viral fetched claim",
+        source_url="https://www.youtube.com/watch?v=abc123",
+        platform="youtube",
+        engagement={"views": 100_000, "likes": 4_000, "comments": 250},
+    )
+    cleanup_submission.append(submission_id)
+
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            "SELECT url, text, source_url, platform, engagement, virality_score "
+            "FROM submissions WHERE id = %s",
+            (submission_id,),
+        )
+        url, text, source_url, platform, engagement, virality_score = cur.fetchone()
+
+    assert url is None  # claim url column stays NULL (XOR with text)
+    assert text == "a viral fetched claim"
+    assert source_url == "https://www.youtube.com/watch?v=abc123"
+    assert platform == "youtube"
+    engagement_dict = engagement if isinstance(engagement, dict) else json.loads(engagement)
+    assert engagement_dict == {"views": 100_000, "likes": 4_000, "comments": 250}
+    assert virality_score is not None
+    assert float(virality_score) > 0
+
+
+def test_emit_without_discovery_metadata_leaves_columns_null(pg_conn, cleanup_submission) -> None:
+    """A fetch item a source returned with no counts (or the back-compat call
+    with no source_url/platform) leaves the discovery columns NULL — trending
+    orders `virality_score DESC NULLS LAST`, so those sort last, never as 0."""
+    submission_id = emit_fetch_submission_received(pg_conn, org_id=ORG_ID, text="no engagement claim")
+    cleanup_submission.append(submission_id)
+    with pg_conn.cursor() as cur:
+        cur.execute(
+            "SELECT source_url, platform, engagement, virality_score FROM submissions WHERE id = %s",
+            (submission_id,),
+        )
+        source_url, platform, engagement, virality_score = cur.fetchone()
+    assert source_url is None
+    assert platform is None
+    assert engagement is None
+    assert virality_score is None

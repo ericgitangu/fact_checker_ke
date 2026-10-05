@@ -5,6 +5,7 @@ import type {
   EntitlementTier,
   FeedItem,
   Submission,
+  TrendingItem,
   WaitlistSignupInput,
   WaitlistSignupResult,
 } from "@fact-checker-ke/core";
@@ -53,6 +54,21 @@ export interface CheckRepository {
    * `listPublished` — the descending feed is unchanged.
    */
   listTopViral(opts: { limit: number }): Promise<FeedItem[]>;
+}
+
+export interface TrendingRepository {
+  /**
+   * "Trending / under review" stream: fetch-DISCOVERED items
+   * (`submissions.ingest_source = 'fetch'`), ordered by `viralityScore` DESC
+   * NULLS LAST (ties broken by observation recency), each with a derived
+   * status (`deriveTrendingStatus`). This reads SUBMISSIONS (not checks), so a
+   * viral item is surfaced BEFORE/without a published check — the whole point
+   * of the stream. It NEVER exposes a held draft's rating/summary: only the
+   * discovered video's own metadata plus the derived status (+ a checkId only
+   * when a published check exists). Served by the partial index
+   * `submissions_fetch_trending_idx`.
+   */
+  listTrending(opts: { limit: number }): Promise<TrendingItem[]>;
 }
 
 export interface WaitlistRepository {

@@ -7,6 +7,7 @@ import {
   type MaandamanoArchiveResponse,
 } from "../schemas/demonstration.js";
 import { FeedResponseSchema, type FeedResponse } from "../schemas/feed.js";
+import { TrendingResponseSchema, type TrendingResponse } from "../schemas/trending.js";
 import { z } from "zod";
 
 export class ApiClientError extends Error {
@@ -118,5 +119,23 @@ export class ApiClient {
     }
     const body: unknown = await res.json();
     return FeedResponseSchema.parse(body);
+  }
+
+  /**
+   * "Trending / under review" stream — fetch-DISCOVERED viral items ordered by
+   * virality, each with a derived status (monitoring / under_review /
+   * published / dismissed). Validates against the same zod schema the server
+   * uses, so contract drift throws rather than yielding `any`.
+   */
+  async getTrending(options?: { limit?: number }, fetchOptions?: RequestInit): Promise<TrendingResponse> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.set("limit", String(options.limit));
+    const qs = params.toString();
+    const res = await this.fetchImpl(`${this.baseUrl}/v1/trending${qs ? `?${qs}` : ""}`, fetchOptions);
+    if (!res.ok) {
+      throw new ApiClientError(`Unexpected status fetching trending: ${res.status}`, res.status);
+    }
+    const body: unknown = await res.json();
+    return TrendingResponseSchema.parse(body);
   }
 }

@@ -6,10 +6,13 @@ import type {
   FeedItem,
   IngestSource,
   Submission,
+  SubmissionStatus,
+  TrendingItem,
   WaitlistSignupInput,
   WaitlistSignupResult,
 } from "@fact-checker-ke/core";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
+import { deriveTrendingStatus, type TrendingCheckPointer } from "../lib/trending-status.js";
 import type {
   CheckRepository,
   DeviceTokenRepository,
@@ -17,6 +20,7 @@ import type {
   EntitlementRepository,
   RepoResult,
   SubmissionRepository,
+  TrendingRepository,
   WaitlistRepository,
 } from "./types.js";
 
@@ -150,6 +154,67 @@ export class InMemoryCheckRepository implements CheckRepository {
         })
         .filter((s): s is FeedItem["sources"][number] => s !== null),
     };
+  }
+}
+
+/**
+ * A seed input for the in-memory trending repo: the raw discovery (a fetch
+ * submission's columns) plus a pointer to its own check (if any). The repo
+ * applies the SAME `deriveTrendingStatus` + ordering the Postgres repo does,
+ * so the two back the same route faithfully.
+ */
+export interface TrendingSeedInput {
+  submissionId: string;
+  title: string;
+  platform: string | null;
+  sourceUrl: string | null;
+  viralityScore: number | null;
+  engagement: { views: number; likes: number; comments: number } | null;
+  observedAt: string;
+  submissionStatus: SubmissionStatus;
+  check: TrendingCheckPointer | null;
+}
+
+/**
+ * In-memory `TrendingRepository` for route tests and the DATABASE_URL-unset
+ * dev fallback. Mirrors `PostgresTrendingRepository`: virality DESC NULLS
+ * LAST, ties by observation recency, status derived per item.
+ */
+export class InMemoryTrendingRepository implements TrendingRepository {
+  private readonly store: TrendingSeedInput[] = [];
+
+  seed(input: TrendingSeedInput): void {
+    this.store.push(input);
+  }
+
+  async listTrending(opts: { limit: number }): Promise<TrendingItem[]> {
+    return [...this.store]
+      .sort((a, b) => {
+        // NULLS LAST on virality, then observation recency (desc).
+        const av = a.viralityScore;
+        const bv = b.viralityScore;
+        if (av === null && bv !== null) return 1;
+        if (av !== null && bv === null) return -1;
+        if (av !== null && bv !== null && av !== bv) return bv - av;
+        return b.observedAt.localeCompare(a.observedAt);
+      })
+      .slice(0, opts.limit)
+      .map((row) => {
+        const { status, checkId } = deriveTrendingStatus(row.submissionStatus, row.check);
+        return {
+          submissionId: row.submissionId,
+          title: row.title,
+          platform: row.platform,
+          sourceUrl: row.sourceUrl,
+          viralityScore: row.viralityScore,
+          engagement: row.engagement,
+          ingestSource: "fetch" as const,
+          status,
+          checkId,
+          observedAt: row.observedAt,
+          publishedAt: status === "published" ? (row.check?.publishedAt ?? null) : null,
+        };
+      });
   }
 }
 
