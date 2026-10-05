@@ -48,7 +48,12 @@ def emit_fetch_submission_received(
     """
     submission_id = submission_id or str(uuid4())
     event_id = str(uuid4())
-    occurred_at = datetime.now(UTC).isoformat()
+    # Emit a "Z" suffix (not Python's "+00:00" offset): the api's
+    # SubmissionReceivedEventSchema (packages/core events.ts) validates
+    # occurred_at with zod .datetime(), which rejects offset timestamps by
+    # default -> a fetch-ingested event with "+00:00" 400s at the
+    # /internal/hops/orchestrate boundary. Confirmed live 2026-10-05.
+    occurred_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
     payload = {
         "event_id": event_id,
