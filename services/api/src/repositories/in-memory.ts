@@ -85,6 +85,14 @@ export class InMemoryCheckRepository implements CheckRepository {
     return { ok: true, value: found };
   }
 
+  async getLatestForSubmission(submissionId: string): Promise<{ id: string; published: boolean } | null> {
+    const latest = [...this.store.values()]
+      .filter((c) => c.submissionId === submissionId)
+      .sort((a, b) => (b.createdAt as string).localeCompare(a.createdAt as string))[0];
+    if (!latest) return null;
+    return { id: latest.id, published: !latest.isDraft && latest.publishedAt !== null };
+  }
+
   async listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItem[]> {
     const published = [...this.store.values()]
       .filter((c) => !c.isDraft && c.publishedAt !== null)
