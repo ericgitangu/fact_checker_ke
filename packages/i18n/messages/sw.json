@@ -206,7 +206,25 @@
       "title": "Hakuna maandamano yanayofuatiliwa kwa sasa",
       "body": "Hakuna taarifa za maandamano zilizothibitishwa kwa sasa. Taarifa zitakapothibitishwa, zitaonekana hapa kwa kata na kaunti ndogo."
     },
-    "staleWarning": "Haijathibitishwa tena kwa zaidi ya saa 2 — hali inaweza kuwa si ya hivi karibuni."
+    "staleWarning": "Haijathibitishwa tena kwa zaidi ya saa 2 — hali inaweza kuwa si ya hivi karibuni.",
+    "media": {
+      "heading": "Klipu za taarifa hii",
+      "clipTitle": "Klipu iliyopachikwa kutoka {platform}",
+      "checking": "Tunakagua klipu hii kwa picha zilizotumika tena…",
+      "flaggedBadge": "⚠ Huenda ni picha zilizotumika tena — nakala ya awali ilionekana kabla ya tarehe hii.",
+      "viewSource": "Tazama kwenye jukwaa la chanzo"
+    },
+    "archive": {
+      "heading": "Taarifa zilizohitimishwa",
+      "intro": "Taarifa zilizokwisha au kughairiwa, pamoja na historia ya hali zao na viungo vya vyanzo. Hakuna media ya moja kwa moja inayotolewa hapa.",
+      "link": "Tazama taarifa zilizohitimishwa",
+      "backToLive": "Rudi kwenye taarifa za moja kwa moja",
+      "statusHistory": "Historia ya hali",
+      "empty": {
+        "title": "Bado hakuna taarifa zilizohitimishwa",
+        "body": "Taarifa inapokwisha au kughairiwa, itahifadhiwa hapa pamoja na historia yake kamili ya hali."
+      }
+    }
   },
   "feed": {
     "heading": "Tunachokihakiki sasa",

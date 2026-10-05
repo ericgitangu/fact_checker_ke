@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { ApiClient, type MaandamanoResponse } from "@fact-checker-ke/core";
 import { Reveal, MegaphoneIcon } from "@fact-checker-ke/brand";
 import { DemonstrationStatusChip } from "../../components/status-chip";
 import { EmptyState } from "../../components/empty-state";
 import { NightBand } from "../../components/night-band";
+import { MediaEmbeds } from "./media-embeds";
 
 /**
  * ADR-0007/ADR-0028 AT-0007-A kill switch. `/maandamano` is ISR-cached
@@ -92,6 +94,9 @@ export default async function MaandamanoPage(): Promise<React.JSX.Element> {
         <div>
           <h1>{t("heading")}</h1>
           <p style={{ color: "var(--ink-2)", marginTop: 6 }}>{t("intro")}</p>
+          <p style={{ marginTop: 6 }}>
+            <Link href="/maandamano/archive">{t("archive.link")}</Link>
+          </p>
         </div>
       </Reveal>
 
@@ -136,6 +141,7 @@ export default async function MaandamanoPage(): Promise<React.JSX.Element> {
                   </span>
                 </div>
                 {isStale(demo.updatedAt) && <p className="advisory-stale">{t("staleWarning")}</p>}
+                <MediaEmbeds media={demo.media} />
               </li>
             ))}
           </ul>

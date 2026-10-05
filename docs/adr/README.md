@@ -51,7 +51,7 @@ Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 
 | [0032](0032-virality-trending-detection.md) | Virality / trending-detection engine (autonomous fetch engine) | pivot | Proposed (two-engine pivot, 2026-10-04) — direction accepted, not built; KE source allow-list appendix pending research |
 | [0033](0033-legal-caveat-indemnity-framework.md) | Legal caveat, T&Cs, Privacy Policy & indemnity framework | pivot / legal | Proposed — **STARTER DRAFT, NOT LEGAL ADVICE**, advocate sign-off required before any text is published (2026-10-04) |
 | [0034](0034-context-rich-verdicts.md) | Context-rich verdicts (amends ADR-0004/0031): context leads, rating follows | no | Accepted (2026-10-05) — first-class `context` field + publish-time gate; AT-0034-1..5 GREEN |
-| [0035](0035-maandamano-live-media-archive.md) | Maandamano live media embeds, misinfo-checked, + archive (amends ADR-0007) | no | Proposed (additive amendment, 2026-10-05) — embed-only, kill-switch-gated, human-curated; AT-0035-1..7 RED |
+| [0035](0035-maandamano-live-media-archive.md) | Maandamano live media embeds, misinfo-checked, + archive (amends ADR-0007) | no | Accepted (2026-10-05) — embed-only, kill-switch-gated, human-curated; AT-0035-1..7 GREEN |
 
 Each row's status is copied verbatim from that ADR's own `**Status:**`
 line (source of truth); "implemented"/"implementation notes" callouts

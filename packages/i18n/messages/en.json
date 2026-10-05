@@ -206,7 +206,25 @@
       "title": "No active demonstrations tracked right now",
       "body": "There are no confirmed maandamano advisories at the moment. When verified advisories come in, they'll appear here by ward and sub-county."
     },
-    "staleWarning": "Not re-verified in over 2 hours — status may be out of date."
+    "staleWarning": "Not re-verified in over 2 hours — status may be out of date.",
+    "media": {
+      "heading": "Clips of this advisory",
+      "clipTitle": "Embedded clip from {platform}",
+      "checking": "Checking this clip for recycled footage…",
+      "flaggedBadge": "⚠ May be recycled footage — an earlier copy was seen before this date.",
+      "viewSource": "View on source platform"
+    },
+    "archive": {
+      "heading": "Concluded advisories",
+      "intro": "Advisories that have ended or been cancelled, with their status history and source links. No live media is served here.",
+      "link": "View concluded advisories",
+      "backToLive": "Back to live advisories",
+      "statusHistory": "Status history",
+      "empty": {
+        "title": "No concluded advisories yet",
+        "body": "When an advisory ends or is cancelled, it will be archived here with its full status history."
+      }
+    }
   },
   "feed": {
     "heading": "What we're checking now",

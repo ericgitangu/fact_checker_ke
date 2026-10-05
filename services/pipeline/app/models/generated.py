@@ -77,6 +77,51 @@ class Date(RootModel[date_aliased]):
     ]
 
 
+class Platform(StrEnum):
+    youtube = 'youtube'
+    x = 'x'
+    tiktok = 'tiktok'
+
+
+class Caption(RootModel[str]):
+    root: Annotated[str, Field(max_length=280)]
+
+
+class MisinfoStatus(StrEnum):
+    unchecked = 'unchecked'
+    checking = 'checking'
+    clear = 'clear'
+    flagged = 'flagged'
+
+
+class MisinfoNote(RootModel[str]):
+    root: Annotated[str, Field(max_length=500)]
+
+
+class DemonstrationMedia(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    id: Annotated[
+        UUID,
+        Field(
+            pattern='^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$'
+        ),
+    ]
+    platform: Platform
+    embed_url: Annotated[AnyUrl, Field(alias='embedUrl')]
+    caption: Caption | None
+    observed_at: Annotated[
+        AwareDatetime,
+        Field(
+            alias='observedAt',
+            pattern='^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$',
+        ),
+    ]
+    misinfo_status: Annotated[MisinfoStatus, Field(alias='misinfoStatus')]
+    misinfo_note: Annotated[MisinfoNote | None, Field(alias='misinfoNote')]
+
+
 class DemonstrationStatus(StrEnum):
     rumoured = 'rumoured'
     announced = 'announced'
@@ -249,6 +294,7 @@ class Demonstration(BaseModel):
             pattern='^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$',
         ),
     ]
+    media: Annotated[list[DemonstrationMedia] | None, Field(validate_default=True)] = []
 
 
 class Submission(BaseModel):

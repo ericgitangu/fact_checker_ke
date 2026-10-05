@@ -1,6 +1,11 @@
 import { SubmissionInputSchema, type SubmissionInput } from "../schemas/submission.js";
 import { CheckSchema, type Check } from "../schemas/check.js";
-import { MaandamanoResponseSchema, type MaandamanoResponse } from "../schemas/demonstration.js";
+import {
+  MaandamanoResponseSchema,
+  type MaandamanoResponse,
+  MaandamanoArchiveResponseSchema,
+  type MaandamanoArchiveResponse,
+} from "../schemas/demonstration.js";
 import { FeedResponseSchema, type FeedResponse } from "../schemas/feed.js";
 import { z } from "zod";
 
@@ -78,6 +83,22 @@ export class ApiClient {
     }
     const body: unknown = await res.json();
     return MaandamanoResponseSchema.parse(body);
+  }
+
+  /**
+   * ADR-0035 archive read model (AT-0035-5): `GET /v1/maandamano/archive`
+   * — `ended`/`cancelled` advisories with their status history + source/
+   * embed links, never raw media. Kill-switch-gated through the same
+   * frozen check as the live list (AT-0035-4). `fetchOptions` is passed
+   * through verbatim (same rationale as `getMaandamano`).
+   */
+  async getMaandamanoArchive(fetchOptions?: RequestInit): Promise<MaandamanoArchiveResponse> {
+    const res = await this.fetchImpl(`${this.baseUrl}/v1/maandamano/archive`, fetchOptions);
+    if (!res.ok) {
+      throw new ApiClientError(`Unexpected status fetching maandamano archive: ${res.status}`, res.status);
+    }
+    const body: unknown = await res.json();
+    return MaandamanoArchiveResponseSchema.parse(body);
   }
 
   /**
