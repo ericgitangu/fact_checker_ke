@@ -33,6 +33,27 @@ module "api_service" {
     REVALIDATE_SECRET = {
       secret = module.secret_revalidate_secret.secret_id
     }
+    # Reconciled from the live pilot (2026-10-05): SSE JWT, QStash publish +
+    # signature verification, the ADR-0035 misinfo callback secret, and the
+    # Redis TCP URL for SSE pub/sub.
+    CAPABILITY_TOKEN_SECRET = {
+      secret = module.secret_capability_token_secret.secret_id
+    }
+    QSTASH_TOKEN = {
+      secret = module.secret_qstash_token.secret_id
+    }
+    QSTASH_CURRENT_SIGNING_KEY = {
+      secret = module.secret_qstash_current_signing_key.secret_id
+    }
+    QSTASH_NEXT_SIGNING_KEY = {
+      secret = module.secret_qstash_next_signing_key.secret_id
+    }
+    PIPELINE_CALLBACK_SECRET = {
+      secret = module.secret_pipeline_callback_secret.secret_id
+    }
+    REDIS_TCP_URL = {
+      secret = module.secret_redis_tcp_url.secret_id
+    }
   }
   # Go-live plumbing (docs/runbooks/activate-on-keys-audit.md gap +
   # ADR-0015 AT-0015-2): the production CORS allow-list. Previously
@@ -43,6 +64,15 @@ module "api_service" {
   # is no second origin to add here -- just the one live web origin.
   plain_env = {
     CORS_ORIGINS = "https://fact-checker-ke-web.vercel.app"
+    # Reconciled from the live pilot (2026-10-05). PIPELINE_BASE_URL: the
+    # orchestrator calls the pipeline's hops directly (ADR-0032 C1). Hardcoded
+    # (not module.pipeline_service[0].url) to avoid an api<->pipeline reference
+    # cycle, since the pipeline also needs API_BASE_URL. API_SELF_BASE_URL: the
+    # orchestrate callback target (QStash can't reach localhost). HOST=:: binds
+    # IPv6 for Cloud Run.
+    PIPELINE_BASE_URL = "https://fact-checker-ke-pipeline-zytlwdcoxa-bq.a.run.app"
+    API_SELF_BASE_URL = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
+    HOST              = "::"
   }
 }
 
@@ -88,6 +118,11 @@ module "pipeline_service" {
     REVERSE_IMAGE_API_KEY = {
       secret = module.secret_reverse_image_api_key.secret_id
     }
+    # ADR-0035: the misinfo write-back POSTs to services/api with this shared
+    # secret (reconciled from the live pilot, 2026-10-05).
+    PIPELINE_CALLBACK_SECRET = {
+      secret = module.secret_pipeline_callback_secret.secret_id
+    }
   }
   # Go-live safety (docs/runbooks/go-live.md §2.2, "belt-and-suspenders"):
   # app/main.py reads FETCH_ENGINE_ENABLED and defaults to "true" when
@@ -99,7 +134,14 @@ module "pipeline_service" {
   # documented step 1 of go-live.md §5's later un-freeze sequence --
   # never the implicit default.
   plain_env = {
-    FETCH_ENGINE_ENABLED = "false"
+    # Reconciled from the live pilot (2026-10-05): the autonomous fetch engine
+    # was deliberately un-frozen (go-live.md §5 step 1) — this encodes that
+    # armed state so a future apply keeps it on rather than re-freezing. The
+    # DB-backed fetch_engine_kill_switch (migration 0014) remains the runtime
+    # guard. publishedAfter window pinned to 2 days ("current virals only").
+    FETCH_ENGINE_ENABLED         = "true"
+    YOUTUBE_PUBLISHED_AFTER_DAYS = "2"
+    API_BASE_URL                 = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
   }
 }
 

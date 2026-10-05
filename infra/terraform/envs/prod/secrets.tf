@@ -135,3 +135,61 @@ module "secret_x_api_bearer_token" {
     google_service_account.pipeline_runtime.email,
   ]
 }
+
+# --- Go-live/pilot secrets reconciled into IaC (2026-10-05) ---
+# These secret CONTAINERS were created out-of-band (`gcloud secrets create`)
+# during the live pilot; encoding them here makes the wiring durable and the
+# plan a no-op. Values never enter state (the secret module is container-only;
+# versions are added with `gcloud secrets versions add --data-file=-`).
+
+module "secret_capability_token_secret" {
+  source     = "../../modules/secret"
+  project_id = var.project_id
+  secret_id  = "fact-checker-ke-capability-token-secret"
+  # services/api/src/config.ts reads CAPABILITY_TOKEN_SECRET (SSE events JWT).
+  accessors = [google_service_account.api_runtime.email]
+}
+
+module "secret_qstash_token" {
+  source     = "../../modules/secret"
+  project_id = var.project_id
+  secret_id  = "fact-checker-ke-qstash-token"
+  # services/api: QStash publish (outbox relay / schedules).
+  accessors = [google_service_account.api_runtime.email]
+}
+
+module "secret_qstash_current_signing_key" {
+  source     = "../../modules/secret"
+  project_id = var.project_id
+  secret_id  = "fact-checker-ke-qstash-current-signing-key"
+  # services/api/src/lib/internal-auth.ts: QStash signature verification.
+  accessors = [google_service_account.api_runtime.email]
+}
+
+module "secret_qstash_next_signing_key" {
+  source     = "../../modules/secret"
+  project_id = var.project_id
+  secret_id  = "fact-checker-ke-qstash-next-signing-key"
+  accessors  = [google_service_account.api_runtime.email]
+}
+
+module "secret_pipeline_callback_secret" {
+  source     = "../../modules/secret"
+  project_id = var.project_id
+  secret_id  = "fact-checker-ke-pipeline-callback-secret"
+  # ADR-0035 misinfo write-back: pipeline POSTs the reverse-image result,
+  # services/api verifies this shared secret (fail-closed when unset).
+  accessors = [
+    google_service_account.api_runtime.email,
+    google_service_account.pipeline_runtime.email,
+  ]
+}
+
+module "secret_redis_tcp_url" {
+  source     = "../../modules/secret"
+  project_id = var.project_id
+  secret_id  = "fact-checker-ke-redis-tcp-url"
+  # services/api/src/lib/pubsub.ts (ioredis) reads REDIS_TCP_URL for SSE
+  # pub/sub across Cloud Run instances (rediss:// — TLS required by Upstash).
+  accessors = [google_service_account.api_runtime.email]
+}
