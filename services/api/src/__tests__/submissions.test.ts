@@ -32,6 +32,7 @@ function seedCheck(
     publishedAt: args.published ? new Date().toISOString() : null,
     calibratedConfidence: null,
     whatWouldChangeThis: null,
+    context: args.published ? "The claim restates a figure the cited source corrects." : null,
     evidence: [],
     riskTier: null,
   });

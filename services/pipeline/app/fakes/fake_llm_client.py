@@ -158,6 +158,12 @@ class FakeLlmClient(LlmClient):
                         "published this week; the evidence shows a smaller increase than "
                         "claimed."
                     ),
+                    "context": (
+                        "The claim asserts fuel prices rose sharply this month. The "
+                        "misleading part is the magnitude, not the direction: the official "
+                        "price-cap schedule published this week shows a smaller increase "
+                        "than claimed, so the figure overstates a real but smaller change."
+                    ),
                     # A high-confidence, auto-publishable verdict MUST cite its
                     # evidence (ADR-0031 AT-0031-1): this fixture cites the fake
                     # Fact Check Tools hit (app/fakes/..FakeFactCheckClient,
@@ -183,6 +189,11 @@ class FakeLlmClient(LlmClient):
                         "The claim is contradicted by the official record; the "
                         "named individual did not do what is claimed."
                     ),
+                    "context": (
+                        "The claim asserts a named individual took a specific action. It "
+                        "misleads by attributing an act the official record does not "
+                        "support; the record shows the action did not happen."
+                    ),
                     "citations": [],
                     "confidence": 0.9,
                     "what_would_change_this": "A primary-source record corroborating the claim.",
@@ -201,6 +212,11 @@ class FakeLlmClient(LlmClient):
                     "rationale": (
                         "Submission contains instruction-like text rather than a "
                         "checkable factual claim; declining to rate."
+                    ),
+                    "context": (
+                        "The submission is phrased as instructions rather than a factual "
+                        "assertion, so there is no checkable claim to contextualise; it is "
+                        "declined rather than rated."
                     ),
                     "citations": [],
                     "confidence": 0.0,
@@ -229,6 +245,11 @@ class FakeLlmClient(LlmClient):
             {
                 "rating": "Unproven",
                 "rationale": "Fake draft verdict fixture: insufficient fixture evidence to confirm or refute.",
+                "context": (
+                    "The claim asserts a specific figure. The retrieved fixture sources "
+                    "are insufficient to confirm or refute it, so the evidence gap — not a "
+                    "finding — is what stands, and the claim remains Unproven."
+                ),
                 "citations": [{"doc_id": doc_id, "quoted_span": quoted_span}] if idx != -1 else [],
                 "confidence": 0.4,
                 "what_would_change_this": "A primary-source KNBS/official release matching the claim's figures.",

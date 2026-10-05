@@ -39,6 +39,8 @@ interface VerifyHopResponseBody {
     rationale: string;
     confidence: number;
     what_would_change_this: string;
+    // ADR-0034: the reader-facing context that leads the artifact.
+    context: string | null;
   } | null;
   rejected: boolean;
   rejection_reason: string | null;
@@ -215,6 +217,7 @@ export async function runSubmissionOrchestration(
       riskTier: verify.publish.risk_tier,
       calibratedConfidence: verify.verdict ? String(verify.verdict.confidence) : null,
       whatWouldChangeThis: verify.verdict?.what_would_change_this ?? null,
+      context: verify.verdict?.context ?? null,
       ingestSource,
     })
     .returning();
@@ -270,6 +273,11 @@ export async function runSubmissionOrchestration(
   // Fail-closed: this is the publish-time half of the invariant the schema
   // enforces at read time.
   const hasEvidence = evidenceItems.length > 0;
+  // ADR-0034: context leads a published artifact, so (belt-and-suspenders to
+  // the pipeline's own rating-implies-context assertion) a verdict with no
+  // context is never auto-published — held for an editor instead.
+  const hasContext = typeof verify.verdict?.context === "string" && verify.verdict.context.trim().length > 0;
+  const publishable = hasEvidence && hasContext;
 
   const enactment = await enactPublishDecision(args.db, {
     checkId: check.id,
@@ -279,10 +287,12 @@ export async function runSubmissionOrchestration(
     summary,
     riskTier: verify.publish.risk_tier,
     decision: {
-      autoPublish: verify.publish.auto_publish && hasEvidence,
-      reason: hasEvidence
+      autoPublish: verify.publish.auto_publish && publishable,
+      reason: publishable
         ? verify.publish.reason
-        : "held for editor review: no citable evidence to satisfy the published-check requirement (ADR-0031 AT-0031-1)",
+        : !hasEvidence
+          ? "held for editor review: no citable evidence to satisfy the published-check requirement (ADR-0031 AT-0031-1)"
+          : "held for editor review: no context to lead the published assessment (ADR-0034)",
       publishMode: verify.publish.publish_mode,
       queuedForAsyncAudit: verify.publish.queued_for_async_audit,
       requiresHumanTap: verify.publish.requires_human_tap,
