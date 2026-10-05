@@ -124,14 +124,24 @@ export class PostgresCheckRepository implements CheckRepository {
       return { ok: false, error: { kind: "not_found", message: `Check ${id} not found` } };
     }
 
-    const [claimRows, sourceRows, evidenceRows] = await Promise.all([
+    const [claimRows, sourceRowsRaw, evidenceRows] = await Promise.all([
       this.db.select().from(schema.claims).where(eq(schema.claims.checkId, id)),
-      // Sources aren't linked to a check via a column in the current
-      // schema (they're linked implicitly through retrieval, tracked as
-      // a schema gap below) — returned empty until that join exists.
-      Promise.resolve([] as (typeof schema.sources.$inferSelect)[]),
+      // The cited sources, via the check_evidence <-> sources join (same
+      // pattern as listPublished). The orchestrator persists one `sources`
+      // row + one `check_evidence` row per cited source (ADR-0031
+      // AT-0031-1), so this resolves every `evidence[].sourceId` to its
+      // url/publisher for display.
+      this.db
+        .select()
+        .from(schema.sources)
+        .innerJoin(schema.checkEvidence, eq(schema.checkEvidence.sourceId, schema.sources.id))
+        .where(eq(schema.checkEvidence.checkId, id)),
       this.db.select().from(schema.checkEvidence).where(eq(schema.checkEvidence.checkId, id)),
     ]);
+    // Dedup: a source cited by more than one evidence row appears once.
+    const sourceRows = Array.from(
+      new Map(sourceRowsRaw.map((r) => [r.sources.id, r.sources])).values(),
+    );
 
     return {
       ok: true,
