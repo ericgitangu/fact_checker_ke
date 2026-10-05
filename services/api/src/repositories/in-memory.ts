@@ -110,6 +110,7 @@ export class InMemoryCheckRepository implements CheckRepository {
       ingestSource: this.ingestSourceByCheckId.get(check.id) ?? "submission",
       riskTier: check.riskTier,
       whatWouldChangeThis: check.whatWouldChangeThis,
+      context: check.context,
       publishedAt: check.publishedAt as string,
       sources: check.evidence
         .map((item) => {

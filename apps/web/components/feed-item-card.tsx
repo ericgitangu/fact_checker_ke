@@ -59,6 +59,14 @@ export async function FeedItemCard({ item }: { item: FeedItem }): Promise<React.
         <MarkdownText content={item.claim} inline />
       </p>
 
+      {/* ADR-0034: lead the row with the context — what the claim asserts and
+          how it misleads — so the feed explains, not just labels. */}
+      {item.context && (
+        <p className="feedcard-context">
+          <MarkdownText content={item.context} inline />
+        </p>
+      )}
+
       <p className="checkcard-rationale">{tCheck("guidance.claimAttributedNote")}</p>
 
       {item.sources.length > 0 && (

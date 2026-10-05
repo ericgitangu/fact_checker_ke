@@ -14,6 +14,7 @@ const validCheck = {
   publishedAt: null,
   calibratedConfidence: null,
   whatWouldChangeThis: null,
+  context: null,
   evidence: [],
   riskTier: null,
 };

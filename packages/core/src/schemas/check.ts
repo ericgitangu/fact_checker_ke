@@ -36,6 +36,11 @@ export const CheckSchema = z
     calibratedConfidence: z.number().min(0).max(1).nullable(),
     /** ADR-0004 step 6 / ADR-0031: what evidence would change this assessment. */
     whatWouldChangeThis: z.string().min(1).max(2000).nullable(),
+    /** ADR-0034: the reader-facing context that LEADS the artifact — (a) what
+     * the claim asserts, (b) how it misleads, (c) the actual context + any
+     * kernel of truth. Nullable at rest; required non-empty on a published
+     * check (superRefine below), same gate as whatWouldChangeThis. */
+    context: z.string().min(1).max(2000).nullable(),
     /** Cited evidence backing the assessment (ADR-0031's "here are the sources"). */
     evidence: z.array(EvidenceItemSchema),
     /** The risk tier that gated (or will gate) auto-publish for this Check. */
@@ -67,7 +72,18 @@ export const CheckSchema = z
         message: "A published Check must cite at least one evidence item (ADR-0031 AT-0031-1).",
       });
     }
-    if (isBareIndictmentFraming(check.summary)) {
+    // ADR-0034: context is the artifact's LEAD, so it is required on publish
+    // (same gate as what_would_change_this) and is policed by the same
+    // bare-indictment framing ban as the summary, so it can't smuggle an
+    // accusation past ADR-0023.
+    if (check.context === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["context"],
+        message: "A published Check must carry context (ADR-0034).",
+      });
+    }
+    if (isBareIndictmentFraming(check.summary) || (check.context !== null && isBareIndictmentFraming(check.context))) {
       ctx.addIssue({
         code: "custom",
         path: ["summary"],

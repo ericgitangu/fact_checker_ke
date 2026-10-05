@@ -800,6 +800,30 @@ a:hover {
   color: var(--ink-2);
 }
 
+/* ADR-0034: the context that leads the artifact — reads as the lede, a notch
+   above body text, with a quiet left rule so it registers as the frame the
+   rating sits inside, not just another paragraph. */
+.checkcard-context {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--line, color-mix(in srgb, var(--ink) 14%, transparent));
+}
+.checkcard-context > * + * {
+  margin-top: 0.6rem;
+}
+
+/* The feed-row variant of the context lead: tighter, but the same quiet
+   left rule so a row reads as explanation, not just a labelled claim. */
+.feedcard-context {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--line, color-mix(in srgb, var(--ink) 14%, transparent));
+}
+
 .checkcard-meta {
   display: flex;
   flex-wrap: wrap;
