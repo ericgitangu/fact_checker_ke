@@ -166,6 +166,12 @@ class SubmissionStatus(StrEnum):
     failed = 'failed'
 
 
+class Interest(StrEnum):
+    premium = 'premium'
+    sponsor = 'sponsor'
+    free = 'free'
+
+
 class Status(StrEnum):
     joined = 'joined'
     already_joined = 'already_joined'
@@ -284,6 +290,7 @@ class WaitlistSignupInput(BaseModel):
     ]
     source: WaitlistSource | None = None
     referrer: Annotated[str | None, Field(max_length=500)] = None
+    interest: Interest | None = None
 
 
 class Check(BaseModel):
