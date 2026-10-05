@@ -2,8 +2,10 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
-import { WaitlistSignupInputSchema } from "@fact-checker-ke/core";
+import { WaitlistInterestSchema, WaitlistSignupInputSchema, type WaitlistInterest } from "@fact-checker-ke/core";
 import { classifyWaitlistResponse } from "../lib/waitlist-outcome";
+
+const INTEREST_OPTIONS: readonly WaitlistInterest[] = WaitlistInterestSchema.options;
 
 type WaitlistState =
   | { status: "idle" }
@@ -39,13 +41,23 @@ const BUSY_STATES: ReadonlySet<WaitlistState["status"]> = new Set(["submitting"]
 export function WaitlistForm(): React.JSX.Element {
   const t = useTranslations("landing.waitlist");
   const [email, setEmail] = useState("");
+  // ADR-0012 monetization-signal capture: one low-friction optional select,
+  // never required and never blocks the submit. "" means "no answer" and is
+  // stripped before the request goes out (an empty string would fail the
+  // core enum schema, unlike an omitted field).
+  const [interest, setInterest] = useState<WaitlistInterest | "">("");
   const [state, setState] = useState<WaitlistState>({ status: "idle" });
   const statusId = useId();
+  const interestId = useId();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
-    const parsedInput = WaitlistSignupInputSchema.safeParse({ email, source: "web" });
+    const parsedInput = WaitlistSignupInputSchema.safeParse({
+      email,
+      source: "web",
+      interest: interest || undefined,
+    });
     if (!parsedInput.success) {
       setState({ status: "invalid", message: t("status.invalid") });
       return;
@@ -58,8 +70,12 @@ export function WaitlistForm(): React.JSX.Element {
       res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        // Only the email leaves the browser; the BFF stamps `source`.
-        body: JSON.stringify({ email: parsedInput.data.email }),
+        // Only the email + optional interest signal leave the browser; the
+        // BFF stamps `source` server-side.
+        body: JSON.stringify({
+          email: parsedInput.data.email,
+          ...(parsedInput.data.interest ? { interest: parsedInput.data.interest } : {}),
+        }),
       });
     } catch {
       // Only a rejected fetch (offline, DNS) is a network error. Never log
@@ -100,6 +116,22 @@ export function WaitlistForm(): React.JSX.Element {
         aria-invalid={state.status === "invalid"}
         aria-describedby={statusId}
       />
+      <div className="waitlist-interest">
+        <label htmlFor={interestId}>{t("interest.label")}</label>
+        <select
+          id={interestId}
+          value={interest}
+          onChange={(e) => setInterest(e.target.value as WaitlistInterest | "")}
+          disabled={isBusy || isDone}
+        >
+          <option value="">{t("interest.placeholder")}</option>
+          {INTEREST_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {t(`interest.options.${option}`)}
+            </option>
+          ))}
+        </select>
+      </div>
       <button type="submit" disabled={isBusy || isDone}>
         {isBusy ? t("joining") : isDone ? t("joined") : t("join")}
       </button>

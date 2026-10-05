@@ -506,6 +506,14 @@
         "referrer": {
           "type": "string",
           "maxLength": 500
+        },
+        "interest": {
+          "type": "string",
+          "enum": [
+            "premium",
+            "sponsor",
+            "free"
+          ]
         }
       },
       "required": [

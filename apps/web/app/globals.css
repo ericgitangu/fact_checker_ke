@@ -95,6 +95,17 @@
   --brand: var(--true);
   --focus-ring: var(--brand);
 
+  /*
+   * Premium-tier accent (ADR-0012). DELIBERATELY NOT a verdict colour or a
+   * maandamano status colour (see header comment) — reusing one of those
+   * would visually imply a paid tier changes a rating or a protest status,
+   * which it never does. #7a5c12 measures 5.48:1 against --premium-tint
+   * (computed with the real WCAG relative-luminance formula against these
+   * exact hex values), comfortably above the 4.5:1 AA floor.
+   */
+  --premium: #7a5c12;
+  --premium-tint: #f7f0dd;
+
   --sans: var(--font-archivo), "Archivo", system-ui, sans-serif;
   /* Display/headline typeface — Bricolage Grotesque, SAME family + weight
      range as apps/site (see packages/brand/README.md's "Font parity"
@@ -164,6 +175,11 @@
   --status-amber-tint: rgba(240, 180, 75, 0.16);
   --status-slate: #9db0a6;
   --status-slate-tint: rgba(157, 176, 166, 0.14);
+
+  /* Same brighten-for-near-black-AA treatment as the verdict/status tokens
+     above, following the established pattern for this token family. */
+  --premium: #e3b94a;
+  --premium-tint: rgba(227, 185, 74, 0.16);
 
   color-scheme: dark;
 }
@@ -2151,6 +2167,38 @@ a:hover {
   cursor: default;
 }
 
+/* ADR-0012 monetization-signal select: a full-width row of its own so it
+   reads as a secondary, optional step after the email + join row, never
+   competing with the primary action. */
+.waitlist-interest {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.waitlist-interest label {
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+
+.waitlist-interest select {
+  padding: 11px 14px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.95rem;
+  background: var(--surface);
+  color: var(--ink);
+  max-width: 100%;
+}
+
+.waitlist-interest select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-color: var(--brand);
+}
+
 .waitlist-status {
   flex-basis: 100%;
   margin: 2px 0 0;
@@ -2178,6 +2226,163 @@ a:hover {
   color: var(--ink);
 }
 
+/* ---------- premium teaser (ADR-0012) ---------- */
+/* The one bold object on this section of the page — same "pressed onto the
+   record" stamp language as .verdict-stamp, in the dedicated --premium
+   accent (never a verdict colour, see :root comment) so it reads as its
+   own distinct surface rather than a seventh rating. */
+.landing-premium {
+  display: flex;
+  justify-content: center;
+}
+
+.premium-card {
+  position: relative;
+  width: 100%;
+  background: var(--surface);
+  border: 1.5px solid color-mix(in srgb, var(--premium) 40%, transparent);
+  border-radius: 20px;
+  padding: clamp(32px, 6vw, 56px);
+  box-shadow: 0 1px 0 var(--rule) inset;
+}
+
+.premium-eyebrow {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--premium);
+  background: var(--premium-tint);
+  border: 1.5px solid color-mix(in srgb, var(--premium) 45%, transparent);
+  transform: rotate(-1.5deg);
+}
+
+.premium-card h2 {
+  margin-top: 18px;
+  font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+  max-width: 24ch;
+}
+
+.premium-body {
+  margin-top: 14px;
+  max-width: 62ch;
+  color: var(--ink-2);
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+
+.premium-features {
+  list-style: none;
+  margin: 32px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px 40px;
+}
+
+.premium-features li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.premium-feature-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--premium);
+  background: var(--premium-tint);
+}
+
+.premium-features h3 {
+  font-family: var(--sans);
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.premium-features p {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.premium-actions {
+  margin-top: 36px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.premium-note {
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+
+/* ---------- sponsor / partner CTA (ADR-0012, ADR-0030) ---------- */
+/* Deliberately quieter than .premium-card — a disciplined, bordered block
+   rather than a second stamp, so the one place this page spends visual
+   boldness stays the Premium teaser and the trust positioning ("independent,
+   open-source") isn't undercut by a second loud commercial surface. */
+.sponsor {
+  border: 1px solid var(--rule-strong);
+  border-radius: 16px;
+  padding: clamp(28px, 5vw, 44px);
+  background: var(--paper-2);
+}
+
+.sponsor-eyebrow {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.sponsor h2 {
+  margin-top: 10px;
+  font-size: clamp(1.5rem, 2.8vw, 2.1rem);
+  max-width: 28ch;
+}
+
+.sponsor-body {
+  margin-top: 12px;
+  max-width: 62ch;
+  color: var(--ink-2);
+}
+
+.sponsor-firewall {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 20px;
+  max-width: 62ch;
+  padding-left: 14px;
+  border-left: 2px solid var(--true);
+  font-size: 0.92rem;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+.sponsor-firewall svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--true);
+}
+
+.sponsor-actions {
+  margin-top: 24px;
+}
+
 /* ---------- landing responsive (375px-audited) ---------- */
 @media (max-width: 860px) {
   .landing-hero {
@@ -2185,6 +2390,9 @@ a:hover {
     gap: 36px;
   }
   .landing-principles-list {
+    grid-template-columns: 1fr;
+  }
+  .premium-features {
     grid-template-columns: 1fr;
   }
 }
