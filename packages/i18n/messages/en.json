@@ -11,13 +11,20 @@
       "terms": "Terms",
       "privacy": "Privacy",
       "menu": "Menu",
-      "submit": "Submit"
+      "submit": "Submit",
+      "join": "How to join",
+      "contact": "Contact"
     },
     "footer": {
       "tagline": "An independent, open-source fact-checking project for Kenya.",
       "languages": "English, Swahili & Sheng",
       "builtIn": "Built in Nairobi",
-      "legalPending": "Terms & Privacy (pending legal review)"
+      "legalPending": "Draft — pending legal review",
+      "groupProduct": "Product",
+      "groupProject": "Project",
+      "groupLegal": "Legal",
+      "sourceLink": "View source on GitHub",
+      "rights": "© {year} fact_checker_ke. Open-source, Apache-2.0."
     },
     "action": {
       "submit": "Check this",
@@ -412,6 +419,62 @@
         "misconfigured": "The waitlist isn't available right now. Please check back soon.",
         "networkError": "We couldn't reach the server — check your connection and try again."
       }
+    }
+  },
+  "contact": {
+    "title": "Contact",
+    "intro": "Press enquiries, corrections, right-of-reply requests, partnership or contribution questions — reach the founder directly.",
+    "card": {
+      "roleLabel": "Role",
+      "role": "Founder · Software Engineering Lead / Architect",
+      "locationLabel": "Location",
+      "location": "Nairobi, Kenya",
+      "emailLabel": "Email",
+      "linksLabel": "Elsewhere",
+      "github": "GitHub",
+      "linkedin": "LinkedIn",
+      "site": "Portfolio site",
+      "download": "Download vCard (.vcf)",
+      "downloaded": "Saved — check your downloads",
+      "sourceNote": "Details sourced directly from developer.ericgitangu.com; nothing here is invented."
+    },
+    "rightOfReply": {
+      "heading": "Right of reply & corrections",
+      "body": "If a published check names you and you believe it is wrong, unfair, or missing context, say so here. Every assessment on fact_checker_ke carries a right of reply and correction path — see the Methodology page and the standing caveat on each check."
+    }
+  },
+  "join": {
+    "title": "How to join the movement",
+    "intro": "fact_checker_ke is a small, open team trying to make Kenya's loudest claims checkable — against evidence, not vibes. It stays useful only if more people help build, check, and spread it.",
+    "mission": {
+      "heading": "Why this exists",
+      "body": "Claims travel faster than corrections, especially in Kenyan WhatsApp groups and timelines during an election, a protest, or a crisis. fact_checker_ke pairs an automated fetch-and-assess engine with a submission flow and async editorial audit, cites every source, shows its confidence, and gives named people a right of reply — see the Methodology page for the full pipeline."
+    },
+    "ways": {
+      "heading": "Ways to get involved",
+      "contribute": {
+        "title": "Contribute code or review",
+        "body": "The whole stack is open-source on GitHub — pipeline, web app, infra, docs. Issues are labelled for first-time contributors; ADRs explain the reasoning behind the harder calls.",
+        "cta": "Browse the repo"
+      },
+      "check": {
+        "title": "Submit or flag a claim",
+        "body": "Spot a claim worth checking, or evidence we got wrong? Submitting is the fastest way to help right now — no sign-up required.",
+        "cta": "Submit a claim"
+      },
+      "partner": {
+        "title": "Partner, sponsor, or go Premium early",
+        "body": "Newsrooms, civic-tech groups, and funders who want to back independent fact-checking in Kenya can register interest — sponsorship funds the work, never the verdict.",
+        "cta": "Register interest"
+      }
+    },
+    "futureNote": {
+      "heading": "Open today — honestly, that may change",
+      "body": "fact_checker_ke is fully open-source and free to use right now. As monetization matures (Premium tiers, sponsorships — see the landing page), parts of the project may move to a gated or private-access model where new contributors request access rather than fork freely. If you want in, the earliest path is registering interest below or opening a pull request today, while everything is still open."
+    },
+    "register": {
+      "heading": "Register your interest",
+      "body": "Leave your email and tell us what best describes you — we'll reach out as contributor and partner access opens up."
     }
   }
 }

@@ -413,27 +413,121 @@ a:hover {
   color: var(--ink);
 }
 
+/* Production footer (replaces the old single-line tagline strip): a
+   brand column + three real link groups (Product/Project/Legal), then a
+   quiet rights line underneath — see components/site-chrome.tsx's
+   `AppFooter`. Deliberately plain/bordered, never a loud card: the
+   footer is the lowest-priority visual register on every page, after the
+   verdict stamps, the premium teaser and the sponsor block. */
 .app-footer {
-  padding: 32px 0 56px;
+  padding: 48px 0 32px;
   border-top: 1px solid var(--rule);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 14px 28px;
-  align-items: baseline;
   font-size: 0.9rem;
   color: var(--ink-3);
 }
 
-.app-footer a {
+.footer-top {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) 2fr;
+  gap: 40px;
+}
+
+.footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 34ch;
+}
+
+.footer-brand .wordmark {
+  margin-bottom: 2px;
+}
+
+.footer-tagline {
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.footer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+
+.footer-groups {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.footer-col-title {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-legal-badge {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+}
+
+.footer-links {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--ink-2);
   text-decoration: none;
 }
 
-.app-footer a:hover {
+.footer-links a:hover {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.footer-bottom {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+
+@media (max-width: 860px) {
+  .footer-top {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .footer-groups {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (max-width: 560px) {
+  .footer-groups {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .app-main {
@@ -2405,5 +2499,134 @@ a:hover {
   .type-caret {
     animation: none;
     display: none;
+  }
+}
+
+/* ---------- /contact: founder contact card ---------- */
+.contact-card {
+  border: 1px solid var(--rule-strong);
+  border-radius: 16px;
+  padding: clamp(24px, 5vw, 36px);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.contact-card-name {
+  font-size: 1.35rem;
+}
+
+.contact-card-role {
+  margin-top: 4px;
+  color: var(--ink-2);
+  font-size: 0.95rem;
+}
+
+.contact-card-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+.contact-card-facts dt {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.contact-card-facts dd {
+  margin: 4px 0 0;
+  color: var(--ink);
+}
+
+.contact-card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.contact-card-links a,
+.contact-card-facts a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.contact-card-links a:hover,
+.contact-card-facts a:hover {
+  border-color: var(--ink);
+}
+
+.contact-card-actions {
+  padding-top: 4px;
+}
+
+.contact-card-source-note {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  border-top: 1px solid var(--rule);
+  padding-top: 14px;
+}
+
+/* ---------- /join: ways-to-get-involved cards ---------- */
+.join-ways {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.join-way-card {
+  border: 1px solid var(--rule-strong);
+  border-radius: 16px;
+  padding: clamp(20px, 4vw, 28px);
+  background: var(--paper-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.join-way-card h3 {
+  font-family: var(--sans);
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.join-way-card p {
+  font-size: 0.9rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+  flex: 1;
+}
+
+.join-future-note {
+  border: 1px solid var(--rule-strong);
+  border-left: 3px solid var(--status-amber);
+  border-radius: 12px;
+  padding: clamp(20px, 4vw, 28px);
+  background: var(--paper-2);
+}
+
+.join-future-note h2 {
+  font-size: 1.1rem;
+}
+
+.join-future-note p {
+  margin-top: 10px;
+  color: var(--ink-2);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .join-ways {
+    grid-template-columns: 1fr;
   }
 }
