@@ -102,6 +102,17 @@ export class PostgresSubmissionRepository implements SubmissionRepository {
 export class PostgresCheckRepository implements CheckRepository {
   constructor(private readonly db: Database) {}
 
+  async getLatestForSubmission(submissionId: string): Promise<{ id: string; published: boolean } | null> {
+    const [row] = await this.db
+      .select({ id: schema.checks.id, isDraft: schema.checks.isDraft, publishedAt: schema.checks.publishedAt })
+      .from(schema.checks)
+      .where(eq(schema.checks.submissionId, submissionId))
+      .orderBy(desc(schema.checks.createdAt))
+      .limit(1);
+    if (!row) return null;
+    return { id: row.id, published: !row.isDraft && row.publishedAt !== null };
+  }
+
   async getById(id: string): Promise<RepoResult<Check>> {
     const [checkRow] = await this.db
       .select()

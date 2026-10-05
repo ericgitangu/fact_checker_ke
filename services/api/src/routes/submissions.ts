@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { SubmissionInputSchema } from "@fact-checker-ke/core";
-import type { SubmissionRepository } from "../repositories/types.js";
+import type { SubmissionRepository, CheckRepository } from "../repositories/types.js";
 import type { SubmissionService } from "../lib/submission-service.js";
 import { hashRequestBody } from "../lib/idempotency.js";
 import { submissionEtag, NO_STORE_CACHE_CONTROL } from "../lib/cache-headers.js";
@@ -12,7 +12,12 @@ const IdempotencyKeySchema = z.string().uuid();
 
 export async function submissionRoutes(
   app: FastifyInstance,
-  deps: { submissions: SubmissionRepository; submissionService: SubmissionService; deviceQuotaGuard: DeviceQuotaGuard },
+  deps: {
+    submissions: SubmissionRepository;
+    submissionService: SubmissionService;
+    deviceQuotaGuard: DeviceQuotaGuard;
+    checks: CheckRepository;
+  },
 ): Promise<void> {
   app.post("/v1/submissions", async (request, reply) => {
     // ADR-0020 §1/§7: the device token (from POST /v1/device) is
@@ -114,6 +119,19 @@ export async function submissionRoutes(
       return reply.status(304).send();
     }
 
-    return reply.status(200).send(result.value);
+    // Resolve the submission's REAL resulting check (distinct id from the
+    // submission) so the tracker can link to the published assessment —
+    // or, for a held draft, know it is not yet public. null while still
+    // in-flight or for a `failed` dead-end. The ETag stays keyed on
+    // (status, updatedAt): a check only exists once status has advanced to
+    // `ready`, which already moves updatedAt, so a polling client refetches
+    // and picks up `checkId` exactly when it becomes available.
+    const check = await deps.checks.getLatestForSubmission(request.params.id);
+
+    return reply.status(200).send({
+      ...result.value,
+      checkId: check?.id ?? null,
+      checkPublished: check?.published ?? false,
+    });
   });
 }

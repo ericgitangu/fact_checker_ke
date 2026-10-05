@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { SubmissionSchema } from "@fact-checker-ke/core";
+import { SubmissionStatusResponseSchema } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
 import { StatusTracker } from "../../../components/status-tracker";
 
@@ -14,7 +14,7 @@ async function getSubmission(id: string) {
     if (res.status === 404) return null;
     if (!res.ok) return null;
     const body: unknown = await res.json();
-    const parsed = SubmissionSchema.safeParse(body);
+    const parsed = SubmissionStatusResponseSchema.safeParse(body);
     return parsed.success ? parsed.data : null;
   } catch {
     // services/api may not be reachable in dev/preview without a live
@@ -49,7 +49,12 @@ export default async function SubmissionStatusPage({
   return (
     <div className="shell-narrow flex flex-col gap-8">
       <h1>{t("heading")}</h1>
-      <StatusTracker submissionId={id} initialStatus={submission.status} />
+      <StatusTracker
+        submissionId={id}
+        initialStatus={submission.status}
+        initialCheckId={submission.checkId}
+        initialCheckPublished={submission.checkPublished}
+      />
     </div>
   );
 }

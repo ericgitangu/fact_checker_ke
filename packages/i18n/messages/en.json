@@ -166,10 +166,12 @@
       "analyzing": "Extracting claims and translating, keeping the original words.",
       "analyzed": "Claims extracted. Matching each one against credible sources.",
       "verifying": "Weighing the evidence and setting a confidence level for the assessment.",
-      "ready": "Published as a confidence-weighted assessment. View it below.",
+      "ready": "The assessment is complete.",
       "failed": "Something went wrong processing this submission."
     },
-    "viewCheck": "View the published check",
+    "viewCheck": "View the published assessment",
+    "viewReview": "See the review status",
+    "readyHeld": "Assessed and held for editor review before publishing — not yet public.",
     "reconnecting": "Reconnecting…",
     "polling": "Live updates unavailable — checking periodically instead."
   },

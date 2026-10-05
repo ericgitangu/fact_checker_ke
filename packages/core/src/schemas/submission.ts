@@ -78,3 +78,21 @@ export const SubmissionSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 export type Submission = z.infer<typeof SubmissionSchema>;
+
+/**
+ * Response shape for `GET /v1/submissions/:id` — the base submission plus
+ * a pointer to its resulting check. Additive: `SubmissionSchema` itself is
+ * unchanged, so every other consumer is unaffected.
+ *
+ * `checkId` is the REAL check id (distinct from the submission id — the
+ * tracker previously, wrongly, linked to `/checks/{submissionId}`), or
+ * null while no check exists yet (in-flight, or a `failed` dead-end).
+ * `checkPublished` is false while the check is a draft held for editor
+ * review and true once it is public — so the UI can link to the published
+ * assessment vs. show a "held for review" state without leaking the draft.
+ */
+export const SubmissionStatusResponseSchema = SubmissionSchema.extend({
+  checkId: z.string().uuid().nullable(),
+  checkPublished: z.boolean(),
+});
+export type SubmissionStatusResponse = z.infer<typeof SubmissionStatusResponseSchema>;

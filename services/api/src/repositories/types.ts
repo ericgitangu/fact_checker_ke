@@ -19,6 +19,15 @@ export interface SubmissionRepository {
 export interface CheckRepository {
   getById(id: string): Promise<RepoResult<Check>>;
   /**
+   * The latest check for a submission (newest by `createdAt`), as a thin
+   * pointer for `GET /v1/submissions/:id` — just the real check id and
+   * whether it is public yet. Null when no check exists (in-flight, or a
+   * `failed` dead-end). Deliberately NOT the full `Check` (no claims/
+   * sources/evidence joins): the tracker only needs to know where to link
+   * and whether the result is published vs. held for review.
+   */
+  getLatestForSubmission(submissionId: string): Promise<{ id: string; published: boolean } | null>;
+  /**
    * ADR-0032 payoff: recently PUBLISHED checks (`isDraft=false AND
    * publishedAt IS NOT NULL`), newest first — the "what we're checking
    * now" feed. `cursor` is the previous page's last item's `publishedAt`

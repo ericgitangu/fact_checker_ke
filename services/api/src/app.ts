@@ -218,7 +218,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   await app.register(healthRoutes);
   await app.register((instance) =>
-    submissionRoutes(instance, { submissions: submissions!, submissionService, deviceQuotaGuard }),
+    submissionRoutes(instance, { submissions: submissions!, submissionService, deviceQuotaGuard, checks: checks! }),
   );
   await app.register((instance) => checkRoutes(instance, { checks: checks!, db }));
   await app.register((instance) => feedRoutes(instance, { checks: checks! }));
