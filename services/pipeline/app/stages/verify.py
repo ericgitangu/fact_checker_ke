@@ -42,6 +42,7 @@ from app.registry.credibility import render_registry_as_prompt_context
 from app.stages.citation_guard import CitationIntegrityError, RetrievedDoc, verify_citations
 from app.stages.dedup_guard import may_reuse
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
+from app.stages.json_extract import strip_code_fences
 from app.stages.publish import finalize_publish
 
 # Cosine-similarity threshold for dedup reuse (ADR-0004 step 3 / amendment
@@ -56,7 +57,7 @@ class DraftVerdictError(Exception):
 
 
 def _parse_draft(raw: str) -> DraftVerdictOutput:
-    payload = json.loads(raw)
+    payload = json.loads(strip_code_fences(raw))
     return DraftVerdictOutput.model_validate(payload)
 
 
