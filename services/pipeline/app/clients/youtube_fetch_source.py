@@ -20,7 +20,7 @@ it documents.
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -40,6 +40,24 @@ _DEFAULT_QUERY = "Kenya politics Ruto maandamano"
 
 def _env_query() -> str:
     return os.environ.get("YOUTUBE_FETCH_QUERY", _DEFAULT_QUERY)
+
+
+# ADR-0032: the fetch engine surfaces CURRENTLY-trending claims, so only
+# pull videos published within a recent rolling window (default 7 days,
+# tunable via YOUTUBE_PUBLISHED_AFTER_DAYS) -- without this, YouTube's
+# order=date search still backfills older videos when recent matches are
+# sparse, which stales the feed. Returned as an RFC3339 "Z" timestamp,
+# the format YouTube's search.list publishedAfter parameter requires.
+_DEFAULT_PUBLISHED_AFTER_DAYS = 7
+
+
+def _published_after() -> str:
+    try:
+        days = int(os.environ.get("YOUTUBE_PUBLISHED_AFTER_DAYS", _DEFAULT_PUBLISHED_AFTER_DAYS))
+    except ValueError:
+        days = _DEFAULT_PUBLISHED_AFTER_DAYS
+    cutoff = datetime.now(UTC) - timedelta(days=max(days, 1))
+    return cutoff.isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 class YouTubeFetchSource:
@@ -67,6 +85,7 @@ class YouTubeFetchSource:
             "q": _env_query(),
             "type": "video",
             "order": "date",
+            "publishedAfter": _published_after(),
             "maxResults": str(min(limit, 50)),
             "regionCode": "KE",
             "key": api_key,

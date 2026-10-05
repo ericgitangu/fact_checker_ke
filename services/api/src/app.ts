@@ -95,7 +95,31 @@ export interface BuildAppOptions {
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: options.logger ?? true,
+    // Cloud Run terminates TLS at the proxy and forwards HTTP to the
+    // container, so request.protocol defaults to "http". QStash signs its
+    // webhooks against the https:// destination URL (ADR-0017), so without
+    // trusting the proxy the reconstructed URL is http:// and every QStash
+    // signature verification 401s. trustProxy makes Fastify read
+    // X-Forwarded-Proto / X-Forwarded-Host (set by Cloud Run's front end).
+    trustProxy: true,
   });
+
+  // Preserve the RAW JSON body. QStash's signature is a JWT whose body claim
+  // is sha256(raw request bytes); verifying against a re-stringified copy of
+  // the parsed body can mismatch, so keep the exact bytes on request.rawBody
+  // (used by routes/internal.ts verifyOrReject — ADR-0017).
+  app.addContentTypeParser(
+    "application/json",
+    { parseAs: "string" },
+    (req, body, done) => {
+      (req as unknown as { rawBody?: string }).rawBody = body as string;
+      try {
+        done(null, body ? JSON.parse(body as string) : {});
+      } catch (err) {
+        done(err as Error);
+      }
+    },
+  );
 
   const config = options.config ?? resolveConfig();
   const warn = (msg: string): void => app.log.warn(msg);

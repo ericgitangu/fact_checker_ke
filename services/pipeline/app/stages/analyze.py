@@ -19,6 +19,7 @@ from app.models.pipeline_io import AnalyzeResult, DetectedClaim, UsageRecord
 from app.prompts.templates import build_analyze_prompt
 from app.protocols.llm_client import LlmClient, LlmCompletionError
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
+from app.stages.json_extract import strip_code_fences
 
 # ADR-0004 AT-0004-E / ADR-0023 §5: at least 10% of dropped (non-checkable)
 # items are sampled to editors so a misclassification doesn't silently drop
@@ -34,7 +35,7 @@ class AnalyzeHopError(Exception):
 
 
 def _parse_and_validate(raw: str) -> tuple[str, str, list[dict[str, str]]]:
-    payload = json.loads(raw)  # raises json.JSONDecodeError on malformed JSON
+    payload = json.loads(strip_code_fences(raw))  # raises json.JSONDecodeError on malformed JSON
     if not isinstance(payload, dict):
         raise TypeError("analyze completion is not a JSON object")
     language = payload["language"]

@@ -98,10 +98,24 @@ class GoogleFactCheckClient:
         results: list[FactCheckResult] = []
         for i, claim in enumerate(payload.get("claims", [])):
             for review in claim.get("claimReview", []):
+                # Include the fact-checker's VERDICT (textualRating) and
+                # review headline, not just the claim text. Without the
+                # verdict the draft-verdict LLM only sees "a claim someone
+                # examined" and can't conclude -> every check stays Unproven
+                # even when a credible fact-check exists (confirmed live
+                # 2026-10-05). textualRating is the fact-checker's own rating
+                # string (e.g. "False", "Misleading"); the model still makes
+                # its own call, citation-integrity-checked against this text.
+                claim_text = claim.get("text", "")
+                verdict = review.get("textualRating") or "(no explicit rating given)"
+                review_title = review.get("title", "")
+                combined = f"Claim examined: {claim_text}\nFact-checker's rating: {verdict}"
+                if review_title:
+                    combined += f"\nReview: {review_title}"
                 results.append(
                     FactCheckResult(
                         doc_id=f"factcheck:{query[:20]}:{i}:{review.get('url', '')}",
-                        text=claim.get("text", ""),
+                        text=combined,
                         publisher=review.get("publisher", {}).get("name", "unknown"),
                         url=review.get("url", ""),
                         review_date=review.get("reviewDate"),

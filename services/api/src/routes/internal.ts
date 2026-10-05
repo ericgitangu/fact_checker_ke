@@ -44,7 +44,14 @@ async function verifyOrReject(
 ): Promise<boolean> {
   const signature = request.headers["upstash-signature"];
   const sig = Array.isArray(signature) ? signature[0] : signature;
-  const rawBody = typeof request.body === "string" ? request.body : JSON.stringify(request.body ?? {});
+  // Prefer the exact bytes captured by the raw-body content-type parser
+  // (app.ts); fall back to re-stringifying only when it's absent (e.g. unit
+  // tests that inject a parsed body). request.protocol/hostname are now
+  // proxy-aware (trustProxy: true), so this reconstructs the https:// URL
+  // QStash actually signed (ADR-0017).
+  const rawBody =
+    (request as unknown as { rawBody?: string }).rawBody ??
+    (typeof request.body === "string" ? request.body : JSON.stringify(request.body ?? {}));
   const url = `${request.protocol}://${request.hostname}${request.url}`;
   const ok = await verifier.verify({ signature: sig, body: rawBody, url });
   if (!ok) {
