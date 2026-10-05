@@ -500,5 +500,22 @@
       "heading": "Jiandikishe kuonyesha nia",
       "body": "Weka barua pepe yako na utuambie ni nini kinachokueleza vizuri zaidi — tutawasiliana nawe pindi ufikiaji wa wachangiaji na washirika unapofunguka."
     }
+  },
+  "ads": {
+    "label": "Tangazo",
+    "consent": {
+      "title": "Chaguo lako la faragha",
+      "body": "Tungependa kuonyesha matangazo ili kusaidia kugharimia ukaguzi huru wa ukweli. Kwa idhini yako tutayapakia; ukikataa hutaona yoyote. Hili halibadilishi kamwe madai tunayokagua wala jinsi tunavyoyakadiria.",
+      "accept": "Kubali matangazo",
+      "decline": "Kataa"
+    }
+  },
+  "premium": {
+    "upsell": {
+      "footerCta": "Ondoa matangazo na Premium",
+      "inlineTitle": "Unga mkono kazi, ondoa matangazo",
+      "inlineBody": "Premium ni usomaji usio na matangazo kabisa — na inagharimia ukaguzi huru wa ukweli bila kubadilisha uamuzi hata mmoja.",
+      "inlineCta": "Ondoa matangazo"
+    }
   }
 }

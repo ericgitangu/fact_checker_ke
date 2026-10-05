@@ -1,10 +1,20 @@
-import type { Check, FeedItem, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
+import type {
+  BillingProvider,
+  Check,
+  EntitlementTier,
+  FeedItem,
+  Submission,
+  WaitlistSignupInput,
+  WaitlistSignupResult,
+} from "@fact-checker-ke/core";
 import { createDb, schema, type Database } from "@fact-checker-ke/db";
 import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import type {
   CheckRepository,
   DeviceTokenRepository,
+  EntitlementRecord,
+  EntitlementRepository,
   RepoResult,
   SubmissionRepository,
   WaitlistRepository,
@@ -20,6 +30,7 @@ export function createPostgresRepositories(connectionString: string): {
   checks: CheckRepository;
   waitlist: WaitlistRepository;
   deviceTokens: DeviceTokenRepository;
+  entitlements: EntitlementRepository;
   db: Database;
   close: () => Promise<void>;
 } {
@@ -29,6 +40,7 @@ export function createPostgresRepositories(connectionString: string): {
     checks: new PostgresCheckRepository(db),
     waitlist: new PostgresWaitlistRepository(db),
     deviceTokens: new PostgresDeviceTokenRepository(db),
+    entitlements: new PostgresEntitlementRepository(db),
     db,
     close,
   };
@@ -309,6 +321,112 @@ export class PostgresDeviceTokenRepository implements DeviceTokenRepository {
     }
     return { ok: true, value: { tokenHash: row.tokenHash } };
   }
+}
+
+/**
+ * ADR-0012 §3: server-authoritative entitlements, backed by the
+ * `entitlements` / `billing_events` tables (migration 0017).
+ */
+export class PostgresEntitlementRepository implements EntitlementRepository {
+  constructor(private readonly db: Database) {}
+
+  async getLatestForDevice(deviceTokenHash: string): Promise<EntitlementRecord | null> {
+    const [row] = await this.db
+      .select()
+      .from(schema.entitlements)
+      .where(eq(schema.entitlements.deviceTokenHash, deviceTokenHash))
+      .orderBy(desc(schema.entitlements.createdAt))
+      .limit(1);
+    return row ? rowToEntitlementRecord(row) : null;
+  }
+
+  async recordBillingEvent(input: {
+    provider: BillingProvider;
+    eventId: string;
+    eventType: string;
+    payload: unknown;
+  }): Promise<{ firstTime: boolean }> {
+    // `on conflict do nothing` on (provider, event_id) + checking the
+    // returned row count is the race-free dedup, same pattern as the
+    // waitlist join above and the processed_messages inbox.
+    const inserted = await this.db
+      .insert(schema.billingEvents)
+      .values({
+        provider: input.provider,
+        eventId: input.eventId,
+        eventType: input.eventType,
+        payload: input.payload as object,
+      })
+      .onConflictDoNothing({ target: [schema.billingEvents.provider, schema.billingEvents.eventId] })
+      .returning({ id: schema.billingEvents.id });
+    return { firstTime: inserted.length > 0 };
+  }
+
+  async activateDeviceEntitlement(input: {
+    deviceTokenHash: string;
+    tier: EntitlementTier;
+    provider: BillingProvider;
+    providerRef: string | null;
+    currentPeriodEnd: Date | null;
+  }): Promise<RepoResult<EntitlementRecord>> {
+    // Upsert on (provider, provider_ref) so a webhook replay updates the
+    // one row rather than inserting a duplicate — relies on the partial
+    // unique index `entitlements_provider_ref_idx` (NULL refs excluded, so
+    // this path requires a non-null ref; a null-ref manual comp is a
+    // different, admin-only path not exposed here).
+    if (input.providerRef === null) {
+      return {
+        ok: false,
+        error: { kind: "internal", message: "activateDeviceEntitlement requires a non-null providerRef" },
+      };
+    }
+    const [row] = await this.db
+      .insert(schema.entitlements)
+      .values({
+        deviceTokenHash: input.deviceTokenHash,
+        tier: input.tier,
+        status: "active",
+        provider: input.provider,
+        providerRef: input.providerRef,
+        currentPeriodEnd: input.currentPeriodEnd,
+      })
+      .onConflictDoUpdate({
+        target: [schema.entitlements.provider, schema.entitlements.providerRef],
+        // The unique index is PARTIAL (`WHERE provider_ref IS NOT NULL`), so
+        // the ON CONFLICT arbiter must repeat that predicate to match it —
+        // without `targetWhere`, Postgres errors "no unique or exclusion
+        // constraint matching the ON CONFLICT specification" (verified
+        // empirically against the real DB — the in-memory double hid it).
+        targetWhere: sql`${schema.entitlements.providerRef} is not null`,
+        set: {
+          deviceTokenHash: input.deviceTokenHash,
+          tier: input.tier,
+          status: "active",
+          currentPeriodEnd: input.currentPeriodEnd,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    if (!row) {
+      return { ok: false, error: { kind: "internal", message: "entitlement upsert returned no row" } };
+    }
+    return { ok: true, value: rowToEntitlementRecord(row) };
+  }
+}
+
+function rowToEntitlementRecord(row: typeof schema.entitlements.$inferSelect): EntitlementRecord {
+  return {
+    id: row.id,
+    deviceTokenHash: row.deviceTokenHash,
+    userId: row.userId,
+    tier: row.tier,
+    status: row.status,
+    provider: row.provider,
+    providerRef: row.providerRef,
+    currentPeriodEnd: row.currentPeriodEnd,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 /** Re-exported for integration tests that need to assert row counts directly. */

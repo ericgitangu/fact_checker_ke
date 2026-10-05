@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import { AppFooter, AppHeader } from "../components/site-chrome";
+import { ConsentBanner } from "../components/ads/consent-banner";
 import { SITE_URL } from "../lib/site";
 import "./globals.css";
 
@@ -145,6 +146,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               {children}
             </main>
             <AppFooter />
+            {/* ADR-0012 §4: EEA/UK consent gate. Renders nothing unless
+                AdSense is configured AND the reader's region requires
+                consent AND no choice was made — invisible by default. */}
+            <ConsentBanner />
           </SerwistProvider>
         </NextIntlClientProvider>
       </body>

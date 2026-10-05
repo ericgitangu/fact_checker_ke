@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   AttributionSchema,
+  BillingProviderSchema,
   ClaimTypeSchema,
   CommentStatusSchema,
   CredibilityTierSchema,
   DemonstrationStatusSchema,
+  EntitlementStatusSchema,
+  EntitlementTierSchema,
   RatingSchema,
   ReviewActionTypeSchema,
   RightOfReplyStatusSchema,
@@ -15,11 +18,14 @@ import {
 import {
   attributionEnum,
   auditLog,
+  billingProviderEnum,
   claimTypeEnum,
   claims,
   commentStatusEnum,
   credibilityTierEnum,
   demonstrationStatusEnum,
+  entitlementStatusEnum,
+  entitlementTierEnum,
   organizations,
   ratingEnum,
   retentionPolicy,
@@ -53,6 +59,9 @@ describe("pgEnums are sourced from @fact-checker-ke/core zod enums", () => {
     [reviewActionTypeEnum, ReviewActionTypeSchema],
     [rightOfReplyStatusEnum, RightOfReplyStatusSchema],
     [commentStatusEnum, CommentStatusSchema],
+    [entitlementTierEnum, EntitlementTierSchema],
+    [entitlementStatusEnum, EntitlementStatusSchema],
+    [billingProviderEnum, BillingProviderSchema],
     // `as [pgEnum, zodEnum][]` would need a shared generic across six
     // distinct enum pairs; test-only helper data, not a boundary type.
   ] as [{ enumValues: string[] }, { options: readonly string[] }][])("%#", (pgEnumValue, zodSchema) => {
