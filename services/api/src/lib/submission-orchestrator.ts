@@ -1,6 +1,7 @@
 import { schema, type Database } from "@fact-checker-ke/db";
-import type { Rating, SubmissionReceivedEvent } from "@fact-checker-ke/core";
+import type { Rating, SubmissionReceivedEvent, SubmissionStatus } from "@fact-checker-ke/core";
 import { enactPublishDecision, type EnactPublishDecisionOutcome } from "./publish-enactment.js";
+import { advanceSubmissionStatus } from "./state-machine.js";
 
 /**
  * ADR-0032/0017 "C1 gap" closer, API side: the ONE place a
@@ -98,6 +99,28 @@ export async function runSubmissionOrchestration(
   // constructs the event object literally rather than via `.parse()`.
   const ingestSource = event.payload.ingest_source ?? "submission";
 
+  // RC1 (the "stuck at received" bug): this orchestrate call is the ONLY
+  // production driver of the ADR-0017 submission state machine. Before
+  // this, nothing in prod ever advanced `submissions.status` past
+  // `received` (the `/internal/events/submission-advanced` route's only
+  // callers are the DEV-ONLY simulator and tests), so even a published
+  // submission showed "Received" forever in the tracker. We advance the
+  // machine inline as each hop completes.
+  //
+  // `advanceSubmissionStatus` is a conditional UPDATE (WHERE status=from),
+  // so a QStash retry of this whole orchestrate call is naturally
+  // idempotent on the status: an already-applied transition is a no-op
+  // `stale_or_duplicate`, never an error. Known limitation (pre-existing,
+  // not introduced here): the final `verifying -> ready` advance is not in
+  // the same tx as enactPublishDecision's commit, so a crash in that
+  // window leaves status=`verifying` with a published check until QStash
+  // retries — the same retry path that already risks a duplicate check
+  // insert (tracked separately; out of scope for RC1).
+  const advance = (from: SubmissionStatus, to: SubmissionStatus) =>
+    advanceSubmissionStatus(args.db, { submissionId: event.submission_id, from, to });
+
+  await advance("received", "analyzing");
+
   const analyze = await postJson<AnalyzeHopResponseBody>(fetchImpl, `${args.pipelineBaseUrl}/hops/analyze`, {
     submission_id: event.submission_id,
     org_id: event.org_id,
@@ -112,6 +135,7 @@ export async function runSubmissionOrchestration(
   });
 
   if (analyze.needs_quote) {
+    await advance("analyzing", "failed");
     return { kind: "needs_quote" };
   }
 
@@ -124,8 +148,12 @@ export async function runSubmissionOrchestration(
   const checkable = analyze.claims.find((c) => c.claim_type === "checkable");
   const claimText = checkable?.text?.trim();
   if (!claimText) {
+    await advance("analyzing", "failed");
     return { kind: "no_checkable_claims" };
   }
+
+  await advance("analyzing", "analyzed");
+  await advance("analyzed", "verifying");
 
   const verify = await postJson<VerifyHopResponseBody>(fetchImpl, `${args.pipelineBaseUrl}/hops/verify`, {
     submission_id: event.submission_id,
@@ -137,6 +165,7 @@ export async function runSubmissionOrchestration(
 
   const summary = verify.verdict?.rationale?.trim() || null;
   if (!verify.publish || verify.rejected || !summary) {
+    await advance("verifying", "failed");
     return { kind: "verify_rejected_no_check_created", reason: verify.rejection_reason ?? verify.publish?.reason ?? null };
   }
 
@@ -168,6 +197,7 @@ export async function runSubmissionOrchestration(
   // this must never fabricate one.
   const rating = verify.verdict?.rating;
   if (!rating) {
+    await advance("verifying", "failed");
     return { kind: "verify_rejected_no_check_created", reason: "verdict had no rating to enact" };
   }
 
@@ -187,6 +217,12 @@ export async function runSubmissionOrchestration(
     },
     sampleRateAtQueueTime: verify.publish.queued_for_async_audit ? 1.0 : undefined,
   });
+
+  // An assessment was produced (published OR held as a draft for an
+  // editor) — the submission's lifecycle is complete either way. Whether
+  // it is publicly visible is a property of the CHECK (isDraft/
+  // publishedAt), surfaced in the UI, not of the submission's status.
+  await advance("verifying", "ready");
 
   return { kind: "check_created", checkId: check.id, enactment };
 }
