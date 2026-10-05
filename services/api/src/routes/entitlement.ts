@@ -84,10 +84,27 @@ export async function entitlementRoutes(app: FastifyInstance, deps: EntitlementR
       tier: parsed.data.tier,
       subjectRef: deviceTokenHash,
       email: parsed.data.email,
+      phone: parsed.data.phone,
       callbackUrl,
     });
 
     if (result.ok) {
+      // Record (provider, reference) → subject so the webhook/callback can
+      // reconcile the payment back to THIS device even when the provider's
+      // event doesn't echo the subject (M-Pesa's Daraja callback carries
+      // only its CheckoutRequestID). Harmless-but-redundant for Paystack/
+      // Stripe (which also echo the subject in metadata). Best-effort: a
+      // failure here must not fail an already-initiated checkout — the
+      // webhook simply falls back to the event's own subject, or no-ops.
+      await deps.entitlements
+        .putPendingSubject({
+          provider: adapter.provider,
+          reference: result.value.reference,
+          deviceTokenHash,
+        })
+        .catch((err: unknown) => {
+          request.log.warn({ err }, "failed to persist pending checkout subject (checkout still initiated)");
+        });
       return reply.status(200).send(result.value);
     }
     const statusByKind: Record<typeof result.error.kind, number> = {
@@ -121,10 +138,13 @@ export async function entitlementRoutes(app: FastifyInstance, deps: EntitlementR
     }
 
     const rawBody = (request as unknown as { rawBody?: string }).rawBody ?? "";
-    const signature = request.headers[adapter.signatureHeader];
+    // adapter.signatureHeader is "" for M-Pesa (no HMAC header); indexing
+    // headers with "" is simply undefined, which the adapter ignores — it
+    // authenticates by source IP instead.
+    const signature = adapter.signatureHeader ? request.headers[adapter.signatureHeader] : undefined;
     const signatureValue = typeof signature === "string" ? signature : undefined;
 
-    if (!adapter.verifyWebhook({ rawBody, signature: signatureValue })) {
+    if (!adapter.verifyWebhook({ rawBody, signature: signatureValue, sourceIp: request.ip })) {
       return reply.status(401).send({ error: "invalid_signature" });
     }
 
@@ -144,9 +164,22 @@ export async function entitlementRoutes(app: FastifyInstance, deps: EntitlementR
       return reply.status(200).send({ status: "duplicate_ignored" });
     }
 
-    if (event.grantsPremium && event.subjectRef) {
+    // Resolve the subject: the event's own (Paystack/Stripe echo it in
+    // metadata) or, failing that, the pending-subject map keyed on
+    // (provider, reference) written at checkout time (the ONLY source for
+    // M-Pesa, whose callback echoes no subject). A still-null subject is a
+    // safe no-op — we never guess whose premium to turn on.
+    let subjectRef = event.subjectRef;
+    if (event.grantsPremium && !subjectRef && event.reference) {
+      subjectRef = await deps.entitlements.getPendingSubject({
+        provider: adapter.provider,
+        reference: event.reference,
+      });
+    }
+
+    if (event.grantsPremium && subjectRef) {
       const activated = await deps.entitlements.activateDeviceEntitlement({
-        deviceTokenHash: event.subjectRef,
+        deviceTokenHash: subjectRef,
         tier: "premium",
         provider: adapter.provider,
         providerRef: event.reference,

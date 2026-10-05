@@ -250,4 +250,52 @@ export class InMemoryEntitlementRepository implements EntitlementRepository {
     this.records.push(created);
     return { ok: true, value: created };
   }
+
+  async sweepExpired(now: Date = new Date()): Promise<{ expired: number }> {
+    let expired = 0;
+    for (const record of this.records) {
+      if (
+        record.status === "active" &&
+        record.currentPeriodEnd !== null &&
+        record.currentPeriodEnd.getTime() < now.getTime()
+      ) {
+        record.status = "expired";
+        record.updatedAt = now;
+        expired += 1;
+      }
+    }
+    return { expired };
+  }
+
+  private readonly pending = new Map<string, { deviceTokenHash: string; createdAt: Date }>();
+
+  private pendingKey(provider: BillingProvider, reference: string): string {
+    return `${provider}:${reference}`;
+  }
+
+  async putPendingSubject(input: {
+    provider: BillingProvider;
+    reference: string;
+    deviceTokenHash: string;
+  }): Promise<void> {
+    this.pending.set(this.pendingKey(input.provider, input.reference), {
+      deviceTokenHash: input.deviceTokenHash,
+      createdAt: new Date(),
+    });
+  }
+
+  async getPendingSubject(input: { provider: BillingProvider; reference: string }): Promise<string | null> {
+    return this.pending.get(this.pendingKey(input.provider, input.reference))?.deviceTokenHash ?? null;
+  }
+
+  async prunePendingCheckouts(olderThan: Date): Promise<{ pruned: number }> {
+    let pruned = 0;
+    for (const [key, value] of this.pending) {
+      if (value.createdAt.getTime() < olderThan.getTime()) {
+        this.pending.delete(key);
+        pruned += 1;
+      }
+    }
+    return { pruned };
+  }
 }

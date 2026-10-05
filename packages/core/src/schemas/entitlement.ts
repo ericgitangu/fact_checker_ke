@@ -41,9 +41,11 @@ export type EntitlementStatus = z.infer<typeof EntitlementStatusSchema>;
  * grants (no PSP, no `providerRef`) — e.g. a newsroom partner or a test
  * account — so a comped entitlement is a first-class, queryable state
  * rather than a fake PSP row. ADR-0012 leads with Paystack (Kenya-native
- * M-Pesa/cards, KES); Stripe is the global fallback.
+ * M-Pesa/cards, KES); `mpesa` is the direct Safaricom Daraja C2B rail
+ * (monetization v2 — no Paystack intermediary, settles straight to the
+ * till); `stripe` is the global card fallback.
  */
-export const BillingProviderSchema = z.enum(["paystack", "stripe", "manual"]);
+export const BillingProviderSchema = z.enum(["paystack", "stripe", "mpesa", "manual"]);
 export type BillingProvider = z.infer<typeof BillingProviderSchema>;
 
 /**
@@ -102,6 +104,15 @@ export const CheckoutInputSchema = z.object({
   tier: EntitlementTierSchema.default("premium"),
   provider: BillingProviderSchema.default("paystack"),
   email: z.string().trim().toLowerCase().email().max(254).optional(),
+  /**
+   * M-Pesa only: the payer's phone, used as the STK-push target. Optional
+   * (and ignored by card PSPs). Accepts any user-entered form (07…, +2547…,
+   * 2547…, bare 7…/1…); the server normalises it to a 2547XXXXXXXX MSISDN
+   * and rejects a non-Kenyan number at checkout. Like `email`, it is NOT the
+   * entitlement subject — the subject is always the server-derived device
+   * token hash — so it is safe to accept from the body.
+   */
+  phone: z.string().trim().max(20).optional(),
 });
 export type CheckoutInput = z.infer<typeof CheckoutInputSchema>;
 
@@ -113,11 +124,33 @@ export type CheckoutInput = z.infer<typeof CheckoutInputSchema>;
  * exist — until then the route is a fail-closed stub (501), so this shape
  * is the contract the real implementation must satisfy, not a live path.
  */
-export const CheckoutResultSchema = z.object({
-  provider: BillingProviderSchema,
-  /** The PSP hosted-checkout URL to redirect the buyer to. */
-  authorizationUrl: z.string().url(),
-  /** Opaque reference echoed back by the webhook to reconcile the payment. */
-  reference: z.string().min(1),
-});
+export const CheckoutResultSchema = z
+  .object({
+    provider: BillingProviderSchema,
+    /**
+     * How the client completes this checkout:
+     *   - `redirect`  — send the buyer to `authorizationUrl` (Paystack,
+     *     Stripe Checkout). The default, so the pre-existing redirect-only
+     *     result shape (`{ provider, authorizationUrl, reference }`) still
+     *     parses unchanged.
+     *   - `stk_push`  — an M-Pesa STK prompt has been pushed to the buyer's
+     *     phone; there is NO URL to redirect to. The client shows
+     *     `customerMessage` and waits for the Daraja callback to grant.
+     */
+    kind: z.enum(["redirect", "stk_push"]).default("redirect"),
+    /**
+     * The PSP hosted-checkout URL to redirect the buyer to. Required for a
+     * `redirect` checkout, absent for `stk_push` (M-Pesa pushes a prompt to
+     * the phone instead of returning a URL).
+     */
+    authorizationUrl: z.string().url().optional(),
+    /** Opaque reference echoed back by the webhook/callback to reconcile the payment. */
+    reference: z.string().min(1),
+    /** M-Pesa `CustomerMessage` ("Success. Request accepted for processing"), shown while awaiting the callback. */
+    customerMessage: z.string().optional(),
+  })
+  .refine((d) => d.kind !== "redirect" || typeof d.authorizationUrl === "string", {
+    message: "a redirect checkout requires an authorizationUrl",
+    path: ["authorizationUrl"],
+  });
 export type CheckoutResult = z.infer<typeof CheckoutResultSchema>;
