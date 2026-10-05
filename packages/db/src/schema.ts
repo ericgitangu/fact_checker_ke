@@ -18,11 +18,14 @@ import {
 } from "drizzle-orm/pg-core";
 import {
   AttributionSchema,
+  BillingProviderSchema,
   ClaimTypeSchema,
   CommentStatusSchema,
   CredibilityTierSchema,
   DemonstrationMediaMisinfoStatusSchema,
   DemonstrationStatusSchema,
+  EntitlementStatusSchema,
+  EntitlementTierSchema,
   EVENT_TYPES,
   RatingSchema,
   ReviewActionTypeSchema,
@@ -97,6 +100,15 @@ export const rightOfReplyStatusEnum = pgEnum(
 export const commentStatusEnum = pgEnum("comment_status", enumValues("comment_status", CommentStatusSchema.options));
 export const riskTierEnum = pgEnum("risk_tier", enumValues("risk_tier", RiskTierSchema.options));
 export const asyncAuditOutcomeEnum = pgEnum("async_audit_outcome", ASYNC_AUDIT_OUTCOMES);
+
+/**
+ * ADR-0012 §3 (Pro/Premium subscription): the entitlement + billing enums,
+ * sourced from @fact-checker-ke/core's zod schemas (same single-source-of-
+ * truth rule as every other core-sourced enum above).
+ */
+export const entitlementTierEnum = pgEnum("entitlement_tier", enumValues("entitlement_tier", EntitlementTierSchema.options));
+export const entitlementStatusEnum = pgEnum("entitlement_status", enumValues("entitlement_status", EntitlementStatusSchema.options));
+export const billingProviderEnum = pgEnum("billing_provider", enumValues("billing_provider", BillingProviderSchema.options));
 
 /**
  * ADR-0032 (two-engine pivot) / AT-0032-6: provenance of which engine
@@ -1068,4 +1080,85 @@ export const engineSpendDaily = pgTable(
   (table) => [
     uniqueIndex("engine_spend_daily_engine_day_idx").on(table.engine, table.day),
   ],
+);
+
+/**
+ * ADR-0012 §3: server-authoritative Premium entitlements. One row per
+ * (subject, provider-subscription) grant.
+ *
+ * SUBJECT MODEL — exactly one of `device_token_hash` / `user_id` is set,
+ * enforced by the `entitlements_one_subject` CHECK (same CHECK-constraint
+ * discipline this schema already uses elsewhere). Readers are
+ * device-identified (there is no consumer user account — `users` is
+ * editors/admins only, see the `users` table above), so a reader's premium
+ * keys on `device_token_hash`; `user_id` is wired now so a future
+ * authenticated-reader or staff comp doesn't need a migration. Keying on
+ * the token HASH (never the raw token) matches `device_tokens` — a DB leak
+ * never exposes a live bearer credential.
+ *
+ * VALIDITY — `status` is the billing-lifecycle label; `current_period_end`
+ * is the source of truth for access. The ad-free / perk decision is
+ * `status='active' AND (current_period_end IS NULL OR current_period_end >
+ * now())` (see services/api/src/lib/entitlement.ts), NEVER `status` alone —
+ * a `canceled` row inside a paid period still confers access until the
+ * period ends, and a `manual` comp has a NULL period (never expires).
+ *
+ * IDEMPOTENCY — `(provider, provider_ref)` is UNIQUE (partial, excluding
+ * NULL refs so multiple manual comps are allowed) so a webhook replay that
+ * re-activates the same subscription updates the one row rather than
+ * inserting a duplicate.
+ */
+export const entitlements = pgTable(
+  "entitlements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    deviceTokenHash: text("device_token_hash").references(() => deviceTokens.tokenHash, {
+      onDelete: "cascade",
+    }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    tier: entitlementTierEnum("tier").notNull().default("premium"),
+    status: entitlementStatusEnum("status").notNull(),
+    provider: billingProviderEnum("provider").notNull(),
+    // The PSP's subscription/transaction reference. NULL for a `manual`
+    // comp. The webhook reconciles a payment to its pending entitlement by
+    // this value.
+    providerRef: text("provider_ref"),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "entitlements_one_subject",
+      sql`(${table.deviceTokenHash} IS NOT NULL) <> (${table.userId} IS NOT NULL)`,
+    ),
+    index("entitlements_device_token_hash_idx").on(table.deviceTokenHash),
+    index("entitlements_user_id_idx").on(table.userId),
+    uniqueIndex("entitlements_provider_ref_idx")
+      .on(table.provider, table.providerRef)
+      .where(sql`${table.providerRef} is not null`),
+  ],
+);
+
+/**
+ * ADR-0012 §3 / ADR-0017 inbox discipline, applied to PSP webhooks: every
+ * verified billing webhook is recorded here BEFORE its side effect, keyed
+ * `(provider, event_id)` UNIQUE. A duplicate delivery (PSPs retry
+ * aggressively) fails the insert, so the handler acks without re-granting —
+ * the same dedup pattern as `processed_messages`. `payload` keeps the raw
+ * verified event for audit/replay. Signature verification happens in the
+ * route (lib/billing/**) BEFORE anything reaches this table; an unsigned or
+ * mis-signed event is rejected and never recorded.
+ */
+export const billingEvents = pgTable(
+  "billing_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    provider: billingProviderEnum("provider").notNull(),
+    eventId: text("event_id").notNull(),
+    eventType: text("event_type").notNull(),
+    payload: jsonb("payload").notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("billing_events_provider_event_idx").on(table.provider, table.eventId)],
 );

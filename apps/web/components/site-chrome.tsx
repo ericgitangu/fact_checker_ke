@@ -5,6 +5,7 @@ import { LocaleSwitcher } from "./locale-switcher";
 import { NavLink } from "./nav-link";
 import { PrimaryNav } from "./primary-nav";
 import { ThemeToggle } from "./theme-toggle";
+import { PremiumUpsell } from "./premium/premium-upsell";
 import { BUY_ME_A_COFFEE_URL, GITHUB_REPO_URL, PATREON_URL } from "../lib/site";
 
 export async function AppHeader(): Promise<React.JSX.Element> {
@@ -128,6 +129,12 @@ export async function AppFooter(): Promise<React.JSX.Element> {
                   <ExternalLinkIcon size={12} aria-hidden="true" />
                 </a>
               </li>
+              {/* ADR-0012 §3: Premium "go ad-free" upsell — complements the
+                  individual-supporter links below (a different ask: a paid
+                  ad-free tier vs. a one-off tip). Always present (its
+                  destination, the #premium teaser, always exists), unlike
+                  the supporter links which hide when their env URL is unset. */}
+              <li className="footer-premium">{await PremiumUpsell({ variant: "footer" })}</li>
               {(BUY_ME_A_COFFEE_URL || PATREON_URL) && (
                 <li className="footer-support">
                   <span className="footer-support-note">{t("footer.supportIntro")}</span>
