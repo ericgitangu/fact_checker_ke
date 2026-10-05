@@ -28,14 +28,23 @@ function stateFor(current: SubmissionStatus, step: SubmissionStatus): "done" | "
 export function StatusTracker({
   submissionId,
   initialStatus,
+  initialCheckId = null,
+  initialCheckPublished = false,
 }: {
   submissionId: string;
   initialStatus: SubmissionStatus;
+  /** The REAL resulting check id (distinct from submissionId), when known
+   * server-side at page load. Null while in-flight — resolved via a refetch
+   * once the tracker reaches `ready` through SSE/polling (see below). */
+  initialCheckId?: string | null;
+  initialCheckPublished?: boolean;
 }): React.JSX.Element {
   const t = useTranslations("status");
   const tCheck = useTranslations("check");
   const [status, setStatus] = useState<SubmissionStatus>(initialStatus);
   const [mode, setMode] = useState<"sse" | "polling">("sse");
+  const [checkId, setCheckId] = useState<string | null>(initialCheckId);
+  const [checkPublished, setCheckPublished] = useState<boolean>(initialCheckPublished);
 
   useEffect(() => {
     if (initialStatus === "ready" || initialStatus === "failed") return;
@@ -45,6 +54,32 @@ export function StatusTracker({
     });
     return () => handle.close();
   }, [submissionId, initialStatus]);
+
+  // When the tracker reaches `ready` via SSE/polling (i.e. the user watched
+  // it finish rather than landing on an already-complete page), the check
+  // id is not yet known client-side — a held draft never emits a
+  // check.published event, so the id can only come from the submission
+  // resource. Resolve it once, via the same BFF the polling fallback uses.
+  useEffect(() => {
+    if (status !== "ready" || checkId !== null) return;
+    let cancelled = false;
+    void fetch(`/api/submissions/${encodeURIComponent(submissionId)}`, { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: unknown) => {
+        if (cancelled || body === null || typeof body !== "object") return;
+        const id = (body as { checkId?: unknown }).checkId;
+        const published = (body as { checkPublished?: unknown }).checkPublished;
+        if (typeof id === "string") setCheckId(id);
+        if (typeof published === "boolean") setCheckPublished(published);
+      })
+      .catch(() => {
+        // Non-fatal: the tracker still shows the terminal `ready` state;
+        // only the follow-on link is unavailable this render.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [status, checkId, submissionId]);
 
   const steps: SubmissionStatus[] = status === "failed" ? ["failed"] : ORDER;
 
@@ -68,18 +103,18 @@ export function StatusTracker({
           </li>
         ))}
       </ol>
-      {status === "ready" && (
-        // KNOWN GAP: `SubmissionSchema` (packages/core) has no `checkId`
-        // field, and a Check's `id` is distinct from its `submissionId` —
-        // there is currently no documented way for the client to learn a
-        // submission's resulting check id. We optimistically try the
-        // submission id as the check id (true for a naive 1:1 pipeline
-        // implementation, but not guaranteed by the schema); the real fix
-        // is for the `check.published` event / `GET /v1/submissions/:id`
-        // response to carry `checkId` explicitly. Flagging rather than
-        // silently assuming this always resolves.
-        <a className="btn btn-primary" style={{ alignSelf: "flex-start" }} href={`/checks/${submissionId}`}>
-          {t("viewCheck")}
+      {/* A held draft (ready, not yet published) is a COMPLETED run, but
+          nothing is public yet — say so honestly rather than "view it
+          below". Resolved the former "checkId == submissionId" guess:
+          GET /v1/submissions/:id now carries the real check id. */}
+      {status === "ready" && !checkPublished && (
+        <p className="form-note form-note-muted" role="status">
+          {t("readyHeld")}
+        </p>
+      )}
+      {status === "ready" && checkId !== null && (
+        <a className="btn btn-primary" style={{ alignSelf: "flex-start" }} href={`/checks/${checkId}`}>
+          {checkPublished ? t("viewCheck") : t("viewReview")}
         </a>
       )}
     </div>

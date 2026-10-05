@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SubmissionSchema } from "@fact-checker-ke/core";
+import { SubmissionStatusResponseSchema } from "@fact-checker-ke/core";
 
 /**
  * BFF proxy for `GET /v1/submissions/:id` (ADR-0018), used by the
@@ -35,7 +35,7 @@ export async function GET(
   }
 
   const body: unknown = await upstream.json().catch(() => null);
-  const parsed = SubmissionSchema.safeParse(body);
+  const parsed = SubmissionStatusResponseSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "upstream_contract_error" }, { status: 502 });
   }

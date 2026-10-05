@@ -166,10 +166,12 @@
       "analyzing": "Tunatoa madai na kutafsiri, tukihifadhi maneno asili.",
       "analyzed": "Madai yametolewa. Yanalinganishwa na vyanzo vinavyoaminika.",
       "verifying": "Tunapima ushahidi na kuweka kiwango cha uhakika kwa tathmini.",
-      "ready": "Imechapishwa kama tathmini yenye uzito wa uhakika. Angalia hapa chini.",
+      "ready": "Tathmini imekamilika.",
       "failed": "Hitilafu imetokea wakati wa kuchakata dai hili."
     },
-    "viewCheck": "Angalia hakiki iliyochapishwa",
+    "viewCheck": "Angalia tathmini iliyochapishwa",
+    "viewReview": "Angalia hali ya ukaguzi",
+    "readyHeld": "Imetathminiwa na inasubiri ukaguzi wa mhariri kabla ya kuchapishwa — bado si ya umma.",
     "reconnecting": "Inaunganisha tena…",
     "polling": "Masasisho ya moja kwa moja hayapatikani — tunakagua mara kwa mara badala yake."
   },
