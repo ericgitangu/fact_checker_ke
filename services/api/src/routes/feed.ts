@@ -10,6 +10,8 @@ const FeedQuerySchema = z.object({
 });
 
 const DEFAULT_LIMIT = 20;
+/** "Most viral right now" shows the top 3 (task brief Part 2). */
+const TOP_VIRAL_LIMIT = 3;
 
 /**
  * ADR-0032's visible payoff: `GET /v1/feed` — recently PUBLISHED checks
@@ -28,11 +30,20 @@ export async function feedRoutes(app: FastifyInstance, deps: { checks: CheckRepo
     }
 
     const limit = parsed.data.limit ?? DEFAULT_LIMIT;
-    const items = await deps.checks.listPublished({ limit, cursor: parsed.data.cursor ?? null });
+    // Additive, backward-compatible: the descending keyset feed is unchanged;
+    // the "most viral right now" top-3 is computed over ALL published rows
+    // alongside it. Only the first page carries it — a reader paginating
+    // "load older" has already seen the viral section, and recomputing it on
+    // every page would be wasted work.
+    const isFirstPage = !parsed.data.cursor;
+    const [items, topViral] = await Promise.all([
+      deps.checks.listPublished({ limit, cursor: parsed.data.cursor ?? null }),
+      isFirstPage ? deps.checks.listTopViral({ limit: TOP_VIRAL_LIMIT }) : Promise.resolve([]),
+    ]);
 
     const nextCursor = items.length === limit ? (items[items.length - 1]?.publishedAt ?? null) : null;
 
-    const body: FeedResponse = { items, nextCursor };
+    const body: FeedResponse = { items, nextCursor, topViral };
 
     reply.header("Cache-Control", FEED_CACHE_CONTROL);
     return reply.status(200).send(body);

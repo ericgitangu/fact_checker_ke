@@ -153,6 +153,12 @@ class VerifyResult(BaseModel):
     rejected: bool = False
     rejection_reason: str | None = None
     reused_existing_check: bool = False
+    # The id of the prior PUBLISHED check this verdict reuses, set ONLY on the
+    # `reused_existing_check=True` dedup short-circuit (run_verify_hop) so the
+    # API orchestrator can point the submission at the existing check instead
+    # of failing it (it reads `reused_existing_check` + this id, never treating
+    # a `publish=None` reuse as a rejection). None on every non-reused return.
+    reused_check_id: str | None = None
     valid_as_of: str | None = None
     usage: UsageRecord | None = None
     # None only for the `reused_existing_check=True` short-circuit in
