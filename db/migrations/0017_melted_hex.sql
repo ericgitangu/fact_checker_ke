@@ -1,0 +1,4 @@
+ALTER TABLE "checks" ADD COLUMN "normalized_claim" text;--> statement-breakpoint
+ALTER TABLE "checks" ADD COLUMN "virality_score" numeric(12, 4);--> statement-breakpoint
+CREATE INDEX "checks_published_normalized_claim_idx" ON "checks" USING btree ("org_id","normalized_claim") WHERE "checks"."is_draft" = false and "checks"."published_at" is not null;--> statement-breakpoint
+CREATE INDEX "checks_published_virality_idx" ON "checks" USING btree ("virality_score" DESC NULLS LAST,"published_at" DESC NULLS LAST) WHERE "checks"."is_draft" = false and "checks"."published_at" is not null and "checks"."virality_score" is not null;

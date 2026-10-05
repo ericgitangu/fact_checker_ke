@@ -4,8 +4,25 @@ import { mockFeedItems } from "../fixtures/feed-items";
 export interface FeedPage {
   items: FeedItem[];
   nextCursor: string | null;
+  /** Feed-quality (virality): the top-3 published items by virality score — the
+   * "most viral right now" section. Empty when nothing qualifies or on a
+   * paginated request (the API only returns it on the first page). */
+  topViral: FeedItem[];
   /** True when the real `GET /v1/feed` wasn't reachable and this is `fixtures/feed-items.ts` instead. */
   isMock: boolean;
+}
+
+/** Derive the top-3 "most viral" from a set of items (used for the demo-fixture
+ * fallback, so the section still demonstrates even without a backend). Mirrors
+ * the API ranking: nulls excluded, score desc, ties by publishedAt desc. */
+function topViralFrom(items: FeedItem[], limit = 3): FeedItem[] {
+  return items
+    .filter((i) => i.viralityScore !== null && i.viralityScore !== undefined)
+    .sort((a, b) => {
+      const byViral = (b.viralityScore as number) - (a.viralityScore as number);
+      return byViral !== 0 ? byViral : b.publishedAt.localeCompare(a.publishedAt);
+    })
+    .slice(0, limit);
 }
 
 /**
@@ -28,8 +45,15 @@ export async function getFeedPage(options?: { limit?: number; cursor?: string | 
 
   try {
     const response = await client.getFeed(options, { next: { revalidate: 30 } });
-    return { items: response.items, nextCursor: response.nextCursor, isMock: false };
+    return {
+      items: response.items,
+      nextCursor: response.nextCursor,
+      // The API only populates `topViral` on the first page; fall back to
+      // deriving it client-side if an older/cached response omitted it.
+      topViral: response.topViral.length > 0 ? response.topViral : topViralFrom(response.items),
+      isMock: false,
+    };
   } catch {
-    return { items: mockFeedItems, nextCursor: null, isMock: true };
+    return { items: mockFeedItems, nextCursor: null, topViral: topViralFrom(mockFeedItems), isMock: true };
   }
 }

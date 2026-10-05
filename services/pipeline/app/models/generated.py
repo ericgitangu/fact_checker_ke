@@ -40,6 +40,10 @@ class Context(RootModel[str]):
     root: Annotated[str, Field(max_length=2000, min_length=1)]
 
 
+class ViralityScore(RootModel[float]):
+    root: Annotated[float, Field(ge=0.0)]
+
+
 class SpanStart(RootModel[int]):
     root: Annotated[int, Field(ge=0, le=9007199254740991)]
 
@@ -383,3 +387,4 @@ class Check(BaseModel):
     context: Context | None
     evidence: list[EvidenceItem]
     risk_tier: Annotated[RiskTier | None, Field(alias='riskTier')]
+    virality_score: Annotated[ViralityScore | None, Field(alias='viralityScore')] = None

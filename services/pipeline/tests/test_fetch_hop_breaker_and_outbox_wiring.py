@@ -74,10 +74,12 @@ async def test_soft_stopped_breaker_still_dedups_but_skips_emission(monkeypatch)
 
 
 async def test_emit_submission_strategy_is_used_instead_of_run_analyze_hop() -> None:
-    captured: list[tuple[str, str, str]] = []
+    captured: list[tuple[str, str, str, dict[str, int]]] = []
 
-    def _fake_emit(claim_text: str, org_id: str, submission_id: str) -> str:
-        captured.append((claim_text, org_id, submission_id))
+    def _fake_emit(
+        claim_text: str, org_id: str, submission_id: str, engagement: dict[str, int]
+    ) -> str:
+        captured.append((claim_text, org_id, submission_id, engagement))
         return f"server-{submission_id}"
 
     source = FakeFetchSource(platform="youtube", fixtures=[_candidate("youtube", "vid-1")])
@@ -92,6 +94,9 @@ async def test_emit_submission_strategy_is_used_instead_of_run_analyze_hop() -> 
     assert len(captured) == 1
     assert captured[0][0] == _HIGH_SCORE_TEXT
     assert captured[0][1] == "org-1"
+    # The raw engagement observed on the candidate is threaded through to the
+    # real-outbox emitter (for the virality score) rather than dropped.
+    assert captured[0][3] == {"views": 100_000}
     assert len(result.emitted) == 1
     # The strategy's returned id (not the locally-generated uuid) is
     # what ends up on the EmittedCandidate -- proves the real-outbox

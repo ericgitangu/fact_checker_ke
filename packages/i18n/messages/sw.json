@@ -231,6 +231,10 @@
     "intro": "Mtiririko wa moja kwa moja wa tathmini zilizochapishwa hivi karibuni — madai tuliyoyapata yakienea, na madai yaliyotumwa na wasomaji. Kila moja lina uzito wa uhakika na vyanzo vilivyotajwa; hakuna hata moja linaloamua kuhusu mtu.",
     "viewAll": "Tazama mtiririko kamili",
     "backHome": "Rudi nyumbani",
+    "viral": {
+      "heading": "Yanayoenea zaidi sasa",
+      "intro": "Madai yaliyochapishwa yanayoenea kwa kasi zaidi kwenye majukwaa tunayofuatilia — yamepangwa kwa ufikiaji, si kwa kiwango cha ukweli."
+    },
     "source": {
       "fetch": "Imepatikana moja kwa moja",
       "submission": "Imetumwa"

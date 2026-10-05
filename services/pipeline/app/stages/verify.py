@@ -196,6 +196,7 @@ async def run_verify_hop(
                     translation_en=request.claim_text,
                 ),
                 reused_existing_check=True,
+                reused_check_id=candidate.check_id,
                 valid_as_of=candidate.valid_as_of.isoformat(),
             )
             store.set(cache_key, result)

@@ -964,6 +964,39 @@ a:hover {
   padding-top: 4px;
 }
 
+/* Feed-quality (virality): the "most viral right now" section. A subtle
+   brand-tinted gradient card sets it apart from the plain descending feed
+   below WITHOUT borrowing a verdict colour (same restraint as .feedcard). */
+.viral-section {
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--brand) 7%, var(--surface) 93%) 0%,
+      var(--surface) 72%
+    );
+}
+
+.viral-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.viral-section-title svg {
+  color: var(--brand);
+  flex: none;
+}
+
+/* The ordered list carries ranking semantics (1 = most viral) but the number
+   itself is visual noise next to the cards, so it is suppressed — the DOM order
+   is the ranking, surfaced to assistive tech, not a printed "1./2./3.". */
+.viral-list {
+  counter-reset: none;
+}
+
 /* Deliberately NOT the verdict stamp's register (no rotation, no
    saturated verdict colour) -- a feed card is a compact list row, the
    full-size `.checkcard` stamp stays reserved for the check's own page. */

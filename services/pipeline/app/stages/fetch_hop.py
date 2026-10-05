@@ -65,7 +65,11 @@ from app.stores.engine_breaker import EngineCostBreaker
 # AT-0017-C "bypasses the outbox" gap in the running system — see that
 # module's docstring. Takes (claim_text, org_id, submission_id) and
 # returns the (possibly server-confirmed) submission id.
-EmitSubmission = Callable[[str, str, str], str]
+# (claim_text, org_id, submission_id, engagement) -> submission_id. The
+# trailing `engagement` arg (raw views/likes/comments at observation) is
+# carried so the real-outbox emitter can derive the virality score for the
+# "most viral" feed section — see app/stores/outbox_postgres.py.
+EmitSubmission = Callable[[str, str, str, dict[str, int]], str]
 
 # ADR-0032 §4: "per-source, per-run candidate cap" — each poll emits at
 # most this many surviving (above-tau) candidates; this slice enforces
@@ -318,8 +322,9 @@ async def _process_candidate(
 
     submission_id = str(uuid.uuid4())
     if emit_submission is not None:
-        # Real-outbox path (AT-0017-C) — see module docstring.
-        submission_id = emit_submission(claim_text, org_id, submission_id)
+        # Real-outbox path (AT-0017-C) — see module docstring. The raw
+        # engagement rides along so the emitter can compute the virality score.
+        submission_id = emit_submission(claim_text, org_id, submission_id, candidate.engagement)
         analyze_result: AnalyzeResult | None = None
     else:
         request = AnalyzeHopRequest(

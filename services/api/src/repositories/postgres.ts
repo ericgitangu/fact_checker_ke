@@ -158,6 +158,7 @@ export class PostgresCheckRepository implements CheckRepository {
         whatWouldChangeThis: checkRow.whatWouldChangeThis,
         context: checkRow.context,
         riskTier: checkRow.riskTier,
+        viralityScore: checkRow.viralityScore === null ? null : Number(checkRow.viralityScore),
         evidence: evidenceRows.map((e) => ({ sourceId: e.sourceId, quote: e.quote })),
         claims: claimRows.map((c) => ({
           id: c.id,
@@ -214,6 +215,34 @@ export class PostgresCheckRepository implements CheckRepository {
       .orderBy(desc(schema.checks.publishedAt))
       .limit(opts.limit);
 
+    return this.hydrateFeedItems(checkRows);
+  }
+
+  async listTopViral(opts: { limit: number }): Promise<FeedItem[]> {
+    // Feed-quality (virality): top published checks by virality score, nulls
+    // EXCLUDED (not ranked as zero), ties broken by recency — served by the
+    // partial index `checks_published_virality_idx`.
+    const checkRows = await this.db
+      .select()
+      .from(schema.checks)
+      .where(
+        and(
+          eq(schema.checks.isDraft, false),
+          isNotNull(schema.checks.publishedAt),
+          isNotNull(schema.checks.viralityScore),
+        ),
+      )
+      .orderBy(desc(schema.checks.viralityScore), desc(schema.checks.publishedAt))
+      .limit(opts.limit);
+
+    return this.hydrateFeedItems(checkRows);
+  }
+
+  /** Resolve the `check_evidence` <-> `sources` join for a set of check rows
+   * and project each to a `FeedItem`, preserving the input order. Shared by
+   * `listPublished` (descending feed) and `listTopViral` (most-viral section)
+   * so the two read paths can never drift in their projection. */
+  private async hydrateFeedItems(checkRows: (typeof schema.checks.$inferSelect)[]): Promise<FeedItem[]> {
     if (checkRows.length === 0) return [];
 
     const checkIds = checkRows.map((c) => c.id);
@@ -257,6 +286,7 @@ export class PostgresCheckRepository implements CheckRepository {
       whatWouldChangeThis: row.whatWouldChangeThis,
       context: row.context,
       publishedAt: toIsoString(row.publishedAt as Date),
+      viralityScore: row.viralityScore === null ? null : Number(row.viralityScore),
       sources: sourcesByCheckId.get(row.id) ?? [],
     }));
   }
