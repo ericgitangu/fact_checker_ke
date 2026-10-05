@@ -18,6 +18,13 @@ import { WaitlistSignupInputSchema } from "@fact-checker-ke/core";
  * without it every signup would share this function's egress IP and the
  * limiter (services/api/src/routes/waitlist.ts) would bucket all users
  * together.
+ *
+ * `interest` (ADR-0012 monetization signal, additive/optional) is passed
+ * through unvalidated-but-schema-checked the same way `email` is: read off
+ * the raw body, then only kept if it survives
+ * `WaitlistSignupInputSchema.safeParse`. A missing or invalid value is
+ * silently dropped (never a 400) so this stays a non-blocking signal, not a
+ * new required field.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const raw: unknown = await request.json().catch(() => null);
@@ -25,8 +32,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     typeof raw === "object" && raw !== null && "email" in raw
       ? (raw as { email: unknown }).email
       : undefined;
+  const interest =
+    typeof raw === "object" && raw !== null && "interest" in raw
+      ? (raw as { interest: unknown }).interest
+      : undefined;
 
-  const parsed = WaitlistSignupInputSchema.safeParse({ email, source: "web" });
+  const parsed = WaitlistSignupInputSchema.safeParse({ email, source: "web", interest });
   if (!parsed.success) {
     return NextResponse.json(
       { error: "validation_error", issues: parsed.error.issues },

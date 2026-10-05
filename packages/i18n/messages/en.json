@@ -352,11 +352,52 @@
       },
       "link": "Read the full methodology"
     },
+    "premium": {
+      "eyebrow": "Coming at launch",
+      "heading": "Premium: back the work, lose the ads.",
+      "body": "A paid tier for readers, researchers, and newsrooms who want more than the free feed — never a tier that changes what gets checked or how. The rating on every claim stays the same whether you pay or not.",
+      "features": {
+        "adFree": {
+          "title": "No ads, anywhere",
+          "body": "A completely ad-free reading experience across every check, every page."
+        },
+        "alerts": {
+          "title": "Real-time alerts",
+          "body": "Priority, real-time notifications the moment a claim you follow gets a published verdict."
+        },
+        "api": {
+          "title": "API & data access",
+          "body": "Pull verdicts, sources, and confidence scores programmatically — built for newsrooms and researchers."
+        },
+        "earlyAccess": {
+          "title": "Early access",
+          "body": "New verticals, languages, and features before they reach the free tier."
+        }
+      },
+      "cta": "Notify me about Premium",
+      "note": "No payment today — this just tells us you're interested."
+    },
+    "sponsor": {
+      "eyebrow": "Fund independence, not verdicts",
+      "heading": "Back independent fact-checking.",
+      "body": "Newsrooms, funders, and civic-tech partners can back fact_checker_ke to keep it independent and open — the same way the code already is.",
+      "firewall": "Editorial firewall: sponsors fund the work, not the outcome. No sponsor sees a verdict before the public does, and none gets a vote on it. Every sponsor and grant is listed on our funding-transparency page.",
+      "cta": "Partner with us"
+    },
     "waitlist": {
       "heading": "Be there when it launches.",
       "body": "We're building in the open. Leave your email and we'll tell you the day it goes live — no other mail.",
       "emailLabel": "Email address",
       "placeholder": "you@example.com",
+      "interest": {
+        "label": "Which best describes you? (optional)",
+        "placeholder": "Prefer not to say",
+        "options": {
+          "premium": "I'd pay for Premium",
+          "sponsor": "I represent an org interested in sponsorship",
+          "free": "Free tier works for me"
+        }
+      },
       "join": "Join",
       "joining": "Joining…",
       "joined": "You're on the list",
