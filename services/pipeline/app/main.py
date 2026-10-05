@@ -150,6 +150,36 @@ def _fetch_emit_submission(claim_text: str, org_id: str, submission_id: str) -> 
     )
 
 
+def _ensure_fetch_conn() -> None:
+    """Reconnect the fetch engine's Postgres connection if it was dropped.
+    The connection is a process-lifetime singleton (see the tech-debt note
+    above), but the fetch schedule runs every ~30 min and Neon closes idle
+    connections well before then, so by the next scheduled /hops/fetch the
+    connection is reliably stale ("the connection is closed"). Probe it
+    cheaply and reconnect + rebuild the stores that hold the reference. A
+    no-op when the fetch engine is running on in-memory stores
+    (_fetch_db_conn is None)."""
+    global _fetch_db_conn, _fetch_dedup_store, _fetch_cost_breaker
+    if _fetch_db_conn is None:
+        return
+    try:
+        with _fetch_db_conn.cursor() as cur:
+            cur.execute("select 1")
+        return  # connection is live
+    except Exception:
+        try:
+            _fetch_db_conn.close()
+        except Exception:
+            pass
+    import psycopg as _psycopg
+
+    from app.db import database_url as _fetch_database_url
+
+    _fetch_db_conn = _psycopg.connect(_fetch_database_url())  # type: ignore[arg-type]
+    _fetch_dedup_store = PostgresFetchDedupStore(_fetch_db_conn)
+    _fetch_cost_breaker = PostgresEngineCostBreaker(_fetch_db_conn)
+
+
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}
@@ -248,6 +278,7 @@ async def hop_fetch(payload: FetchHopRequest) -> FetchHopResponse:
             hard_stopped=False,
             blocked_non_compliant_media_needs_quote=0,
         )
+    _ensure_fetch_conn()  # reconnect a Neon-dropped idle connection before use
     result = await run_fetch_hop(
         sources=_fetch_sources,
         dedup_store=_fetch_dedup_store,
