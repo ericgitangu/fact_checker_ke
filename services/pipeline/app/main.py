@@ -146,12 +146,19 @@ _fetch_cost_breaker: EngineCostBreaker = (
 
 
 def _fetch_emit_submission(
-    claim_text: str, org_id: str, submission_id: str, engagement: dict[str, int]
+    claim_text: str,
+    org_id: str,
+    submission_id: str,
+    engagement: dict[str, int],
+    source_url: str | None = None,
+    platform: str | None = None,
 ) -> str:
     """The real-outbox emission strategy (AT-0017-C) — wired only when a
     database is configured; see app/stores/outbox_postgres.py. `engagement`
     (raw views/likes/comments) is carried so the emitter derives the virality
-    score for the 'most viral' feed section."""
+    score; `source_url` (discovered video link) and `platform` are persisted on
+    the submissions row so the fetch-DISCOVERED item is surfaceable in the
+    'Trending / under review' stream (GET /v1/trending)."""
     assert _fetch_db_conn is not None
     return emit_fetch_submission_received(
         _fetch_db_conn,
@@ -159,6 +166,8 @@ def _fetch_emit_submission(
         text=claim_text,
         submission_id=submission_id,
         engagement=engagement,
+        source_url=source_url,
+        platform=platform,
     )
 
 

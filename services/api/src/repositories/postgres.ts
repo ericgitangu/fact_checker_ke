@@ -4,12 +4,14 @@ import type {
   EntitlementTier,
   FeedItem,
   Submission,
+  TrendingItem,
   WaitlistSignupInput,
   WaitlistSignupResult,
 } from "@fact-checker-ke/core";
 import { createDb, schema, type Database } from "@fact-checker-ke/db";
 import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
+import { deriveTrendingStatus } from "../lib/trending-status.js";
 import type {
   CheckRepository,
   DeviceTokenRepository,
@@ -17,6 +19,7 @@ import type {
   EntitlementRepository,
   RepoResult,
   SubmissionRepository,
+  TrendingRepository,
   WaitlistRepository,
 } from "./types.js";
 
@@ -28,6 +31,7 @@ import type {
 export function createPostgresRepositories(connectionString: string): {
   submissions: SubmissionRepository;
   checks: CheckRepository;
+  trending: TrendingRepository;
   waitlist: WaitlistRepository;
   deviceTokens: DeviceTokenRepository;
   entitlements: EntitlementRepository;
@@ -38,6 +42,7 @@ export function createPostgresRepositories(connectionString: string): {
   return {
     submissions: new PostgresSubmissionRepository(db),
     checks: new PostgresCheckRepository(db),
+    trending: new PostgresTrendingRepository(db),
     waitlist: new PostgresWaitlistRepository(db),
     deviceTokens: new PostgresDeviceTokenRepository(db),
     entitlements: new PostgresEntitlementRepository(db),
@@ -301,6 +306,100 @@ export class PostgresCheckRepository implements CheckRepository {
       viralityScore: row.viralityScore === null ? null : Number(row.viralityScore),
       sources: sourcesByCheckId.get(row.id) ?? [],
     }));
+  }
+}
+
+/**
+ * "Trending / under review" stream. Reads SUBMISSIONS (not checks) so a
+ * fetch-DISCOVERED viral item is surfaced BEFORE/without a published check.
+ * Two bounded queries (mirrors `hydrateFeedItems`): the fetch submissions
+ * page, then their own checks — joined in JS so the status derivation
+ * (`deriveTrendingStatus`) is the single shared mapping the in-memory repo
+ * also uses, and the discovered item's metadata is never conflated with a
+ * draft's (unexposed) verdict content.
+ */
+export class PostgresTrendingRepository implements TrendingRepository {
+  constructor(private readonly db: Database) {}
+
+  async listTrending(opts: { limit: number }): Promise<TrendingItem[]> {
+    // Fetch-sourced discoveries ranked by virality DESC NULLS LAST, ties by
+    // observation recency — served by the partial index
+    // `submissions_fetch_trending_idx`. `desc()` alone would be NULLS FIRST in
+    // Postgres, so the ordering is spelled out to match the index + contract.
+    const subRows = await this.db
+      .select({
+        id: schema.submissions.id,
+        text: schema.submissions.text,
+        platform: schema.submissions.platform,
+        sourceUrl: schema.submissions.sourceUrl,
+        engagement: schema.submissions.engagement,
+        viralityScore: schema.submissions.viralityScore,
+        status: schema.submissions.status,
+        createdAt: schema.submissions.createdAt,
+      })
+      .from(schema.submissions)
+      .where(eq(schema.submissions.ingestSource, "fetch"))
+      .orderBy(sql`${schema.submissions.viralityScore} desc nulls last`, desc(schema.submissions.createdAt))
+      .limit(opts.limit);
+
+    if (subRows.length === 0) return [];
+
+    const submissionIds = subRows.map((s) => s.id);
+    const checkRows = await this.db
+      .select({
+        id: schema.checks.id,
+        submissionId: schema.checks.submissionId,
+        isDraft: schema.checks.isDraft,
+        publishedAt: schema.checks.publishedAt,
+        createdAt: schema.checks.createdAt,
+      })
+      .from(schema.checks)
+      .where(inArray(schema.checks.submissionId, submissionIds));
+
+    // Pick the single most relevant check per submission: a PUBLISHED check
+    // wins (the assessment is public and linkable), else the latest by
+    // createdAt (e.g. a held draft). Mirrors `deriveTrendingStatus`'s
+    // precedence so the chosen pointer and the derived status agree.
+    const bestCheckBySubmission = new Map<string, (typeof checkRows)[number]>();
+    for (const c of checkRows) {
+      const current = bestCheckBySubmission.get(c.submissionId);
+      if (!current) {
+        bestCheckBySubmission.set(c.submissionId, c);
+        continue;
+      }
+      const cPublished = !c.isDraft && c.publishedAt !== null;
+      const curPublished = !current.isDraft && current.publishedAt !== null;
+      if (cPublished && !curPublished) {
+        bestCheckBySubmission.set(c.submissionId, c);
+      } else if (cPublished === curPublished && c.createdAt > current.createdAt) {
+        bestCheckBySubmission.set(c.submissionId, c);
+      }
+    }
+
+    return subRows.map((row) => {
+      const best = bestCheckBySubmission.get(row.id) ?? null;
+      const pointer = best
+        ? { checkId: best.id, isDraft: best.isDraft, publishedAt: best.publishedAt ? toIsoString(best.publishedAt) : null }
+        : null;
+      const { status, checkId } = deriveTrendingStatus(row.status, pointer);
+      return {
+        submissionId: row.id,
+        // The fetch submission's `text` is the discovered claim/video title
+        // (youtube_fetch_source.py sets it to "title\ndescription"). It is
+        // always present for a fetch row (the XOR constraint: fetch is a
+        // text submission), but guard defensively.
+        title: row.text ?? "",
+        platform: row.platform,
+        sourceUrl: row.sourceUrl,
+        viralityScore: row.viralityScore === null ? null : Number(row.viralityScore),
+        engagement: row.engagement ?? null,
+        ingestSource: "fetch" as const,
+        status,
+        checkId,
+        observedAt: toIsoString(row.createdAt),
+        publishedAt: status === "published" ? pointer?.publishedAt ?? null : null,
+      };
+    });
   }
 }
 
