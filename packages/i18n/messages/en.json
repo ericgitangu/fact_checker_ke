@@ -504,5 +504,22 @@
       "heading": "Register your interest",
       "body": "Leave your email and tell us what best describes you — we'll reach out as contributor and partner access opens up."
     }
+  },
+  "ads": {
+    "label": "Ad",
+    "consent": {
+      "title": "Your privacy choice",
+      "body": "We'd like to show ads to help fund independent fact-checking. With your consent we'll load them; decline and you'll see none. This never affects which claims we check or how we rate them.",
+      "accept": "Accept ads",
+      "decline": "Decline"
+    }
+  },
+  "premium": {
+    "upsell": {
+      "footerCta": "Go ad-free with Premium",
+      "inlineTitle": "Back the work, lose the ads",
+      "inlineBody": "Premium is a fully ad-free read — and it funds independent fact-checking without changing a single verdict.",
+      "inlineCta": "Go ad-free"
+    }
   }
 }

@@ -14,10 +14,14 @@ import { editorRoutes } from "./routes/editor.js";
 import { funnelRoutes } from "./routes/funnel.js";
 import { commentRoutes } from "./routes/comments.js";
 import { maandamanoRoutes } from "./routes/maandamano.js";
+import { entitlementRoutes } from "./routes/entitlement.js";
 import { AuthService } from "./lib/auth/service.js";
+import { EntitlementService } from "./lib/entitlement.js";
+import { createBillingRegistry } from "./lib/billing/registry.js";
 import {
   InMemoryCheckRepository,
   InMemoryDeviceTokenRepository,
+  InMemoryEntitlementRepository,
   InMemorySubmissionRepository,
   InMemoryWaitlistRepository,
 } from "./repositories/in-memory.js";
@@ -25,6 +29,7 @@ import { createPostgresRepositories } from "./repositories/postgres.js";
 import type {
   CheckRepository,
   DeviceTokenRepository,
+  EntitlementRepository,
   SubmissionRepository,
   WaitlistRepository,
 } from "./repositories/types.js";
@@ -64,6 +69,7 @@ export interface BuildAppOptions {
   checks?: CheckRepository;
   waitlist?: WaitlistRepository;
   deviceTokens?: DeviceTokenRepository;
+  entitlements?: EntitlementRepository;
   submissionService?: SubmissionService;
   rateLimiter?: RateLimiter;
   publisher?: Publisher;
@@ -128,19 +134,21 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   let checks = options.checks;
   let waitlist = options.waitlist;
   let deviceTokens = options.deviceTokens;
+  let entitlements = options.entitlements;
   let db: Database | null = null;
   // Kept distinctly (not just as `submissions`) because
   // `InMemorySubmissionService` needs the concrete `.insert()` escape
   // hatch below — see its docblock in lib/submission-service.ts.
   let inMemorySubmissionsStore: InMemorySubmissionRepository | null = null;
 
-  if (!submissions || !checks || !waitlist || !deviceTokens) {
+  if (!submissions || !checks || !waitlist || !deviceTokens || !entitlements) {
     if (config.databaseUrl) {
       const pg = createPostgresRepositories(config.databaseUrl);
       submissions ??= pg.submissions;
       checks ??= pg.checks;
       waitlist ??= pg.waitlist;
       deviceTokens ??= pg.deviceTokens;
+      entitlements ??= pg.entitlements;
       db = pg.db;
       app.addHook("onClose", async () => {
         await pg.close();
@@ -154,6 +162,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       checks ??= new InMemoryCheckRepository();
       waitlist ??= new InMemoryWaitlistRepository();
       deviceTokens ??= new InMemoryDeviceTokenRepository();
+      entitlements ??= new InMemoryEntitlementRepository();
     }
   }
 
@@ -224,6 +233,23 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register((instance) => feedRoutes(instance, { checks: checks! }));
   await app.register((instance) => waitlistRoutes(instance, { waitlist: waitlist!, rateLimiter }));
   await app.register((instance) => deviceRoutes(instance, { deviceTokens: deviceTokens! }));
+
+  // ADR-0012 §3: entitlement read + billing (checkout/webhook). Registered
+  // with either the Postgres or in-memory entitlement repo (same fallback
+  // as the repos above), so the read path works in local dev; the billing
+  // adapter is built from config and fails closed when PAYSTACK_SECRET_KEY
+  // is unset (checkout → 503, webhook → 401), making the whole surface
+  // inert until the owner adds a real key.
+  const billing = createBillingRegistry({ paystackSecretKey: config.paystackSecretKey ?? null });
+  const entitlementService = new EntitlementService(entitlements!);
+  await app.register((instance) =>
+    entitlementRoutes(instance, {
+      entitlements: entitlements!,
+      entitlementService,
+      billing,
+      webBaseUrl: config.webBaseUrl ?? null,
+    }),
+  );
   await app.register((instance) =>
     internalRoutes(instance, {
       db,

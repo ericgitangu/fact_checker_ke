@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { FeedItem } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
@@ -5,6 +6,8 @@ import { Reveal, RadarIcon } from "@fact-checker-ke/brand";
 import { EmptyState, type EmptyStateAction } from "./empty-state";
 import { FeedItemCard } from "./feed-item-card";
 import { LegalCaveat } from "./legal-caveat";
+import { AdSlot } from "./ads/ad-slot";
+import { IN_FEED_AD_AFTER } from "../lib/ads";
 
 /**
  * ADR-0032's visible payoff: the "what we're checking now" feed section,
@@ -59,13 +62,30 @@ export async function FeedSection({
       ) : (
         <ul className="feed-list">
           {await Promise.all(
-            items.map(async (item: FeedItem, i: number) => (
-              <li key={item.id}>
-                <Reveal motion="rise" delay={Math.min(i, 4) * 0.06}>
-                  {await FeedItemCard({ item })}
-                </Reveal>
-              </li>
-            )),
+            items.map(async (item: FeedItem, i: number) => {
+              // ADR-0012 §4: in-feed ad unit AFTER item N — between whole
+              // cards (never above the fold, never between a claim and its
+              // evidence). Its own <li> so the list stays valid. Renders
+              // nothing until the owner configures AdSense, and nothing for
+              // Premium (ad-free) readers. Only on the full /feed list, not
+              // the short home-page preview (`showViewAllLink`).
+              const showAdAfter =
+                !showViewAllLink && i === IN_FEED_AD_AFTER - 1 && items.length > IN_FEED_AD_AFTER;
+              return (
+                <Fragment key={item.id}>
+                  <li>
+                    <Reveal motion="rise" delay={Math.min(i, 4) * 0.06}>
+                      {await FeedItemCard({ item })}
+                    </Reveal>
+                  </li>
+                  {showAdAfter && (
+                    <li className="feed-ad-row" aria-hidden={false}>
+                      <AdSlot slot="inFeed" className="ad-slot-in-feed" />
+                    </li>
+                  )}
+                </Fragment>
+              );
+            }),
           )}
         </ul>
       )}

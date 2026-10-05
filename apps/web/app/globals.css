@@ -2966,3 +2966,155 @@ a:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   ADR-0012 monetization surfaces: ad slots, the EEA/UK consent banner, and
+   the Premium "go ad-free" upsell. All theme-aware via the existing tokens
+   (--surface / --rule / --ink-* / --premium). The ad surfaces are inert
+   until the owner configures AdSense, so these styles only ever paint once
+   a real ad/consent flow is live — but they ship now so there is no
+   unstyled flash when it is turned on.
+   --------------------------------------------------------------------------- */
+
+/* Ad unit: labelled, height-reserved (CLS-safe) container. The reserved
+   min-height is set inline per-slot (components/ads/ad-slot.tsx); this just
+   frames and labels it so it reads as a clearly-marked ad, never editorial. */
+.ad-slot {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--rule);
+  background: transparent;
+}
+
+.ad-slot-label {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.feed-ad-row {
+  list-style: none;
+}
+
+/* Consent banner (CMP): a quiet bottom-anchored bar, not a full-screen
+   interstitial — accept/decline are equally weighted. */
+.consent-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 50;
+  width: min(680px, calc(100vw - 32px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px -22px rgba(21, 24, 27, 0.55);
+}
+
+.consent-banner-body {
+  flex: 1 1 320px;
+  min-width: 260px;
+}
+
+.consent-banner-title {
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.consent-banner-text {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.consent-banner-actions {
+  display: flex;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+/* Premium upsell — inline card variant (under an in-article ad). Uses the
+   --premium accent so it reads as the paid tier, consistent with
+   <PremiumTeaser>, without shouting. */
+.premium-upsell {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 10px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--premium);
+  border-radius: 12px;
+  background: var(--premium-tint);
+}
+
+.premium-upsell-icon {
+  color: var(--premium);
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.premium-upsell-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.premium-upsell-title {
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 2px;
+  font-size: 0.92rem;
+}
+
+.premium-upsell-body {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink-2);
+  margin: 0;
+}
+
+.premium-upsell-cta {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Premium upsell — footer link variant (beside the supporter links). */
+.footer-premium-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--premium);
+  font-weight: 500;
+}
+
+.footer-premium-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 760px) {
+  .premium-upsell {
+    flex-wrap: wrap;
+  }
+  .premium-upsell-cta {
+    width: 100%;
+    text-align: center;
+  }
+  .consent-banner {
+    bottom: 8px;
+  }
+}

@@ -9,6 +9,8 @@ import {
 import { getTranslations } from "next-intl/server";
 import { CheckCard } from "../../../components/check-card";
 import { AiAssistedNote } from "../../../components/verdict";
+import { AdSlot } from "../../../components/ads/ad-slot";
+import { PremiumUpsell } from "../../../components/premium/premium-upsell";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +85,16 @@ export default async function CheckPage({
       )}
 
       <CheckCard check={check} />
+
+      {/* ADR-0012 §4: in-article ad unit — BELOW the full assessment, never
+          above the fold and never between a claim and its evidence (those
+          all live inside <CheckCard> above). Renders nothing until the
+          owner configures AdSense, and nothing for Premium readers. The
+          Premium upsell sits beside it as the contextual "go ad-free"
+          moment — and, for a Premium reader (no ad), still stands on its
+          own as a quiet support nudge. */}
+      <AdSlot slot="inArticle" className="ad-slot-in-article" />
+      {await PremiumUpsell({ variant: "inline" })}
     </div>
   );
 }

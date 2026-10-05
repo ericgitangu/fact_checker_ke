@@ -15,4 +15,5 @@ export * from "./schemas/moderation.js";
 export * from "./schemas/retention.js";
 export * from "./schemas/guidance.js";
 export * from "./schemas/feed.js";
+export * from "./schemas/entitlement.js";
 export * from "./legal/caveat.js";

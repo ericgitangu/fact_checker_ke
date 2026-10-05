@@ -1,6 +1,6 @@
 {
-  "id": "1765fea2-a6f7-4e6f-aab2-c079705a5406",
-  "prevId": "ac613e12-b8bc-4271-bd1a-f77b1bfef7f3",
+  "id": "8b6004da-a6c4-438e-914d-51ed081d1128",
+  "prevId": "1765fea2-a6f7-4e6f-aab2-c079705a5406",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -518,6 +518,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'submission'"
+        },
+        "normalized_claim": {
+          "name": "normalized_claim",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "virality_score": {
+          "name": "virality_score",
+          "type": "numeric(12, 4)",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -562,6 +574,50 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "checks_published_normalized_claim_idx": {
+          "name": "checks_published_normalized_claim_idx",
+          "columns": [
+            {
+              "expression": "org_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "normalized_claim",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"checks\".\"is_draft\" = false and \"checks\".\"published_at\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "checks_published_virality_idx": {
+          "name": "checks_published_virality_idx",
+          "columns": [
+            {
+              "expression": "virality_score",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            },
+            {
+              "expression": "published_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"checks\".\"is_draft\" = false and \"checks\".\"published_at\" is not null and \"checks\".\"virality_score\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
