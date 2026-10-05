@@ -45,6 +45,16 @@ export const CheckSchema = z
     evidence: z.array(EvidenceItemSchema),
     /** The risk tier that gated (or will gate) auto-publish for this Check. */
     riskTier: RiskTierSchema.nullable(),
+    /** Feed-quality (virality): a single log-weighted engagement score carried
+     * from the fetch engine's `submission.received` event (see
+     * services/pipeline/app/stores/outbox_postgres.py). `null` for every
+     * submission-sourced check (readers' claims carry no platform engagement)
+     * and for historical fetch checks predating this field. OPTIONAL on the
+     * schema (not just nullable) so the many hand-written `Check` literals in
+     * this codebase keep validating unchanged — it is an additive read-model
+     * field, never a published-check invariant (submission items legitimately
+     * have none), so it is deliberately absent from the `superRefine` below. */
+    viralityScore: z.number().nonnegative().nullable().optional(),
   })
   .superRefine((check, ctx) => {
     if (check.isDraft || !check.publishedAt) return;

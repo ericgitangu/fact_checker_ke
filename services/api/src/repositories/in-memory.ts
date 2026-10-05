@@ -106,7 +106,25 @@ export class InMemoryCheckRepository implements CheckRepository {
       ? published.filter((c) => (c.publishedAt as string) < (opts.cursor as string))
       : published;
 
-    return afterCursor.slice(0, opts.limit).map((check) => ({
+    return afterCursor.slice(0, opts.limit).map((check) => this.toFeedItem(check));
+  }
+
+  async listTopViral(opts: { limit: number }): Promise<FeedItem[]> {
+    // Feed-quality (virality): published checks with a non-null virality score,
+    // highest first, nulls EXCLUDED, ties broken by recency — mirrors the
+    // postgres repo's `listTopViral` ordering so the two back the same route.
+    return [...this.store.values()]
+      .filter((c) => !c.isDraft && c.publishedAt !== null && (c.viralityScore ?? null) !== null)
+      .sort((a, b) => {
+        const byViral = (b.viralityScore as number) - (a.viralityScore as number);
+        return byViral !== 0 ? byViral : (b.publishedAt as string).localeCompare(a.publishedAt as string);
+      })
+      .slice(0, opts.limit)
+      .map((check) => this.toFeedItem(check));
+  }
+
+  private toFeedItem(check: Check): FeedItem {
+    return {
       id: check.id,
       claim: check.summary,
       rating: check.rating as FeedItem["rating"],
@@ -116,6 +134,7 @@ export class InMemoryCheckRepository implements CheckRepository {
       whatWouldChangeThis: check.whatWouldChangeThis,
       context: check.context,
       publishedAt: check.publishedAt as string,
+      viralityScore: check.viralityScore ?? null,
       sources: check.evidence
         .map((item) => {
           const source = check.sources.find((s) => s.id === item.sourceId);
@@ -130,7 +149,7 @@ export class InMemoryCheckRepository implements CheckRepository {
           };
         })
         .filter((s): s is FeedItem["sources"][number] => s !== null),
-    }));
+    };
   }
 }
 

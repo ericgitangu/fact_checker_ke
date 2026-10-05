@@ -44,6 +44,15 @@ export interface CheckRepository {
    * concurrent inserts); omit it for the first page.
    */
   listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItem[]>;
+  /**
+   * Feed-quality (virality): the top-N PUBLISHED checks by `viralityScore`
+   * DESC — the "most viral right now" section. Rows with a null virality score
+   * (every submission-sourced check, and fetch checks predating the field) are
+   * EXCLUDED, not ranked as zero; ties are broken by `publishedAt` DESC. This
+   * is computed over ALL published rows, not a keyset page, and is additive to
+   * `listPublished` — the descending feed is unchanged.
+   */
+  listTopViral(opts: { limit: number }): Promise<FeedItem[]>;
 }
 
 export interface WaitlistRepository {

@@ -36,6 +36,7 @@ describe.skipIf(!connectionString)("GET /v1/feed — CheckRepository.listPublish
     summary: string;
     publishedAt: Date;
     withSource?: boolean;
+    viralityScore?: number | null;
   }): Promise<string> {
     const [submission] = await db
       .insert(schema.submissions)
@@ -53,6 +54,8 @@ describe.skipIf(!connectionString)("GET /v1/feed — CheckRepository.listPublish
         whatWouldChangeThis: "A material correction to the underlying figures.",
         riskTier: "A",
         ingestSource: opts.ingestSource,
+        viralityScore:
+          opts.viralityScore === undefined || opts.viralityScore === null ? null : String(opts.viralityScore),
       })
       .returning();
 
@@ -134,6 +137,40 @@ describe.skipIf(!connectionString)("GET /v1/feed — CheckRepository.listPublish
     const olderItem = items.find((i) => i.id === older)!;
     expect(olderItem.ingestSource).toBe("submission");
     expect(olderItem.sources).toHaveLength(0);
+  });
+
+  it("listTopViral ranks by viralityScore desc (ties by recency), excludes nulls, and does not disturb listPublished", async () => {
+    // Three fetch items with distinct, deliberately-high virality scores (far
+    // above anything other suites seed, which leave virality null), plus a
+    // null-score published item that must be EXCLUDED from the ranking.
+    const marker = `viral-${randomUUID()}`;
+    const low = await seedPublishedCheck({ ingestSource: "fetch", summary: `${marker}-low`, publishedAt: new Date("2026-09-10T00:00:00.000Z"), viralityScore: 900.1 });
+    const highOld = await seedPublishedCheck({ ingestSource: "fetch", summary: `${marker}-highOld`, publishedAt: new Date("2026-09-11T00:00:00.000Z"), viralityScore: 999.9 });
+    const highNew = await seedPublishedCheck({ ingestSource: "fetch", summary: `${marker}-highNew`, publishedAt: new Date("2026-09-12T00:00:00.000Z"), viralityScore: 999.9 });
+    const nullScore = await seedPublishedCheck({ ingestSource: "submission", summary: `${marker}-null`, publishedAt: new Date("2026-09-13T00:00:00.000Z"), viralityScore: null });
+
+    // A top-3 call returns at most 3, all non-null, globally sorted desc —
+    // asserted without pinning WHICH rows (other runs may leave viral rows in
+    // the shared DB), so this stays isolation-robust.
+    const top3 = await checks.listTopViral({ limit: 3 });
+    expect(top3.length).toBeLessThanOrEqual(3);
+    expect(top3.every((i) => i.viralityScore !== null)).toBe(true);
+    for (let i = 1; i < top3.length; i += 1) {
+      expect(top3[i - 1]!.viralityScore!).toBeGreaterThanOrEqual(top3[i]!.viralityScore!);
+    }
+
+    // Ranking semantics, pinned to THIS test's own rows (filter by marker):
+    // null excluded, score desc, ties broken by recency.
+    const mine = (await checks.listTopViral({ limit: 5000 })).filter((i) => i.claim.startsWith(marker));
+    expect(mine.map((i) => i.id)).toEqual([highNew, highOld, low]);
+    expect(mine.map((i) => i.id)).not.toContain(nullScore);
+
+    // listPublished (descending feed) still returns every published row,
+    // including the null-score one — the viral ranking is purely additive.
+    const published = await checks.listPublished({ limit: 5000 });
+    const publishedIds = published.map((i) => i.id);
+    expect(publishedIds).toContain(nullScore);
+    expect(publishedIds).toContain(highNew);
   });
 
   it("keyset-paginates via cursor", async () => {

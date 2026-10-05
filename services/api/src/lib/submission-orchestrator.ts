@@ -1,7 +1,21 @@
+import { and, eq, isNotNull } from "drizzle-orm";
 import { schema, type Database } from "@fact-checker-ke/db";
 import type { Rating, SubmissionReceivedEvent, SubmissionStatus } from "@fact-checker-ke/core";
 import { enactPublishDecision, type EnactPublishDecisionOutcome } from "./publish-enactment.js";
 import { advanceSubmissionStatus } from "./state-machine.js";
+
+/**
+ * Feed-quality (ingestion dedup): the canonical form of a claim used to detect
+ * an already-PUBLISHED duplicate before creating a second published check for
+ * the same claim (trim, lowercase, collapse ALL internal whitespace runs to a
+ * single space). Mirrors the pipeline's `_normalize_claim_text`
+ * (services/pipeline/app/stages/fetch_hop.py) so the two engines agree on what
+ * "the same claim" means. Persisted on `checks.normalized_claim` and compared
+ * via the partial index `checks_published_normalized_claim_idx`.
+ */
+export function normalizeClaim(text: string): string {
+  return text.trim().toLowerCase().split(/\s+/).join(" ");
+}
 
 /**
  * ADR-0032/0017 "C1 gap" closer, API side: the ONE place a
@@ -45,6 +59,10 @@ interface VerifyHopResponseBody {
   rejected: boolean;
   rejection_reason: string | null;
   reused_existing_check: boolean;
+  // The prior published check this verdict reuses (set only alongside
+  // `reused_existing_check: true`). Carried so this orchestrator points the
+  // submission at the existing check instead of failing it.
+  reused_check_id?: string | null;
   // ADR-0031 AT-0031-1: the citation-integrity-checked sources behind the
   // verdict, which a PUBLISHED check must carry (CheckSchema.superRefine).
   // snake_case to match the pipeline's wire format (same as the fields above).
@@ -78,6 +96,14 @@ export type OrchestrationOutcome =
   // creating one and relying solely on enactPublishDecision's own
   // fail-closed defence. See this module's docblock trade-off note.
   | { kind: "verify_rejected_no_check_created"; reason: string | null }
+  // Feed-quality (ingestion dedup, 1a): an already-PUBLISHED check exists for
+  // this exact (normalized) claim — we do NOT create a second published check;
+  // the submission is pointed at the existing one and advanced to `ready`.
+  | { kind: "duplicate_published"; checkId: string }
+  // Feed-quality (reused-check path, 1b): the pipeline's embedding dedup
+  // short-circuited to a prior check (publish=None). The submission is a
+  // completed, de-duplicated run — advanced to `ready`, never `failed`.
+  | { kind: "reused_existing_check"; checkId: string | null }
   | { kind: "check_created"; checkId: string; enactment: EnactPublishDecisionOutcome };
 
 export interface RunSubmissionOrchestrationArgs {
@@ -188,6 +214,35 @@ export async function runSubmissionOrchestration(
     return { kind: "no_checkable_claims" };
   }
 
+  // Feed-quality (ingestion dedup, 1a): BEFORE running verify or creating any
+  // check, see whether a PUBLISHED check already exists for this exact
+  // (normalized) claim in this org. The pipeline's embedding dedup
+  // (`check_store`) is an empty in-memory stub in prod (nothing calls
+  // `.save`), so the durable "same claim submitted twice -> one feed item"
+  // guarantee lives here, at the API layer, as a cheap indexed lookup
+  // (`checks_published_normalized_claim_idx`). If a duplicate exists we do NOT
+  // run verify (saving the LLM cost) and do NOT create a second published
+  // check — we point the submission at the existing check and finish `ready`.
+  const normalizedClaim = normalizeClaim(claimText);
+  const [existingPublished] = await args.db
+    .select({ id: schema.checks.id })
+    .from(schema.checks)
+    .where(
+      and(
+        eq(schema.checks.orgId, event.org_id),
+        eq(schema.checks.normalizedClaim, normalizedClaim),
+        eq(schema.checks.isDraft, false),
+        isNotNull(schema.checks.publishedAt),
+      ),
+    )
+    .limit(1);
+  if (existingPublished) {
+    await advance("analyzing", "analyzed");
+    await advance("analyzed", "verifying");
+    await advance("verifying", "ready");
+    return { kind: "duplicate_published", checkId: existingPublished.id };
+  }
+
   await advance("analyzing", "analyzed");
   await advance("analyzed", "verifying");
 
@@ -198,6 +253,18 @@ export async function runSubmissionOrchestration(
     language: analyze.language && analyze.language !== "unknown" ? analyze.language : "en",
     named_person_involved: false,
   });
+
+  // Feed-quality (reused-check path, 1b): the pipeline's embedding dedup
+  // matched a prior check and short-circuited — `reused_existing_check: true`
+  // with `publish: null` (pipeline_io.py). This is a KNOWN/duplicate claim,
+  // NOT a rejection: handle it explicitly BEFORE the `!verify.publish`
+  // fail-closed branch below (which would otherwise mis-advance the submission
+  // to `failed`). No second check is created; the submission is a completed,
+  // de-duplicated run — advanced to `ready`, carrying the reused check id.
+  if (verify.reused_existing_check) {
+    await advance("verifying", "ready");
+    return { kind: "reused_existing_check", checkId: verify.reused_check_id ?? null };
+  }
 
   const summary = verify.verdict?.rationale?.trim() || null;
   if (!verify.publish || verify.rejected || !summary) {
@@ -219,6 +286,20 @@ export async function runSubmissionOrchestration(
       whatWouldChangeThis: verify.verdict?.what_would_change_this ?? null,
       context: verify.verdict?.context ?? null,
       ingestSource,
+      // Feed-quality (ingestion dedup, 1a): persist the normalized claim so a
+      // LATER submission of the same claim finds this one via the published
+      // dedup lookup above. Stored on drafts too (harmless — the lookup filters
+      // on published), so a held draft that an editor later publishes still
+      // dedups future submissions.
+      normalizedClaim,
+      // Feed-quality (virality): the single log-weighted engagement score the
+      // fetch engine computed and carried on the event (null for every reader
+      // submission). numeric column -> string, same convention as
+      // calibratedConfidence above.
+      viralityScore:
+        event.payload.virality_score === null || event.payload.virality_score === undefined
+          ? null
+          : String(event.payload.virality_score),
     })
     .returning();
   if (!check) {

@@ -24,10 +24,39 @@ tier-c-policy.ts) — there is no shared ORM between the two languages.
 from __future__ import annotations
 
 import json
+import math
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import psycopg
+
+# Feed-quality (virality) weights: scarcer, higher-effort engagement signals
+# count for more than cheap ones — a comment (someone wrote something) weighs
+# more than a like (one tap), which weighs more than a view (autoplay/scroll).
+# `log1p` (= ln(1+x)) damps the raw-count dominance of view counts so a video
+# with 10M views doesn't drown out a hotly-argued 50k-view clip. The score is
+# therefore `1·ln(1+views) + 2·ln(1+likes) + 3·ln(1+comments)`, a single
+# monotonic number used only for RELATIVE ranking of the "most viral" feed
+# section (never shown as an absolute figure), rounded to 4dp to match the
+# `numeric(12,4)` column it lands in (packages/db checks.virality_score).
+_VIRALITY_WEIGHTS = {"views": 1.0, "likes": 2.0, "comments": 3.0}
+
+
+def compute_virality_score(engagement: dict[str, int] | None) -> float | None:
+    """Collapse raw engagement counts to one log-weighted virality score, or
+    None when there is no engagement at all (a submission-sourced item, or a
+    fetch item a source returned with no counts) — the "most viral" ranking
+    EXCLUDES nulls rather than treating absent engagement as a zero. An
+    all-zero engagement dict is a real 0.0 (a fetch item that genuinely has no
+    traction yet), distinct from None."""
+    if not engagement:
+        return None
+    score = 0.0
+    for key, weight in _VIRALITY_WEIGHTS.items():
+        raw = engagement.get(key, 0) or 0
+        count = max(0, int(raw))
+        score += weight * math.log1p(count)
+    return round(score, 4)
 
 
 def emit_fetch_submission_received(
@@ -36,6 +65,7 @@ def emit_fetch_submission_received(
     org_id: str,
     text: str,
     submission_id: str | None = None,
+    engagement: dict[str, int] | None = None,
 ) -> str:
     """Inserts `submissions` (ingest_source='fetch'), `outbox`
     (event_type='submission.received'), and `submission_events` in one
@@ -48,6 +78,19 @@ def emit_fetch_submission_received(
     """
     submission_id = submission_id or str(uuid4())
     event_id = str(uuid4())
+    # Normalize the raw engagement to the three keys the event contract
+    # (packages/core SubmissionReceivedEventSchema.payload.engagement) and the
+    # virality formula agree on; None stays None (no engagement observed).
+    engagement_payload = (
+        {
+            "views": max(0, int(engagement.get("views", 0) or 0)),
+            "likes": max(0, int(engagement.get("likes", 0) or 0)),
+            "comments": max(0, int(engagement.get("comments", 0) or 0)),
+        }
+        if engagement
+        else None
+    )
+    virality_score = compute_virality_score(engagement)
     # Emit a "Z" suffix (not Python's "+00:00" offset): the api's
     # SubmissionReceivedEventSchema (packages/core events.ts) validates
     # occurred_at with zod .datetime(), which rejects offset timestamps by
@@ -69,6 +112,10 @@ def emit_fetch_submission_received(
             "quote": None,
             "timestamp_sec": None,
             "ingest_source": "fetch",
+            # Feed-quality (virality): carry the raw counts for provenance and
+            # the single derived score the API persists on the published check.
+            "engagement": engagement_payload,
+            "virality_score": virality_score,
         },
     }
 
@@ -98,4 +145,4 @@ def emit_fetch_submission_received(
     return submission_id
 
 
-__all__ = ["emit_fetch_submission_received"]
+__all__ = ["compute_virality_score", "emit_fetch_submission_received"]
