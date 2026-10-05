@@ -43,6 +43,17 @@ interface VerifyHopResponseBody {
   rejected: boolean;
   rejection_reason: string | null;
   reused_existing_check: boolean;
+  // ADR-0031 AT-0031-1: the citation-integrity-checked sources behind the
+  // verdict, which a PUBLISHED check must carry (CheckSchema.superRefine).
+  // snake_case to match the pipeline's wire format (same as the fields above).
+  evidence?: Array<{
+    url: string;
+    title: string;
+    publisher: string;
+    credibility_tier: string;
+    quote: string;
+    published_at: string | null;
+  }>;
   publish: {
     risk_tier: "A" | "B" | "C";
     auto_publish: boolean;
@@ -86,6 +97,29 @@ async function postJson<T>(fetchImpl: typeof fetch, url: string, body: unknown):
     throw new Error(`POST ${url} returned ${res.status}: ${text}`);
   }
   return (await res.json()) as T;
+}
+
+const CREDIBILITY_TIERS = [
+  "tier1_primary",
+  "tier2_established_media",
+  "tier3_general",
+  "tier4_unverified",
+] as const;
+type CredibilityTier = (typeof CREDIBILITY_TIERS)[number];
+
+/** Coerce the pipeline's credibility_tier string to the DB enum, defaulting
+ * an unexpected value to tier3_general rather than failing the whole hop. */
+function normalizeCredibilityTier(tier: string): CredibilityTier {
+  return (CREDIBILITY_TIERS as readonly string[]).includes(tier) ? (tier as CredibilityTier) : "tier3_general";
+}
+
+/** Parse a wire date (e.g. a fact-check reviewDate, which may be date-only or
+ * absent) to a Date, or null — never an Invalid Date that would break the
+ * timestamp insert. */
+function parseDateOrNull(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 export async function runSubmissionOrchestration(
@@ -201,6 +235,42 @@ export async function runSubmissionOrchestration(
     return { kind: "verify_rejected_no_check_created", reason: "verdict had no rating to enact" };
   }
 
+  // ADR-0031 AT-0031-1: persist the citation-integrity-checked sources
+  // (ADR-0023 §2) as this check's evidence. Done for EVERY check, published
+  // or held — a held draft needs its evidence when an editor later approves
+  // it. (Not wrapped in one tx with the check insert / enactment: same
+  // non-atomic window as the pre-existing enactment step; a crash here is
+  // recovered by QStash's retry of the whole orchestrate call.)
+  const evidenceItems = verify.evidence ?? [];
+  for (const ev of evidenceItems) {
+    const [src] = await args.db
+      .insert(schema.sources)
+      .values({
+        orgId: event.org_id,
+        url: ev.url,
+        title: ev.title,
+        publisher: ev.publisher,
+        credibilityTier: normalizeCredibilityTier(ev.credibility_tier),
+        publishedAt: parseDateOrNull(ev.published_at),
+        excerpt: ev.quote.slice(0, 2000),
+      })
+      .returning({ id: schema.sources.id });
+    if (!src) continue;
+    await args.db.insert(schema.checkEvidence).values({
+      checkId: check.id,
+      sourceId: src.id,
+      quote: ev.quote.slice(0, 2000),
+    });
+  }
+
+  // A PUBLISHED check must cite at least one source (ADR-0031 AT-0031-1,
+  // enforced by CheckSchema.superRefine at read time). So an un-cited verdict
+  // is NEVER auto-published here — it is held as a draft for an editor,
+  // regardless of the pipeline's confidence-based auto_publish decision.
+  // Fail-closed: this is the publish-time half of the invariant the schema
+  // enforces at read time.
+  const hasEvidence = evidenceItems.length > 0;
+
   const enactment = await enactPublishDecision(args.db, {
     checkId: check.id,
     actorId: null,
@@ -209,8 +279,10 @@ export async function runSubmissionOrchestration(
     summary,
     riskTier: verify.publish.risk_tier,
     decision: {
-      autoPublish: verify.publish.auto_publish,
-      reason: verify.publish.reason,
+      autoPublish: verify.publish.auto_publish && hasEvidence,
+      reason: hasEvidence
+        ? verify.publish.reason
+        : "held for editor review: no citable evidence to satisfy the published-check requirement (ADR-0031 AT-0031-1)",
       publishMode: verify.publish.publish_mode,
       queuedForAsyncAudit: verify.publish.queued_for_async_audit,
       requiresHumanTap: verify.publish.requires_human_tap,

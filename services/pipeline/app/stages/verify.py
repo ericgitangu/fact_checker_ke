@@ -20,16 +20,19 @@ any other source).
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pydantic import ValidationError
 
+from app.models.enums import CredibilityTier
 from app.models.hop_requests import VerifyHopRequest
 from app.models.pipeline_io import (
     Citation,
     DraftVerdictOutput,
     PublishDecisionPayload,
     UsageRecord,
+    VerifyEvidence,
     VerifyResult,
 )
 from app.prompts.templates import build_draft_verdict_prompt
@@ -38,7 +41,7 @@ from app.protocols.embedder import Embedder
 from app.protocols.factcheck_client import FactCheckClient
 from app.protocols.llm_client import LlmClient, LlmCompletionError
 from app.protocols.reverse_image import ReverseImageSearch, ReverseImageSearchError
-from app.registry.credibility import render_registry_as_prompt_context
+from app.registry.credibility import render_registry_as_prompt_context, tier_for_url
 from app.stages.citation_guard import CitationIntegrityError, RetrievedDoc, verify_citations
 from app.stages.dedup_guard import may_reuse
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
@@ -80,6 +83,47 @@ async def _draft_once(
     # from the model.
     verify_citations(draft.citations, retrieved)
     return draft, usage
+
+
+@dataclass(frozen=True)
+class _SourceMeta:
+    url: str
+    title: str
+    publisher: str
+    credibility_tier: CredibilityTier
+    published_at: str | None
+
+
+def _build_evidence(
+    citations: list[Citation],
+    source_meta: dict[str, _SourceMeta],
+) -> list[VerifyEvidence]:
+    """Pair each citation-integrity-checked citation (ADR-0023 §2) with the
+    structured source metadata captured when its doc was retrieved, producing
+    the persistable `evidence[]` a published Check requires (ADR-0031
+    AT-0031-1). A cited doc with no URL-bearing source is skipped (SourceSchema
+    requires a URL); deduped by (url, quote)."""
+    out: list[VerifyEvidence] = []
+    seen: set[tuple[str, str]] = set()
+    for citation in citations:
+        meta = source_meta.get(citation.doc_id)
+        if meta is None or not meta.url:
+            continue
+        key = (meta.url, citation.quoted_span)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            VerifyEvidence(
+                url=meta.url,
+                title=meta.title or meta.publisher or "Source",
+                publisher=meta.publisher or "unknown",
+                credibility_tier=meta.credibility_tier,
+                quote=citation.quoted_span,
+                published_at=meta.published_at,
+            )
+        )
+    return out
 
 
 async def run_verify_hop(
@@ -144,6 +188,10 @@ async def run_verify_hop(
     # API hits below, but purely as citable evidence: the draft-verdict
     # LLM call decides what it means, never a hardcoded verdict here. ---
     retrieved: list[RetrievedDoc] = []
+    # doc_id -> structured source metadata, captured here (where the url/
+    # publisher are still available) so citations can be turned into
+    # persistable evidence after the draft passes integrity checks.
+    source_meta: dict[str, _SourceMeta] = {}
     if request.media_hash:
         try:
             earlier_copy = reverse_image_search.find_earlier_copy(request.media_hash)
@@ -163,9 +211,10 @@ async def run_verify_hop(
             # vendor is observable instead of just "no evidence found".
             earlier_copy = None
         if earlier_copy is not None:
+            ri_doc_id = f"reverse-image-earlier-copy:{request.media_hash}"
             retrieved.append(
                 RetrievedDoc(
-                    doc_id=f"reverse-image-earlier-copy:{request.media_hash}",
+                    doc_id=ri_doc_id,
                     text=(
                         f"Reverse-image search found an earlier copy of this media at "
                         f"{earlier_copy.source_url}, first seen {earlier_copy.found_at} — "
@@ -175,14 +224,32 @@ async def run_verify_hop(
                     ),
                 )
             )
+            if earlier_copy.source_url:
+                source_meta[ri_doc_id] = _SourceMeta(
+                    url=earlier_copy.source_url,
+                    title="Earlier copy of this media (reverse-image match)",
+                    publisher="Reverse-image match",
+                    credibility_tier=CredibilityTier.tier4_unverified,
+                    published_at=None,
+                )
 
     # --- retrieve (ADR-0004 step 4): our prior checks already queried
     # above via check_store; Fact Check Tools API is the second source. ---
     factcheck_hits = await factcheck_client.search(request.claim_text, language_code=request.language[:2])
-    retrieved.extend(
-        RetrievedDoc(doc_id=hit.doc_id, text=f"{hit.text} — {hit.publisher} ({hit.review_date})")
-        for hit in factcheck_hits
-    )
+    for hit in factcheck_hits:
+        retrieved.append(
+            RetrievedDoc(doc_id=hit.doc_id, text=f"{hit.text} — {hit.publisher} ({hit.review_date})")
+        )
+        # A hit with no URL can't become a `sources` row (SourceSchema needs a
+        # URL), so it stays citable context but is never emitted as evidence.
+        if hit.url:
+            source_meta[hit.doc_id] = _SourceMeta(
+                url=hit.url,
+                title=(hit.text[:200].strip() or hit.publisher or "Fact-check"),
+                publisher=hit.publisher or "unknown",
+                credibility_tier=tier_for_url(hit.url),
+                published_at=hit.review_date,
+            )
 
     # --- draft verdict + citation integrity, retry once then fail ---
     last_error: Exception | None = None
@@ -202,6 +269,7 @@ async def run_verify_hop(
             # that contract is visible at this boundary too.
             result = VerifyResult(
                 verdict=draft,
+                evidence=_build_evidence(draft.citations, source_meta),
                 reused_existing_check=False,
                 valid_as_of=datetime.now(UTC).date().isoformat(),
                 usage=usage,
