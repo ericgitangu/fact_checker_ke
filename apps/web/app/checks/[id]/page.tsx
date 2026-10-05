@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { ZodError } from "zod";
 import {
   ApiClient,
   ApiClientError,
@@ -18,6 +19,17 @@ async function getCheck(id: string) {
     return await client.getCheck(id);
   } catch (err) {
     if (err instanceof ApiClientError && err.status === 404) {
+      return null;
+    }
+    // Defense-in-depth (ADR-0031 AT-0031-1): if the API ever returns a check
+    // that violates the published-check contract — e.g. a LEGACY published
+    // check persisted before the orchestrator carried evidence, which has no
+    // evidence[] — CheckSchema.parse throws. Treat it as "not viewable" (404)
+    // rather than 500-ing the page. The real fix is upstream (the pipeline
+    // now emits citations and the orchestrator persists them + refuses to
+    // auto-publish an un-cited check); this just stops a stale row crashing.
+    if (err instanceof ZodError) {
+      console.error(`check ${id} failed CheckSchema validation; treating as not found`, err.issues);
       return null;
     }
     throw err;

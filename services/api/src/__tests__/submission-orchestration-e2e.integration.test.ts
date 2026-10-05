@@ -2,8 +2,10 @@ import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
+import { CheckSchema } from "@fact-checker-ke/core";
 import { createDb, schema, type Database } from "@fact-checker-ke/db";
 import { buildApp } from "../app.js";
+import { runSubmissionOrchestration } from "../lib/submission-orchestrator.js";
 import { drainOutbox } from "../lib/outbox.js";
 import { FakePublisher } from "../lib/publisher.js";
 import type { SignatureVerifier } from "../lib/internal-auth.js";
@@ -243,6 +245,109 @@ describe.skipIf(!connectionString)(
       // so the submission is terminally `ready`.
       const [sub] = await db.select().from(schema.submissions).where(eq(schema.submissions.id, submissionId));
       expect(sub!.status).toBe("ready");
+
+      // RC2 (published-check evidence gap): a published check MUST cite
+      // evidence (ADR-0031 AT-0031-1). The orchestrator persists the verify
+      // hop's citation-checked sources as `sources` + `check_evidence` rows...
+      const evidenceRows = await db
+        .select()
+        .from(schema.checkEvidence)
+        .where(eq(schema.checkEvidence.checkId, check!.id));
+      expect(evidenceRows.length).toBeGreaterThanOrEqual(1);
+      const [sourceRow] = await db
+        .select()
+        .from(schema.sources)
+        .where(eq(schema.sources.id, evidenceRows[0]!.sourceId));
+      expect(sourceRow!.url).toMatch(/^https?:\/\//);
+
+      // ...so GET /v1/checks/:id now PARSES against CheckSchema's
+      // published-check invariant instead of throwing (the bug that 500'd
+      // /checks/[id] for every evidence-less published check).
+      const getApp = await buildApp({
+        logger: false,
+        signatureVerifier: allowAll,
+        config: {
+          databaseUrl: connectionString as string,
+          corsOrigins: ["http://localhost:3000"],
+          upstashRedisRestUrl: null,
+          upstashRedisRestToken: null,
+          isProduction: false,
+          qstashToken: null,
+          analyzeHopUrl: "unused-in-this-test",
+          pipelineBaseUrl: PIPELINE_BASE_URL,
+          qstashCurrentSigningKey: null,
+          qstashNextSigningKey: null,
+          capabilityTokenSecret: "test-capability-secret",
+          redisTcpUrl: null,
+        },
+      });
+      const checkRes = await getApp.inject({ method: "GET", url: `/v1/checks/${check!.id}` });
+      await getApp.close();
+      expect(checkRes.statusCode).toBe(200);
+      expect(() => CheckSchema.parse(checkRes.json())).not.toThrow();
+    }, 30_000);
+
+    it("holds an un-cited verdict as a DRAFT even when the pipeline says auto_publish (ADR-0031 evidence guard)", async () => {
+      // Direct orchestrator call with a stub pipeline that returns a
+      // high-confidence, auto_publish=true verdict but ZERO evidence — the
+      // guard must refuse to publish an un-cited check (fail-closed), holding
+      // it as a draft for an editor instead.
+      const submissionId = randomUUID();
+      const orgId = "00000000-0000-0000-0000-000000000001";
+      await db.insert(schema.submissions).values({
+        id: submissionId,
+        orgId,
+        url: null,
+        text: "a checkable claim with no citable sources",
+        submittedBy: null,
+        ingestSource: "submission",
+      });
+
+      const stubFetch = (async (url: string | URL | Request) => {
+        const u = String(url);
+        if (u.endsWith("/hops/analyze")) {
+          return Response.json({
+            language: "en",
+            translation_en: "a checkable claim with no citable sources",
+            claims: [{ text: "a checkable claim", claim_type: "checkable", sampled_for_editor_review: false }],
+            attribution: null,
+            needs_quote: false,
+          });
+        }
+        if (u.endsWith("/hops/verify")) {
+          return Response.json({
+            verdict: { rating: "False", rationale: "No sources corroborate this.", confidence: 0.99, what_would_change_this: "A credible source." },
+            rejected: false,
+            rejection_reason: null,
+            reused_existing_check: false,
+            evidence: [],
+            publish: { risk_tier: "A", auto_publish: true, reason: "high confidence", publish_mode: null, queued_for_async_audit: false, requires_human_tap: false },
+          });
+        }
+        throw new Error(`unexpected fetch ${u}`);
+      }) as unknown as typeof fetch;
+
+      const outcome = await runSubmissionOrchestration({
+        db,
+        pipelineBaseUrl: "http://pipeline.invalid",
+        event: {
+          event_id: randomUUID(),
+          occurred_at: new Date().toISOString(),
+          submission_id: submissionId,
+          org_id: orgId,
+          event_type: "submission.received",
+          schema_version: "v1",
+          payload: { url: null, text: "a checkable claim with no citable sources", submitted_by: null, quote: null, timestamp_sec: null, ingest_source: "submission" },
+        },
+        fetchImpl: stubFetch,
+      });
+
+      expect(outcome.kind).toBe("check_created");
+      const [check] = await db.select().from(schema.checks).where(eq(schema.checks.submissionId, submissionId));
+      expect(check!.isDraft).toBe(true); // held, NOT published, despite auto_publish=true
+      expect(check!.publishedAt).toBeNull();
+      const ev = await db.select().from(schema.checkEvidence).where(eq(schema.checkEvidence.checkId, check!.id));
+      expect(ev.length).toBe(0);
     }, 30_000);
 
     it("a non-checkable (rhetoric/injection) submission never reaches /hops/verify and never publishes, through the REAL relay", async () => {

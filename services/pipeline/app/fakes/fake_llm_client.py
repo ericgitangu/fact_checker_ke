@@ -158,7 +158,16 @@ class FakeLlmClient(LlmClient):
                         "published this week; the evidence shows a smaller increase than "
                         "claimed."
                     ),
-                    "citations": [],
+                    # A high-confidence, auto-publishable verdict MUST cite its
+                    # evidence (ADR-0031 AT-0031-1): this fixture cites the fake
+                    # Fact Check Tools hit (app/fakes/..FakeFactCheckClient,
+                    # doc_id "factcheck:fake:0"); `quoted_span` substring-matches
+                    # that doc's retrieved text so citation integrity (ADR-0023
+                    # §2) passes, and the API persists it as the published
+                    # Check's one evidence item.
+                    "citations": [
+                        {"doc_id": "factcheck:fake:0", "quoted_span": "fake fact-check result"}
+                    ],
                     "confidence": 0.97,
                     "what_would_change_this": "A revised official schedule.",
                     "language": _detect_language(claim_text),
