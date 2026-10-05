@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ADVOCATE_SIGNOFF_COMPLETE } from "@fact-checker-ke/core";
-import { Wordmark } from "@fact-checker-ke/brand";
+import { ExternalLinkIcon, Wordmark } from "@fact-checker-ke/brand";
 import { LocaleSwitcher } from "./locale-switcher";
 import { PrimaryNav } from "./primary-nav";
 import { ThemeToggle } from "./theme-toggle";
+import { GITHUB_REPO_URL } from "../lib/site";
 
 export async function AppHeader(): Promise<React.JSX.Element> {
   const t = await getTranslations("common");
@@ -49,31 +49,104 @@ export async function AppHeader(): Promise<React.JSX.Element> {
   );
 }
 
+/**
+ * Production footer (replaces the single-line "Terms & Privacy (pending
+ * legal review)" stub that linked nowhere). Three real link groups —
+ * Product, Project, Legal — every entry resolving to a real page, no
+ * exceptions:
+ *
+ * - Product: the live product surfaces (Submit/Feed/Maandamano/Methodology),
+ *   same destinations as the header nav.
+ * - Project: `/join` ("how to join the movement") and `/contact` (the
+ *   founder's contact card + downloadable vCard), plus an outbound link to
+ *   the GitHub repo.
+ * - Legal: `/terms` and `/privacy`. These ARE now linked even though
+ *   `ADVOCATE_SIGNOFF_COMPLETE` (@fact-checker-ke/core) is still `false` —
+ *   the pages themselves render a visible DRAFT badge and every
+ *   `[ADVOCATE: ...]` open question (see app/terms|privacy/page.tsx), so
+ *   publishing them as a readable draft (rather than hiding them behind a
+ *   dead "pending review" label with no link) is the honest state: a real
+ *   page you can read today, clearly marked as not yet legally binding.
+ *   `ADVOCATE_SIGNOFF_COMPLETE` still gates search-engine indexing
+ *   (`robots: noindex` on both pages) — only the *discovery-from-footer*
+ *   gate is lifted here.
+ */
 export async function AppFooter(): Promise<React.JSX.Element> {
   const t = await getTranslations("common");
+  const year = new Date().getUTCFullYear();
+
   return (
     <footer className="shell app-footer">
-      <p>{t("footer.tagline")}</p>
-      <div style={{ display: "flex", gap: 24 }}>
-        <span>{t("footer.languages")}</span>
-        <span>{t("footer.builtIn")}</span>
-        {/* ADR-0033 AT-0033-2 deploy gate: the Terms/Privacy pages are
-            draft legal copy pending a Kenyan advocate's sign-off
-            (`ADVOCATE_SIGNOFF_COMPLETE`, @fact-checker-ke/core). Until
-            that flips, they're removed from this primary discovery path
-            (and noindex'd — see app/terms|privacy/page.tsx) rather than
-            linked as if they were finished policy; a plain-text
-            "pending review" stub replaces the links so the footer stays
-            honest about why they're missing instead of silently
-            dropping the row. */}
-        {ADVOCATE_SIGNOFF_COMPLETE ? (
-          <>
-            <Link href="/terms">{t("nav.terms")}</Link>
-            <Link href="/privacy">{t("nav.privacy")}</Link>
-          </>
-        ) : (
-          <span className="legal-draft-badge">{t("footer.legalPending")}</span>
-        )}
+      <div className="footer-top">
+        <div className="footer-brand">
+          <Link className="wordmark" href="/" aria-label={`${t("appName")} home`}>
+            <Wordmark size="sm" variant="light" />
+          </Link>
+          <p className="footer-tagline">{t("footer.tagline")}</p>
+          <div className="footer-meta">
+            <span>{t("footer.languages")}</span>
+            <span>{t("footer.builtIn")}</span>
+          </div>
+        </div>
+
+        <div className="footer-groups">
+          <div className="footer-col">
+            <h2 className="footer-col-title">{t("footer.groupProduct")}</h2>
+            <ul className="footer-links">
+              <li>
+                <Link href="/submit">{t("nav.submit")}</Link>
+              </li>
+              <li>
+                <Link href="/feed">{t("nav.feed")}</Link>
+              </li>
+              <li>
+                <Link href="/maandamano">{t("nav.tracker")}</Link>
+              </li>
+              <li>
+                <Link href="/methodology">{t("nav.methodology")}</Link>
+              </li>
+            </ul>
+          </div>
+
+          <div className="footer-col">
+            <h2 className="footer-col-title">{t("footer.groupProject")}</h2>
+            <ul className="footer-links">
+              <li>
+                <Link href="/join">{t("nav.join")}</Link>
+              </li>
+              <li>
+                <Link href="/contact">{t("nav.contact")}</Link>
+              </li>
+              <li>
+                <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer noopener">
+                  {t("footer.sourceLink")}
+                  <ExternalLinkIcon size={12} aria-hidden="true" />
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div className="footer-col">
+            <h2 className="footer-col-title">
+              {t("footer.groupLegal")}{" "}
+              <span className="legal-draft-badge footer-legal-badge">
+                {t("footer.legalPending")}
+              </span>
+            </h2>
+            <ul className="footer-links">
+              <li>
+                <Link href="/terms">{t("nav.terms")}</Link>
+              </li>
+              <li>
+                <Link href="/privacy">{t("nav.privacy")}</Link>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="footer-bottom">
+        <p>{t("footer.rights", { year })}</p>
       </div>
     </footer>
   );

@@ -4,11 +4,11 @@ import { getTranslations } from "next-intl/server";
 
 // ADR-0033 AT-0033-2 deploy gate: this draft legal text must not be
 // publicly indexed until a Kenyan advocate has signed off
-// (`ADVOCATE_SIGNOFF_COMPLETE`, @fact-checker-ke/core). The page itself
-// stays reachable by direct link (the LegalCaveat component on every
-// published check links here for right-of-reply purposes) — only search
-// indexing and the primary nav/footer discovery path are gated; see
-// components/site-chrome.tsx's `AppFooter`.
+// (`ADVOCATE_SIGNOFF_COMPLETE`, @fact-checker-ke/core). The page itself is
+// linked from the footer's Legal column (components/site-chrome.tsx's
+// `AppFooter`) and from the LegalCaveat component on every published
+// check (right-of-reply purposes) — publishing it as a readable, visibly
+// DRAFT page is the point; only search-engine indexing stays gated below.
 export const metadata: Metadata = {
   title: "Terms & Conditions (draft) — fact_checker_ke",
   description:
