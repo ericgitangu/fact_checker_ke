@@ -326,11 +326,39 @@ export const checks = pgTable(
     // join, so the provenance survives even if the submission row is
     // later retention-purged (ADR-0021).
     ingestSource: ingestSourceEnum("ingest_source").notNull().default("submission"),
+    // Feed-quality (ingestion dedup): the normalized claim text (trim,
+    // lowercase, collapse internal whitespace — see
+    // services/api/src/lib/submission-orchestrator.ts `normalizeClaim`) the
+    // orchestrator checks for an already-PUBLISHED duplicate BEFORE creating
+    // a second published check for the same claim. Nullable: historical rows
+    // predate it and are never backfilled (the claim text is not otherwise
+    // persisted on `checks` — `summary` is the rationale, not the claim), so
+    // dedup applies to checks created from this change forward. The partial
+    // index below makes the lookup a cheap index scan, not a full table scan.
+    normalizedClaim: text("normalized_claim"),
+    // Feed-quality (virality): a single log-weighted engagement score carried
+    // from the fetch engine's `submission.received` event (views/likes/
+    // comments at ingestion). Null for every submission-sourced check and any
+    // fetch check predating the field — the "most viral" feed ranking excludes
+    // nulls rather than treating them as zero.
+    viralityScore: numeric("virality_score", { precision: 12, scale: 4 }),
   },
   (table) => [
     index("checks_org_id_idx").on(table.orgId),
     index("checks_submission_id_idx").on(table.submissionId),
     index("checks_demonstration_id_idx").on(table.demonstrationId),
+    // Ingestion-dedup lookup: find a PUBLISHED check for a given normalized
+    // claim within an org. Partial (published rows only) + scoped to the two
+    // columns the lookup filters on, so it stays small and the dedup probe is
+    // an index scan.
+    index("checks_published_normalized_claim_idx")
+      .on(table.orgId, table.normalizedClaim)
+      .where(sql`${table.isDraft} = false and ${table.publishedAt} is not null`),
+    // "Most viral" feed ranking: published rows with a non-null virality
+    // score, highest first, ties broken by recency.
+    index("checks_published_virality_idx")
+      .on(table.viralityScore.desc(), table.publishedAt.desc())
+      .where(sql`${table.isDraft} = false and ${table.publishedAt} is not null and ${table.viralityScore} is not null`),
     check(
       "checks_published_requires_rating",
       sql`${table.publishedAt} is null or ${table.rating} is not null`,

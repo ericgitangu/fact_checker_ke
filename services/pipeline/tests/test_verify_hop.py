@@ -84,6 +84,10 @@ async def test_dedup_reuse_when_similar_claim_already_stored() -> None:
         store=InMemoryIdempotencyStore(),
     )
     assert result.reused_existing_check is True
+    # The reused check's id is carried so the API orchestrator can point the
+    # submission at the existing published check instead of failing it.
+    assert result.reused_check_id == "existing-1"
+    assert result.publish is None  # reuse short-circuits before a publish decision
     assert result.verdict is not None
     assert result.verdict.rating == Rating.true
     assert result.valid_as_of == "2026-01-01"

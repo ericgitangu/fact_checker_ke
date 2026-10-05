@@ -27,6 +27,7 @@ const fetchItem: FeedItem = {
   riskTier: "A",
   whatWouldChangeThis: "A revised EPRA pricing circular.",
   context: "The claim predicts a 10% fuel-price drop; the EPRA formula caps prices rather than guaranteeing a cut, so the figure overstates it.",
+  viralityScore: 14.2,
   publishedAt: "2026-09-29T07:12:00.000Z",
   sources: [
     {
@@ -45,6 +46,7 @@ const submissionItem: FeedItem = {
   id: "33333333-3333-4333-8333-333333333333",
   ingestSource: "submission",
   rating: "False",
+  viralityScore: null,
 };
 
 describe("FeedSection a11y (ADR-0032 payoff)", () => {

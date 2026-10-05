@@ -48,6 +48,23 @@ export const SubmissionReceivedEventSchema = EventEnvelopeSchema.extend({
     // schema change. The fetch engine (services/pipeline's fetch hop) is
     // the only producer that sets "fetch" explicitly.
     ingest_source: z.enum(["submission", "fetch"]).default("submission"),
+    // Feed-quality (virality): the raw engagement counts the fetch engine
+    // observed for this item at ingestion (youtube_fetch_source.py), and a
+    // single pre-computed `virality_score` derived from them in the
+    // pipeline (services/pipeline/app/stores/outbox_postgres.py). Both are
+    // `.default(null)` so EVERY existing producer parses unchanged — the
+    // human-submission path (submission-service.ts) and historical fetch
+    // rows never set them, which is exactly "submission-sourced items have
+    // none". Only the fetch engine populates them.
+    engagement: z
+      .object({
+        views: z.number().int().nonnegative(),
+        likes: z.number().int().nonnegative(),
+        comments: z.number().int().nonnegative(),
+      })
+      .nullable()
+      .default(null),
+    virality_score: z.number().nonnegative().nullable().default(null),
   }),
 });
 export type SubmissionReceivedEvent = z.infer<typeof SubmissionReceivedEventSchema>;

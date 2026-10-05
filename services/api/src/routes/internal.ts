@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { OutboxEventSchema, SubmissionStatusSchema } from "@fact-checker-ke/core";
 import { schema, type Database } from "@fact-checker-ke/db";
 import type { Publisher } from "../lib/publisher.js";
@@ -170,6 +170,30 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
       return reply.status(200).send({ outcome: "ignored_non_submission_received", eventType: event.event_type });
     }
 
+    // Idempotency (retry safety, 1c): orchestration is a multi-step,
+    // NON-transactional flow (two pipeline HTTP calls + several inserts +
+    // enactment), so a QStash retry of a delivery that already succeeded would
+    // otherwise re-run analyze+verify and insert a SECOND published check.
+    // Claim the event in the ADR-0017 inbox (`processed_messages`, handler
+    // "orchestrate") up front: a duplicate delivery of an already-processed
+    // event is acked as a no-op. Because the work is not transactional, a
+    // FAILED run RELEASES the claim (delete) so QStash's retry genuinely
+    // re-drives it — the claim means "already succeeded", never "already
+    // attempted". (Same-message concurrent redelivery is not a real QStash
+    // behaviour; the small release/win race it would imply is acceptable and
+    // flagged here rather than hidden.)
+    const ORCHESTRATE_HANDLER = "orchestrate";
+    const claimed = await deps.db
+      .insert(schema.processedMessages)
+      .values({ messageId: event.event_id, handler: ORCHESTRATE_HANDLER })
+      .onConflictDoNothing({
+        target: [schema.processedMessages.messageId, schema.processedMessages.handler],
+      })
+      .returning({ messageId: schema.processedMessages.messageId });
+    if (claimed.length === 0) {
+      return reply.status(200).send({ outcome: "duplicate_message_acked" });
+    }
+
     try {
       const outcome = await runSubmissionOrchestration({
         db: deps.db,
@@ -178,6 +202,20 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
       });
       return reply.status(200).send({ outcome: outcome.kind, ...outcome });
     } catch (err) {
+      // Release the inbox claim so the retry re-runs (the run did NOT succeed).
+      await deps.db
+        .delete(schema.processedMessages)
+        .where(
+          and(
+            eq(schema.processedMessages.messageId, event.event_id),
+            eq(schema.processedMessages.handler, ORCHESTRATE_HANDLER),
+          ),
+        )
+        .catch(() => {
+          // A failed release just means the retry is acked as a duplicate
+          // instead of re-running — surfaced via the 500 + log below, not
+          // silently swallowed into a success.
+        });
       // Propagate as a 5xx (unlike the producer-side relay's own
       // swallowed-failure convention) so QStash retries this delivery —
       // this route is the CONSUMER of record for submission.received;

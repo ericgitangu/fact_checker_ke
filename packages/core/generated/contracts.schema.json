@@ -121,6 +121,17 @@
               "type": "null"
             }
           ]
+        },
+        "viralityScore": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

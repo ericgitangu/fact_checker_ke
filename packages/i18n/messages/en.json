@@ -231,6 +231,10 @@
     "intro": "A live stream of recently published assessments — claims we caught trending, and claims readers submitted. Each carries a confidence weight and cited sources; none is a verdict on a person.",
     "viewAll": "View the full feed",
     "backHome": "Back home",
+    "viral": {
+      "heading": "Most viral right now",
+      "intro": "The published claims spreading fastest on the platforms we monitor — ranked by reach, not by rating."
+    },
     "source": {
       "fetch": "Auto-surfaced",
       "submission": "Submitted"

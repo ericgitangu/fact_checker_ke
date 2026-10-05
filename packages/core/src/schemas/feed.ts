@@ -57,6 +57,13 @@ export const FeedItemSchema = z.object({
   context: z.string().nullable(),
   sources: z.array(FeedCitedSourceSchema),
   publishedAt: z.string().datetime(),
+  /** Feed-quality (virality): the log-weighted engagement score for a
+   * fetch-sourced item (views/likes/comments at ingestion, see
+   * services/pipeline/app/stores/outbox_postgres.py). `null` for every
+   * submission-sourced item (readers' claims carry no platform engagement)
+   * and any fetch item that predates the field — those are excluded from the
+   * "most viral" ranking rather than treated as a zero. */
+  viralityScore: z.number().nonnegative().nullable(),
 });
 export type FeedItem = z.infer<typeof FeedItemSchema>;
 
@@ -64,5 +71,11 @@ export const FeedResponseSchema = z.object({
   items: z.array(FeedItemSchema),
   /** Opaque keyset cursor (the oldest item's `publishedAt` in this page) — pass back as `?cursor=` for the next page. `null` means no more pages. */
   nextCursor: z.string().datetime().nullable(),
+  /** ADDITIVE, backward-compatible: the top-N (currently 3) PUBLISHED items by
+   * `viralityScore` DESC (nulls excluded, ties broken by `publishedAt` DESC) —
+   * the "most viral right now" section, computed over ALL published rows, not
+   * just this keyset page. `.default([])` so a response produced before this
+   * field existed (a cached body, the demo fixture) still parses. */
+  topViral: z.array(FeedItemSchema).default([]),
 });
 export type FeedResponse = z.infer<typeof FeedResponseSchema>;

@@ -30,7 +30,41 @@ describe("GET /v1/feed", () => {
     const app = await buildApp({ logger: false, checks: new InMemoryCheckRepository() });
     const res = await app.inject({ method: "GET", url: "/v1/feed" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ items: [], nextCursor: null });
+    // `topViral` is additive + backward-compatible (empty when nothing viral).
+    expect(res.json()).toEqual({ items: [], nextCursor: null, topViral: [] });
+    await app.close();
+  });
+
+  it("surfaces a top-3 'most viral' section by viralityScore desc, excluding nulls, ties by recency", async () => {
+    const checks = new InMemoryCheckRepository();
+    // Four viral (fetch) items with distinct scores + one tie, and one
+    // submission item with no virality score (must be EXCLUDED from topViral).
+    const v10 = publishedCheck({ summary: "v10", viralityScore: 10, publishedAt: "2026-09-01T00:00:00.000Z" });
+    const v30 = publishedCheck({ summary: "v30", viralityScore: 30, publishedAt: "2026-09-02T00:00:00.000Z" });
+    const v20 = publishedCheck({ summary: "v20", viralityScore: 20, publishedAt: "2026-09-03T00:00:00.000Z" });
+    const v30newer = publishedCheck({ summary: "v30newer", viralityScore: 30, publishedAt: "2026-09-04T00:00:00.000Z" });
+    const noScore = publishedCheck({ summary: "noScore", viralityScore: null, publishedAt: "2026-09-09T00:00:00.000Z" });
+
+    for (const c of [v10, v30, v20, v30newer, noScore]) checks.seed(c, "fetch");
+
+    const app = await buildApp({ logger: false, checks });
+    const res = await app.inject({ method: "GET", url: "/v1/feed" });
+    const body = res.json() as { topViral: Array<{ summary?: string; claim: string; viralityScore: number | null }> };
+
+    // Top 3: the two 30s first (newer 30 wins the tie), then 20. The 10 and the
+    // null-score item never make the cut.
+    expect(body.topViral.map((i) => i.claim)).toEqual(["v30newer", "v30", "v20"]);
+    expect(body.topViral.every((i) => i.viralityScore !== null)).toBe(true);
+    await app.close();
+  });
+
+  it("omits topViral on a paginated (cursor) request — the viral section is first-page only", async () => {
+    const checks = new InMemoryCheckRepository();
+    checks.seed(publishedCheck({ viralityScore: 42, publishedAt: "2026-09-01T00:00:00.000Z" }), "fetch");
+    const app = await buildApp({ logger: false, checks });
+    const res = await app.inject({ method: "GET", url: "/v1/feed?cursor=2026-09-05T00:00:00.000Z" });
+    const body = res.json() as { topViral: unknown[] };
+    expect(body.topViral).toEqual([]);
     await app.close();
   });
 

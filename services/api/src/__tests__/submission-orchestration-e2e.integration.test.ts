@@ -213,8 +213,12 @@ describe.skipIf(!connectionString)(
         // /hops/verify draft to confidence=0.97 (>= TAU_A_PRE_CALIBRATION
         // = 0.95), Tier A (named_person_involved=false), auto-publish
         // eligible -- without a fitted calibration artifact or any real
-        // vendor call.
-        text: "AUTO_PUBLISH_FIXTURE_HIGH_CONFIDENCE: Fuel prices increased by 10% this month, government data shows.",
+        // vendor call. The trailing unique token keeps the claim distinct
+        // per run so the NEW ingestion-dedup (a published check with the same
+        // normalized claim short-circuits as `duplicate_published`) does not
+        // match a check a PRIOR run of this test published to the shared DB —
+        // the marker is a substring, so the fixture path still triggers.
+        text: `AUTO_PUBLISH_FIXTURE_HIGH_CONFIDENCE: Fuel prices increased by 10% this month, government data shows. (run ${randomUUID()})`,
         ingestSource: "fetch",
       });
 
@@ -343,7 +347,7 @@ describe.skipIf(!connectionString)(
           org_id: orgId,
           event_type: "submission.received",
           schema_version: "v1",
-          payload: { url: null, text: "a checkable claim with no citable sources", submitted_by: null, quote: null, timestamp_sec: null, ingest_source: "submission" },
+          payload: { url: null, text: "a checkable claim with no citable sources", submitted_by: null, quote: null, timestamp_sec: null, ingest_source: "submission", engagement: null, virality_score: null },
         },
         fetchImpl: stubFetch,
       });

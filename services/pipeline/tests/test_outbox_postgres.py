@@ -60,6 +60,38 @@ def test_emit_writes_submission_outbox_and_submission_events_rows(pg_conn, clean
     assert events_row == ("submission.received",)
 
 
+def test_emit_carries_engagement_and_virality_into_the_event_payload(pg_conn, cleanup_submission) -> None:
+    submission_id = emit_fetch_submission_received(
+        pg_conn,
+        org_id=ORG_ID,
+        text="a viral fetched claim",
+        engagement={"views": 100_000, "likes": 4_000, "comments": 250},
+    )
+    cleanup_submission.append(submission_id)
+
+    with pg_conn.cursor() as cur:
+        cur.execute("SELECT payload FROM outbox WHERE aggregate_id = %s", (submission_id,))
+        (payload,) = cur.fetchone()
+    payload_dict = payload if isinstance(payload, dict) else json.loads(payload)
+    inner = payload_dict["payload"]
+    assert inner["engagement"] == {"views": 100_000, "likes": 4_000, "comments": 250}
+    # The derived score is present and positive (exact formula pinned in
+    # test_virality_score.py); submission-sourced events never carry one.
+    assert inner["virality_score"] is not None
+    assert inner["virality_score"] > 0
+
+
+def test_emit_without_engagement_carries_null_virality(pg_conn, cleanup_submission) -> None:
+    submission_id = emit_fetch_submission_received(pg_conn, org_id=ORG_ID, text="no engagement claim")
+    cleanup_submission.append(submission_id)
+    with pg_conn.cursor() as cur:
+        cur.execute("SELECT payload FROM outbox WHERE aggregate_id = %s", (submission_id,))
+        (payload,) = cur.fetchone()
+    payload_dict = payload if isinstance(payload, dict) else json.loads(payload)
+    assert payload_dict["payload"]["engagement"] is None
+    assert payload_dict["payload"]["virality_score"] is None
+
+
 def test_emit_keeps_caller_supplied_submission_id(pg_conn, cleanup_submission) -> None:
     fixed_id = "22222222-2222-2222-2222-222222222222"
     returned_id = emit_fetch_submission_received(pg_conn, org_id=ORG_ID, text="x", submission_id=fixed_id)

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { FeedSection } from "../../components/feed-section";
+import { ViralSection } from "../../components/viral-section";
 import { getFeedPage } from "../../lib/get-feed";
 
 export const metadata: Metadata = {
@@ -31,6 +32,11 @@ export default async function FeedPage({
 
   return (
     <div className="shell-narrow flex flex-col gap-6">
+      {/* "Most viral right now" leads the page (top-3 by reach) above the
+          descending feed — additive, and self-hiding (renders null) when
+          nothing qualifies, so an all-submission feed is unaffected. */}
+      <ViralSection items={feed.topViral} />
+
       <FeedSection
         items={feed.items}
         isMock={feed.isMock}
