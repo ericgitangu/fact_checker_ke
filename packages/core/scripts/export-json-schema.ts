@@ -38,7 +38,11 @@ import { z } from "zod";
 
 import { ClaimSchema } from "../src/schemas/claim.js";
 import { CheckSchema } from "../src/schemas/check.js";
-import { DemonstrationSchema, DemonstrationStatusSchema } from "../src/schemas/demonstration.js";
+import {
+  DemonstrationSchema,
+  DemonstrationStatusSchema,
+  DemonstrationMediaSchema,
+} from "../src/schemas/demonstration.js";
 import { ClaimTypeSchema, RatingSchema } from "../src/schemas/rating.js";
 import { CredibilityTierSchema, SourceSchema } from "../src/schemas/source.js";
 import { EvidenceItemSchema, RiskTierSchema } from "../src/schemas/guidance.js";
@@ -68,6 +72,7 @@ const CONTRACT_SCHEMAS = {
   ClaimType: ClaimTypeSchema,
   CredibilityTier: CredibilityTierSchema,
   Demonstration: DemonstrationSchema,
+  DemonstrationMedia: DemonstrationMediaSchema,
   DemonstrationStatus: DemonstrationStatusSchema,
   EvidenceItem: EvidenceItemSchema,
   Rating: RatingSchema,

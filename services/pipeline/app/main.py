@@ -34,6 +34,10 @@ from app.stages.analyze import AnalyzeHopError, run_analyze_hop
 from app.stages.fetch_hop import FetchHopResult, run_fetch_hop
 from app.stages.fetch_scoring import FetchScoringConfig
 from app.stages.idempotency import InMemoryIdempotencyStore
+from app.stages.maandamano_media_triage import (
+    MediaTriageError,
+    run_maandamano_media_triage,
+)
 from app.stages.media_processing import MediaProcessingError, process_media
 from app.stages.stubs import run_draft, run_extract, run_normalize, run_retrieve, run_transcribe
 from app.stages.synthetic_media_triage import TriageError, run_synthetic_media_triage
@@ -328,6 +332,92 @@ async def hop_synthetic_media_triage(payload: SyntheticMediaTriageHopRequest) ->
         provenance_present=result.provenance_present,
         earlier_copy_source_url=result.earlier_copy_source_url,
         detector_score=result.detector_score,
+    )
+
+
+class MaandamanoMediaTriageRequest(BaseModel):
+    """ADR-0035: POST /hops/media-triage request body — the embed to
+    misinfo-check. `thumbnail_ref` is the platform thumbnail/frame hash the
+    reverse-image backend is queried with; NO third-party bytes are
+    downloaded (ADR-0002). `platform`/`embed_url` are carried for logging
+    and the write-back context only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    media_id: str = Field(min_length=1)
+    platform: str = Field(min_length=1)
+    embed_url: str = Field(min_length=1)
+    thumbnail_ref: str = Field(min_length=1)
+
+
+class MaandamanoMediaTriageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    media_id: str
+    status: str
+    note: str | None
+    earlier_url: str | None
+    # Whether the result was also written back to services/api (requires
+    # API_BASE_URL + PIPELINE_CALLBACK_SECRET; the HTTP response carries the
+    # result regardless, same "flip still succeeds without propagation"
+    # posture as the kill-switch revalidation webhook).
+    callback_delivered: bool
+
+
+def _post_media_misinfo_callback(media_id: str, *, status: str, note: str | None, earlier_url: str | None) -> bool:
+    """ADR-0035 step 6: write the embed's misinfo result back to the
+    secret-gated API callback. Best-effort and non-throwing — a failed
+    callback must not fail the hop (the embed stays `unchecked` until
+    re-triaged). Fires only when both env vars are set; a no-op (returns
+    False) otherwise, mirroring services/api's revalidation-webhook
+    fallback. The API base URL + shared secret come from THIS service's env
+    (never from the job payload) so the secret never crosses the queue."""
+    import httpx
+
+    api_base_url = os.environ.get("API_BASE_URL")
+    secret = os.environ.get("PIPELINE_CALLBACK_SECRET")
+    if not api_base_url or not secret:
+        logger.info(
+            "API_BASE_URL/PIPELINE_CALLBACK_SECRET unset — skipping the ADR-0035 misinfo write-back for "
+            "media %s; the result is still returned in the hop response.",
+            media_id,
+        )
+        return False
+
+    url = f"{api_base_url.rstrip('/')}/v1/internal/maandamano/media/{media_id}/misinfo"
+    try:
+        resp = httpx.post(
+            url,
+            json={"status": status, "note": note, "earlierUrl": earlier_url},
+            headers={"x-internal-secret": secret},
+            timeout=10.0,
+        )
+        if resp.status_code != 200:
+            logger.warning("ADR-0035 misinfo write-back for media %s returned %s", media_id, resp.status_code)
+            return False
+        return True
+    except httpx.HTTPError as exc:
+        logger.warning("ADR-0035 misinfo write-back for media %s failed: %s", media_id, exc)
+        return False
+
+
+@app.post("/hops/media-triage")
+async def hop_media_triage(payload: MaandamanoMediaTriageRequest) -> MaandamanoMediaTriageResponse:
+    try:
+        result = run_maandamano_media_triage(payload.thumbnail_ref, reverse_image_search=_reverse_image_search)
+    except MediaTriageError as exc:
+        logger.warning("maandamano media-triage hop failed: %s", exc)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    delivered = _post_media_misinfo_callback(
+        payload.media_id, status=result.status, note=result.note, earlier_url=result.earlier_url
+    )
+    return MaandamanoMediaTriageResponse(
+        media_id=payload.media_id,
+        status=result.status,
+        note=result.note,
+        earlier_url=result.earlier_url,
+        callback_delivered=delivered,
     )
 
 

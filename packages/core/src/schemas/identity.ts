@@ -67,6 +67,13 @@ export const AuditActionSchema = z.enum([
   // enactment time) — the draft is left pending for a human instead. See
   // services/api/src/lib/publish-enactment.ts.
   "check.auto_publish_blocked",
+  // ADR-0035: an editor/admin attached an iframe embed (a POINTER to a
+  // source-platform post, never bytes) to a demonstration advisory, and
+  // an editor/admin changed a demonstration's status (the latter also
+  // appends a demonstration_status_events row in the same transaction).
+  // Both are human-curated actions — the fetch engine never writes these.
+  "demonstration.media_attached",
+  "demonstration.status_changed",
 ]);
 export type AuditAction = z.infer<typeof AuditActionSchema>;
 

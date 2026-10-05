@@ -265,6 +265,10 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
         db,
         auth: authService,
         revalidate: { webBaseUrl: config.webBaseUrl ?? null, revalidateSecret: config.revalidateSecret ?? null },
+        publisher,
+        // ADR-0035: QStash target for the misinfo-triage job on attach.
+        mediaTriageUrl: `${pipelineBaseUrl}/hops/media-triage`,
+        pipelineCallbackSecret: config.pipelineCallbackSecret ?? null,
       }),
     );
   } else {

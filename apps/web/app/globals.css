@@ -1671,6 +1671,65 @@ a:hover {
   font-weight: 600;
 }
 
+/* ---------- ADR-0035: advisory media embeds + status history ---------- */
+.advisory-media {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line, var(--ink-3));
+}
+
+.advisory-media-heading,
+.advisory-history-heading {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 10px;
+}
+
+.advisory-media-frame {
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--paper-2, rgba(0, 0, 0, 0.04));
+}
+
+.advisory-media-caption {
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  margin: 6px 0 0;
+}
+
+.advisory-media-source {
+  font-size: 0.8rem;
+  margin: 4px 0 0;
+}
+
+.advisory-media-checking {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  font-style: italic;
+  margin: 0 0 8px;
+}
+
+.advisory-media-flagged {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--misleading);
+  background: color-mix(in srgb, var(--misleading) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--misleading) 35%, transparent);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 8px;
+}
+
+.advisory-history {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line, var(--ink-3));
+  font-size: 0.85rem;
+}
+
 /* ---------- night band (maandamano street framing) ---------- */
 .street {
   background: var(--night);
