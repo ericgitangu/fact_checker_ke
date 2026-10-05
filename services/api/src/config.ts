@@ -73,6 +73,15 @@ export interface ResolvedConfig {
   // `app.ts` treats an omitted value the same as an explicit `null`.
   webBaseUrl?: string | null;
   revalidateSecret?: string | null;
+  /**
+   * ADR-0035: shared secret for the pipeline → API misinfo write-back
+   * (`POST /v1/internal/maandamano/media/:mediaId/misinfo`). Optional for
+   * the same reason as the two fields above (existing config literals in
+   * tests predate it); fail-closed when unset — the callback route rejects
+   * every request, so an embed simply stays `unchecked` rather than
+   * accepting an unauthenticated status write.
+   */
+  pipelineCallbackSecret?: string | null;
 }
 
 const DEFAULT_DEV_CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"];
@@ -123,5 +132,6 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     redisTcpUrl: env.REDIS_TCP_URL ?? null,
     webBaseUrl: env.WEB_BASE_URL ?? null,
     revalidateSecret: env.REVALIDATE_SECRET ?? null,
+    pipelineCallbackSecret: env.PIPELINE_CALLBACK_SECRET ?? null,
   };
 }

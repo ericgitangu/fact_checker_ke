@@ -81,4 +81,42 @@ describe("Maandamano tracker page a11y (AT-0028-2)", () => {
     const results = await axe(container, pageAxeOptions);
     expectNoAxeViolations(results);
   });
+
+  // ADR-0035: an advisory carrying a flagged embed (iframe + caveat badge)
+  // must stay WCAG-clean — the iframe needs a title, the badge an alert role.
+  it("advisory with a flagged media embed: zero WCAG 2.2 AA violations", async () => {
+    mockMaandamanoFetch({
+      frozen: false,
+      demonstrations: [
+        {
+          id: "d1a1f1a0-0000-4000-8000-000000000002",
+          title: "Ongoing march along Moi Avenue",
+          area: "Nairobi Central Ward",
+          county: "Nairobi",
+          status: "ongoing",
+          date: "2026-10-10",
+          summary: "An ongoing march with an attached clip flagged as possibly recycled footage.",
+          sourceUrl: "https://example.com/advisory/2",
+          updatedAt: new Date().toISOString(),
+          media: [
+            {
+              id: "aaaaaaa0-0000-4000-8000-000000000001",
+              platform: "youtube",
+              embedUrl: "https://www.youtube.com/embed/abc123",
+              caption: "Clip observed during the march",
+              observedAt: new Date().toISOString(),
+              misinfoStatus: "flagged",
+              misinfoNote: "earlier copy seen https://example.com/old 2019-01-01",
+            },
+          ],
+        },
+      ],
+    });
+
+    const pageJsx = await MaandamanoPage();
+    const page = await AppShellHarness({ children: pageJsx });
+    const { container } = render(<IntlProviderHarness>{page}</IntlProviderHarness>);
+    const results = await axe(container, pageAxeOptions);
+    expectNoAxeViolations(results);
+  });
 });
