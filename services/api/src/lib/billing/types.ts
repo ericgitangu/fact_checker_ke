@@ -25,6 +25,12 @@ export interface CreateCheckoutInput {
   email?: string;
   /** The URL the PSP redirects back to after payment. */
   callbackUrl?: string;
+  /**
+   * M-Pesa only: the payer's phone (the STK-push target), as entered by the
+   * user. The adapter normalises it to a 2547XXXXXXXX MSISDN and rejects a
+   * non-Kenyan number. Ignored by card PSPs. NEVER the entitlement subject.
+   */
+  phone?: string;
 }
 
 export type CreateCheckoutResult =
@@ -72,19 +78,29 @@ export interface NormalizedBillingEvent {
 export interface BillingProviderAdapter {
   /** The core `BillingProvider` value this adapter owns. */
   readonly provider: PspProvider;
-  /** The lowercase HTTP header the PSP puts its webhook signature in. */
+  /**
+   * The lowercase HTTP header the PSP puts its webhook signature in. Empty
+   * string for a provider that doesn't sign its callback with a header
+   * (M-Pesa's Daraja callback is authenticated by source-IP allowlist +
+   * result-field validation, not an HMAC header).
+   */
   readonly signatureHeader: string;
-  /** False when the PSP secret is unset — every mutating op fails closed. */
+  /** False when the PSP secret(s) are unset — every mutating op fails closed. */
   readonly configured: boolean;
-  /** Start a hosted checkout. Fail-closed when unconfigured; never calls a live PSP API in this scaffold. */
+  /** Start a hosted checkout / STK push. Fail-closed when unconfigured. */
   createCheckout(input: CreateCheckoutInput): Promise<CreateCheckoutResult>;
   /**
-   * Verify the webhook signature against the RAW request bytes. Returns
-   * false (never throws) on a missing/invalid signature or when
-   * unconfigured — an internal endpoint with no configured secret must
-   * fail closed, exactly like `DenyAllSignatureVerifier`.
+   * Verify the webhook/callback against the RAW request bytes. Returns false
+   * (never throws) on a missing/invalid signature, a disallowed source IP,
+   * or when unconfigured — fail closed, exactly like
+   * `DenyAllSignatureVerifier`.
+   *
+   * `signature` is the header-borne HMAC (Paystack/Stripe). `sourceIp` is
+   * the request's client IP, used by providers that authenticate the
+   * callback by source-IP allowlist (M-Pesa) rather than a signature.
+   * Providers ignore whichever they don't use.
    */
-  verifyWebhook(input: { rawBody: string; signature: string | undefined }): boolean;
+  verifyWebhook(input: { rawBody: string; signature: string | undefined; sourceIp?: string | undefined }): boolean;
   /** Parse a (already signature-verified) raw webhook body into the normalised shape, or null if unparseable. */
   parseEvent(rawBody: string): NormalizedBillingEvent | null;
 }

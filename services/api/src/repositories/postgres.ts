@@ -442,6 +442,66 @@ export class PostgresEntitlementRepository implements EntitlementRepository {
     }
     return { ok: true, value: rowToEntitlementRecord(row) };
   }
+
+  async sweepExpired(now: Date = new Date()): Promise<{ expired: number }> {
+    // Bulk, set-based transition (not a per-row loop) — the index on
+    // nothing special here, but it's a single UPDATE so even a full scan is
+    // one round-trip. `RETURNING id` lets us count exactly what we flipped.
+    // Comparing against the passed `now` (default: wall clock) rather than
+    // SQL now() keeps this deterministic under an injected clock in tests.
+    const rows = await this.db
+      .update(schema.entitlements)
+      .set({ status: "expired", updatedAt: now })
+      .where(
+        and(
+          eq(schema.entitlements.status, "active"),
+          isNotNull(schema.entitlements.currentPeriodEnd),
+          lt(schema.entitlements.currentPeriodEnd, now),
+        ),
+      )
+      .returning({ id: schema.entitlements.id });
+    return { expired: rows.length };
+  }
+
+  async putPendingSubject(input: {
+    provider: BillingProvider;
+    reference: string;
+    deviceTokenHash: string;
+  }): Promise<void> {
+    await this.db
+      .insert(schema.pendingCheckoutSubjects)
+      .values({
+        provider: input.provider,
+        reference: input.reference,
+        deviceTokenHash: input.deviceTokenHash,
+      })
+      .onConflictDoUpdate({
+        target: [schema.pendingCheckoutSubjects.provider, schema.pendingCheckoutSubjects.reference],
+        set: { deviceTokenHash: input.deviceTokenHash, createdAt: new Date() },
+      });
+  }
+
+  async getPendingSubject(input: { provider: BillingProvider; reference: string }): Promise<string | null> {
+    const [row] = await this.db
+      .select({ deviceTokenHash: schema.pendingCheckoutSubjects.deviceTokenHash })
+      .from(schema.pendingCheckoutSubjects)
+      .where(
+        and(
+          eq(schema.pendingCheckoutSubjects.provider, input.provider),
+          eq(schema.pendingCheckoutSubjects.reference, input.reference),
+        ),
+      )
+      .limit(1);
+    return row?.deviceTokenHash ?? null;
+  }
+
+  async prunePendingCheckouts(olderThan: Date): Promise<{ pruned: number }> {
+    const rows = await this.db
+      .delete(schema.pendingCheckoutSubjects)
+      .where(lt(schema.pendingCheckoutSubjects.createdAt, olderThan))
+      .returning({ reference: schema.pendingCheckoutSubjects.reference });
+    return { pruned: rows.length };
+  }
 }
 
 function rowToEntitlementRecord(row: typeof schema.entitlements.$inferSelect): EntitlementRecord {

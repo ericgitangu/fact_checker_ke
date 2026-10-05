@@ -24,6 +24,7 @@
     "ioredis": "^5.4.2",
     "jose": "^5.9.6",
     "pino": "^9.6.0",
+    "stripe": "^23.0.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {

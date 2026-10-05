@@ -91,6 +91,57 @@ export interface ResolvedConfig {
    * reason the fields above are: test config literals predate it.
    */
   paystackSecretKey?: string | null;
+  /**
+   * ADR-0012 §3 (monetization v2): the M-Pesa Daraja C2B STK-push config.
+   * All read ONLY from env, never hardcoded. The adapter is `configured`
+   * only when the full set (consumer key+secret, shortcode, passkey) is
+   * present; any missing piece ⇒ `configured=false` ⇒ checkout 503 and
+   * every callback fails closed. `env` selects the Daraja base URL
+   * (sandbox vs production) — defaults to `sandbox`, so a half-configured
+   * deploy can never accidentally hit the live Safaricom endpoint. All
+   * optional for the same reason as the fields above (test config literals
+   * predate them). See services/api/src/lib/billing/mpesa.ts.
+   */
+  mpesa?: MpesaConfig;
+  /**
+   * ADR-0012 §3 (monetization v2): Stripe config (global fallback PSP —
+   * cards, no native M-Pesa). All read ONLY from env. The adapter is
+   * `configured` only when `secretKey` is present; webhook verification
+   * additionally requires `webhookSecret`, and checkout requires
+   * `priceId` — each missing piece fails that specific op closed (503)
+   * rather than guessing. Optional for the same reason as above. See
+   * services/api/src/lib/billing/stripe.ts.
+   */
+  stripe?: StripeConfig;
+}
+
+/** ADR-0012 §3: M-Pesa Daraja config block. `null`s mean "unset" (fail-closed). */
+export interface MpesaConfig {
+  consumerKey: string | null;
+  consumerSecret: string | null;
+  shortcode: string | null;
+  passkey: string | null;
+  /** `sandbox` (default) or `production` — selects the Daraja base URL. */
+  env: "sandbox" | "production";
+  /** The HTTPS URL Safaricom POSTs the STK callback to. */
+  callbackUrl: string | null;
+  /**
+   * Safaricom callback source-IP allowlist (comma-separated IPv4 / CIDR in
+   * `MPESA_CALLBACK_IP_ALLOWLIST`). Daraja doesn't HMAC-sign its callback,
+   * so this is the app-layer authenticity check — UNSET ⇒ every callback is
+   * rejected (fail-closed). The owner also keeps an edge (nginx/LB)
+   * allowlist; this is defence-in-depth, not a replacement.
+   */
+  callbackIpAllowlist: string[];
+  /** Premium price in whole KES (the STK push amount), from `MPESA_C2B_AMOUNT`; null ⇒ adapter default (1 KES, sandbox-safe). */
+  amountKes: number | null;
+}
+
+/** ADR-0012 §3: Stripe config block. `null`s mean "unset" (fail-closed). */
+export interface StripeConfig {
+  secretKey: string | null;
+  webhookSecret: string | null;
+  priceId: string | null;
 }
 
 const DEFAULT_DEV_CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"];
@@ -143,5 +194,25 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     revalidateSecret: env.REVALIDATE_SECRET ?? null,
     pipelineCallbackSecret: env.PIPELINE_CALLBACK_SECRET ?? null,
     paystackSecretKey: env.PAYSTACK_SECRET_KEY ?? null,
+    mpesa: {
+      consumerKey: env.MPESA_C2B_CONSUMER_KEY ?? null, // gitleaks:allow -- reads an env var NAME, no secret literal
+      consumerSecret: env.MPESA_C2B_CONSUMER_SECRET ?? null, // gitleaks:allow -- reads an env var NAME, no secret literal
+      shortcode: env.MPESA_C2B_SHORTCODE ?? null,
+      passkey: env.MPESA_C2B_ONLINE_PASSKEY ?? null,
+      // Fail-safe default: only an explicit `production` selects the live
+      // Safaricom base URL; anything else (unset, "sandbox", a typo) stays
+      // on the sandbox endpoint, so a misconfigured deploy never hits live.
+      env: env.MPESA_ENV === "production" ? "production" : "sandbox",
+      callbackUrl: env.MPESA_C2B_CALLBACK_URL ?? null,
+      callbackIpAllowlist: env.MPESA_CALLBACK_IP_ALLOWLIST
+        ? env.MPESA_CALLBACK_IP_ALLOWLIST.split(",").map((s) => s.trim()).filter(Boolean)
+        : [],
+      amountKes: env.MPESA_C2B_AMOUNT ? Number(env.MPESA_C2B_AMOUNT) || null : null,
+    },
+    stripe: {
+      secretKey: env.STRIPE_SECRET_KEY ?? null,
+      webhookSecret: env.STRIPE_WEBHOOK_SECRET ?? null,
+      priceId: env.STRIPE_PRICE_ID ?? null,
+    },
   };
 }

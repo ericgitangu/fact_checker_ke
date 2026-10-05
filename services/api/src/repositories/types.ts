@@ -141,4 +141,43 @@ export interface EntitlementRepository {
     providerRef: string | null;
     currentPeriodEnd: Date | null;
   }): Promise<RepoResult<EntitlementRecord>>;
+  /**
+   * ADR-0012 §3 (monetization v2): the expiry sweeper's write. Marks every
+   * `active` row whose paid period has lapsed (`current_period_end` present
+   * AND strictly before `now`) as `expired` — the terminal label — and
+   * returns how many rows it transitioned. A NULL `current_period_end` is a
+   * never-expiring manual comp and is NEVER swept; a `canceled` row is
+   * already denied lazily by `isActiveNow` once its period passes, so it is
+   * left to its own display label rather than relabelled here.
+   *
+   * This exists so access is not ONLY lazy-evaluated at read time: without
+   * it, a lapsed `active` row keeps its stale `active` status in the DB
+   * forever (correctly denied by `isActiveNow`, but misleading to any
+   * admin/analytics query reading `status` directly). Idempotent — a second
+   * run after the first finds nothing left to transition and returns 0.
+   */
+  sweepExpired(now?: Date): Promise<{ expired: number }>;
+  /**
+   * ADR-0012 §3 (monetization v2): record the device subject that started a
+   * checkout, keyed on `(provider, reference)`, so a later webhook/callback
+   * that doesn't itself carry the subject (M-Pesa's Daraja STK callback only
+   * echoes its `CheckoutRequestID`) can still reconcile the payment to the
+   * right device. Upserts, so a re-push of the same reference refreshes it.
+   * Written by the checkout route on EVERY provider's successful checkout —
+   * redundant-but-harmless for Paystack/Stripe (which also echo the subject
+   * in metadata), essential for M-Pesa.
+   */
+  putPendingSubject(input: { provider: BillingProvider; reference: string; deviceTokenHash: string }): Promise<void>;
+  /**
+   * Looks up the device subject recorded by `putPendingSubject`, or null if
+   * none (expired/never-recorded) — in which case the webhook grant is a
+   * safe no-op, exactly like a subjectless Paystack event.
+   */
+  getPendingSubject(input: { provider: BillingProvider; reference: string }): Promise<string | null>;
+  /**
+   * Housekeeping for the pending-subject map: deletes rows older than
+   * `olderThan`. Rides the monetization sweeper (lib/entitlement-sweep.ts)
+   * so stale mappings (abandoned/expired STK prompts) don't accumulate.
+   */
+  prunePendingCheckouts(olderThan: Date): Promise<{ pruned: number }>;
 }
