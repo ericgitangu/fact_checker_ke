@@ -214,7 +214,8 @@
     },
     "empty": {
       "heading": "The feed fills as we publish — nothing yet",
-      "body": "We haven't published an assessment yet. This is an honest empty state, not placeholder data — check back shortly, or submit a claim yourself."
+      "body": "We haven't published an assessment yet. This is an honest empty state, not placeholder data — check back shortly, or submit a claim yourself.",
+      "cta": "Submit a claim"
     },
     "mockNotice": "Demo data — the live feed isn't reachable right now, so these are example assessments, not real published checks.",
     "loadOlder": "Load older checks",

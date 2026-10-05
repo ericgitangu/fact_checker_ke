@@ -214,7 +214,8 @@
     },
     "empty": {
       "heading": "Mtiririko hujaa tunapochapisha — bado hakuna",
-      "body": "Hatujachapisha tathmini bado. Hii ni hali ya kweli ya kutokuwa na data, si data ya kujazia — rudi hivi karibuni, au tuma dai lako."
+      "body": "Hatujachapisha tathmini bado. Hii ni hali ya kweli ya kutokuwa na data, si data ya kujazia — rudi hivi karibuni, au tuma dai lako.",
+      "cta": "Tuma dai"
     },
     "mockNotice": "Data ya mfano — mtiririko halisi hauwezi kufikiwa kwa sasa, hivyo hizi ni tathmini za mfano, si hakiki halisi zilizochapishwa.",
     "loadOlder": "Pakia hakiki za zamani",

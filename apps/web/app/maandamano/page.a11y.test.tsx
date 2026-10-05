@@ -15,6 +15,7 @@ vi.mock("next-intl/server", async () => {
 // Router runtime -- see apps/web/app/page.a11y.test.tsx for the same note.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/",
 }));
 
 const { default: MaandamanoPage } = await import("./page");

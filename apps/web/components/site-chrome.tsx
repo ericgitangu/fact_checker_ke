@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { ExternalLinkIcon, Wordmark } from "@fact-checker-ke/brand";
 import { LocaleSwitcher } from "./locale-switcher";
+import { NavLink } from "./nav-link";
 import { PrimaryNav } from "./primary-nav";
 import { ThemeToggle } from "./theme-toggle";
 import { GITHUB_REPO_URL } from "../lib/site";
@@ -32,10 +33,10 @@ export async function AppHeader(): Promise<React.JSX.Element> {
         <Wordmark size="md" variant="light" />
       </Link>
       <PrimaryNav menuLabel={t("nav.menu")}>
-        <Link href="/submit">{t("nav.submit")}</Link>
-        <Link href="/feed">{t("nav.feed")}</Link>
-        <Link href="/methodology">{t("nav.methodology")}</Link>
-        <Link href="/maandamano">{t("nav.tracker")}</Link>
+        <NavLink href="/submit">{t("nav.submit")}</NavLink>
+        <NavLink href="/feed">{t("nav.feed")}</NavLink>
+        <NavLink href="/methodology">{t("nav.methodology")}</NavLink>
+        <NavLink href="/maandamano">{t("nav.tracker")}</NavLink>
         {/* `/editor` is intentionally NOT linked here: it is an internal,
             authenticated-only surface (see app/editor/page.tsx), not a
             public destination. */}

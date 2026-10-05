@@ -2,6 +2,7 @@ import type { Check } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
 import { ConfidenceGauge, ExternalLinkIcon, ShieldCheckIcon, Reveal } from "@fact-checker-ke/brand";
 import { LegalCaveat } from "./legal-caveat";
+import { MarkdownText } from "./markdown-text";
 import { AwaitingEditorNotice, VerdictStamp } from "./verdict";
 
 /**
@@ -47,7 +48,9 @@ export async function CheckCard({ check }: { check: Check }): Promise<React.JSX.
           </p>
         )}
 
-        <h1 className="checkcard-claim">{check.summary}</h1>
+        <h1 className="checkcard-claim">
+          <MarkdownText content={check.summary} inline />
+        </h1>
 
         {/* The focal "record" row: the pressed verdict stamp, and — for a
             published check — the calibrated confidence dial beside it. A
@@ -140,10 +143,10 @@ export async function CheckCard({ check }: { check: Check }): Promise<React.JSX.
         )}
 
         {!check.isDraft && check.whatWouldChangeThis && (
-          <p className="checkcard-rationale checkcard-change">
-            <strong>{t("guidance.whatWouldChangeThisHeading")}:</strong>{" "}
-            {check.whatWouldChangeThis}
-          </p>
+          <div className="checkcard-rationale checkcard-change">
+            <strong>{t("guidance.whatWouldChangeThisHeading")}:</strong>
+            <MarkdownText content={check.whatWouldChangeThis} className="checkcard-change-body" />
+          </div>
         )}
 
         {/* ADR-0033 AT-0033-1: the standing legal caveat renders on every
