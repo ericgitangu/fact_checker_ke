@@ -10,7 +10,9 @@ import type { SignatureVerifier } from "../lib/internal-auth.js";
 import { drainOutbox, cleanupExpiredIdempotencyKeys, publishOutboxRowInline } from "../lib/outbox.js";
 import { advanceWithInbox } from "../lib/advance.js";
 import { runRetentionSweep } from "../lib/retention.js";
+import { runEntitlementSweep } from "../lib/entitlement-sweep.js";
 import { runSubmissionOrchestration } from "../lib/submission-orchestrator.js";
+import type { EntitlementRepository } from "../repositories/types.js";
 
 const SubmissionAdvancedBodySchema = z.object({
   messageId: z.string().min(1),
@@ -35,6 +37,15 @@ export interface InternalRoutesDeps {
   pipelineBaseUrl?: string;
   verifier: SignatureVerifier;
   isProduction: boolean;
+  /**
+   * ADR-0012 §3 (monetization v2): the entitlement repository, used by the
+   * expiry sweeper (`/internal/entitlements/sweep` and the piggyback on
+   * `/internal/outbox/drain`). Optional + defaulted so existing tests that
+   * construct `InternalRoutesDeps` literally (predating this field) keep
+   * compiling; when omitted the sweeper is a no-op (0 rows), same
+   * fail-safe spirit as the `db`-gated branches below.
+   */
+  entitlements?: EntitlementRepository;
 }
 
 async function verifyOrReject(
@@ -80,13 +91,35 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
     // endpoint rather than a new cron (task brief's explicit
     // instruction) -- see services/api/src/lib/retention.ts.
     const retention = await runRetentionSweep(deps.db);
+    // ADR-0012 §3 (monetization v2): the entitlement expiry sweep rides the
+    // SAME existing sweeper (same ADR-0021 piggyback pattern) so lapsed
+    // `active` rows get their durable `expired` label without a new cron.
+    // No-op when the entitlement repo isn't wired (older test deps).
+    const entitlementsExpired = deps.entitlements ? (await runEntitlementSweep(deps.entitlements)).expired : 0;
 
     return reply.status(200).send({
       drained: drainResult.drained,
       failed: drainResult.failed,
       idempotencyKeysCleaned,
       retention,
+      entitlementsExpired,
     });
+  });
+
+  // ADR-0012 §3 (monetization v2): a dedicated, independently-schedulable
+  // entitlement expiry sweep. Same QStash signature verification as every
+  // other /internal route (fail-closed when no signing keys are set). It
+  // needs NO database branch of its own — it goes through the entitlement
+  // REPOSITORY (which is backed by Postgres or the in-memory double exactly
+  // like the read/webhook paths), so it works in local dev too; a missing
+  // repo (older wiring) is a safe no-op rather than a 503.
+  app.post("/internal/entitlements/sweep", async (request, reply) => {
+    if (!(await verifyOrReject(request, reply, deps.verifier))) return;
+    if (!deps.entitlements) {
+      return reply.status(200).send({ expired: 0, note: "entitlement repository not wired; no-op" });
+    }
+    const result = await runEntitlementSweep(deps.entitlements);
+    return reply.status(200).send(result);
   });
 
   app.post("/internal/events/submission-advanced", async (request, reply) => {

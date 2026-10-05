@@ -13,7 +13,7 @@ describe("entitlement contracts (ADR-0012 §3)", () => {
   it("enumerates exactly the tiers / statuses / providers the schema promises", () => {
     expect(EntitlementTierSchema.options).toEqual(["premium"]);
     expect(EntitlementStatusSchema.options).toEqual(["active", "expired", "canceled"]);
-    expect(BillingProviderSchema.options).toEqual(["paystack", "stripe", "manual"]);
+    expect(BillingProviderSchema.options).toEqual(["paystack", "stripe", "mpesa", "manual"]);
   });
 
   it("NO_ENTITLEMENT is the fail-safe projection: ads ON, no perks", () => {
@@ -55,19 +55,36 @@ describe("entitlement contracts (ADR-0012 §3)", () => {
   });
 
   it("CheckoutResult requires an https authorization URL + opaque reference", () => {
-    expect(() =>
-      CheckoutResultSchema.parse({
-        provider: "paystack",
-        authorizationUrl: "https://checkout.paystack.com/abc123",
-        reference: "ref_abc123",
-      }),
-    ).not.toThrow();
+    const parsed = CheckoutResultSchema.parse({
+      provider: "paystack",
+      authorizationUrl: "https://checkout.paystack.com/abc123",
+      reference: "ref_abc123",
+    });
+    // The pre-existing redirect-only shape still parses, defaulting to `redirect`.
+    expect(parsed.kind).toBe("redirect");
     expect(
       CheckoutResultSchema.safeParse({
         provider: "paystack",
         authorizationUrl: "not-a-url",
         reference: "ref_abc123",
       }).success,
+    ).toBe(false);
+  });
+
+  it("CheckoutResult accepts an M-Pesa stk_push result with no authorizationUrl", () => {
+    const parsed = CheckoutResultSchema.parse({
+      provider: "mpesa",
+      kind: "stk_push",
+      reference: "ws_CO_123456789",
+      customerMessage: "Success. Request accepted for processing",
+    });
+    expect(parsed.kind).toBe("stk_push");
+    expect(parsed.authorizationUrl).toBeUndefined();
+  });
+
+  it("CheckoutResult rejects a redirect result missing its authorizationUrl", () => {
+    expect(
+      CheckoutResultSchema.safeParse({ provider: "stripe", kind: "redirect", reference: "cs_test_1" }).success,
     ).toBe(false);
   });
 });

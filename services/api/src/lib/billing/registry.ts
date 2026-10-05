@@ -1,5 +1,8 @@
 import type { BillingProvider } from "@fact-checker-ke/core";
+import type { MpesaConfig, StripeConfig } from "../../config.js";
 import { PaystackBillingProvider } from "./paystack.js";
+import { MpesaBillingProvider } from "./mpesa.js";
+import { StripeBillingProvider } from "./stripe.js";
 import type { BillingProviderAdapter, PspProvider } from "./types.js";
 
 /**
@@ -31,7 +34,21 @@ export class BillingRegistry {
   }
 }
 
-/** Builds the registry from resolved config. Paystack today; Stripe is a future adapter. */
-export function createBillingRegistry(env: { paystackSecretKey: string | null }): BillingRegistry {
-  return new BillingRegistry([new PaystackBillingProvider(env.paystackSecretKey)]);
+/**
+ * Builds the registry from resolved config. ADR-0012 §3 (monetization v2):
+ * Paystack, M-Pesa (direct Daraja C2B) and Stripe are ALL registered — even
+ * when unconfigured — so their checkout/webhook routes exist and fail closed
+ * (503/401) rather than 404, exactly like the original Paystack-only
+ * scaffold. Every secret comes from config (env); nothing is hardcoded.
+ */
+export function createBillingRegistry(env: {
+  paystackSecretKey: string | null;
+  mpesa?: MpesaConfig;
+  stripe?: StripeConfig;
+}): BillingRegistry {
+  const adapters: BillingProviderAdapter[] = [new PaystackBillingProvider(env.paystackSecretKey)];
+  // The M-Pesa allowlist + amount travel on the config block itself.
+  if (env.mpesa) adapters.push(new MpesaBillingProvider(env.mpesa));
+  if (env.stripe) adapters.push(new StripeBillingProvider(env.stripe));
+  return new BillingRegistry(adapters);
 }

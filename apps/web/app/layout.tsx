@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { Archivo, Bricolage_Grotesque, Newsreader } from "next/font/google";
+import { headers } from "next/headers";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import { AppFooter, AppHeader } from "../components/site-chrome";
 import { ConsentBanner } from "../components/ads/consent-banner";
+import { ConsentRegionProvider } from "../components/ads/consent-region-provider";
+import { countryRequiresConsent } from "../lib/consent-region";
 import { SITE_URL } from "../lib/site";
 import "./globals.css";
 
@@ -124,6 +127,16 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const locale = await getLocale();
   const messages = await getMessages();
 
+  // ADR-0012 §4 (monetization v2): the AUTHORITATIVE consent-region decision,
+  // made server-side from the platform geo header rather than a client
+  // timezone guess. Vercel sets `x-vercel-ip-country` on every request; a
+  // null result (local dev / non-Vercel host / unresolved geo) tells the
+  // client hook to fall back to its legacy heuristic. Reading headers() opts
+  // this layout into dynamic rendering, which is already the case (it reads
+  // the locale cookie via next-intl).
+  const country = (await headers()).get("x-vercel-ip-country");
+  const serverRequiresConsent = countryRequiresConsent(country);
+
   return (
     <html
       lang={locale}
@@ -137,20 +150,25 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         {/* Must be the first thing in <body> so it runs before paint. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <a className="skip-link" href="#main-content">
-            Skip to content
-          </a>
-          <SerwistProvider swUrl="/serwist/sw.js">
-            <AppHeader />
-            <main id="main-content" className="app-main">
-              {children}
-            </main>
-            <AppFooter />
-            {/* ADR-0012 §4: EEA/UK consent gate. Renders nothing unless
-                AdSense is configured AND the reader's region requires
-                consent AND no choice was made — invisible by default. */}
-            <ConsentBanner />
-          </SerwistProvider>
+          {/* ADR-0012 §4: the server-decided region flag is the authoritative
+              signal for the consent gate below; wraps the whole tree so every
+              AdSlot/ConsentBanner reads the same decision. */}
+          <ConsentRegionProvider serverRequired={serverRequiresConsent}>
+            <a className="skip-link" href="#main-content">
+              Skip to content
+            </a>
+            <SerwistProvider swUrl="/serwist/sw.js">
+              <AppHeader />
+              <main id="main-content" className="app-main">
+                {children}
+              </main>
+              <AppFooter />
+              {/* ADR-0012 §4: EEA/UK consent gate. Renders nothing unless
+                  AdSense is configured AND the reader's region requires
+                  consent AND no choice was made — invisible by default. */}
+              <ConsentBanner />
+            </SerwistProvider>
+          </ConsentRegionProvider>
         </NextIntlClientProvider>
       </body>
     </html>

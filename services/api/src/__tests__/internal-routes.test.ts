@@ -41,6 +41,23 @@ describe("internal routes — signature verification", () => {
     expect(res.statusCode).toBe(401);
     await app.close();
   });
+
+  it("rejects /internal/entitlements/sweep with no/invalid signature (fail closed)", async () => {
+    const app = await buildApp({ logger: false, signatureVerifier: deny });
+    const res = await app.inject({ method: "POST", url: "/internal/entitlements/sweep", payload: {} });
+    expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("runs /internal/entitlements/sweep past verification via the (in-memory) repo — no DB 503", async () => {
+    // Unlike the db-gated drain route, the sweep goes through the entitlement
+    // REPOSITORY, so it works in in-memory mode and returns a count.
+    const app = await buildApp({ logger: false, signatureVerifier: allow });
+    const res = await app.inject({ method: "POST", url: "/internal/entitlements/sweep", payload: {} });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ expired: 0, pendingPruned: 0 });
+    await app.close();
+  });
 });
 
 describe("dev-only simulator route", () => {
