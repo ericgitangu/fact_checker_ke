@@ -50,6 +50,7 @@ Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 
 | [0031](0031-confidence-weighted-guidance.md) | Confidence-weighted guidance & data-flywheel threshold evolution | model direction | Proposed — **auto-publish flipped to DEFAULT** (two-engine pivot amendment, 2026-10-04) |
 | [0032](0032-virality-trending-detection.md) | Virality / trending-detection engine (autonomous fetch engine) | pivot | Proposed (two-engine pivot, 2026-10-04) — direction accepted, not built; KE source allow-list appendix pending research |
 | [0033](0033-legal-caveat-indemnity-framework.md) | Legal caveat, T&Cs, Privacy Policy & indemnity framework | pivot / legal | Proposed — **STARTER DRAFT, NOT LEGAL ADVICE**, advocate sign-off required before any text is published (2026-10-04) |
+| [0035](0035-maandamano-live-media-archive.md) | Maandamano tracker: live media embeds (misinfo-checked) + archive | no | Proposed — implemented (additive; amends ADR-0007), 2026-10-05 |
 
 Each row's status is copied verbatim from that ADR's own `**Status:**`
 line (source of truth); "implemented"/"implementation notes" callouts

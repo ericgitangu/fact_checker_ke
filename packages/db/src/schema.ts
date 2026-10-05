@@ -21,6 +21,7 @@ import {
   ClaimTypeSchema,
   CommentStatusSchema,
   CredibilityTierSchema,
+  DemonstrationMediaMisinfoStatusSchema,
   DemonstrationStatusSchema,
   EVENT_TYPES,
   RatingSchema,
@@ -65,6 +66,15 @@ export const ratingEnum = pgEnum("rating", enumValues("rating", RatingSchema.opt
 export const claimTypeEnum = pgEnum("claim_type", enumValues("claim_type", ClaimTypeSchema.options));
 export const credibilityTierEnum = pgEnum("credibility_tier", enumValues("credibility_tier", CredibilityTierSchema.options));
 export const demonstrationStatusEnum = pgEnum("demonstration_status", enumValues("demonstration_status", DemonstrationStatusSchema.options));
+/**
+ * ADR-0035: the misinfo-check lifecycle of an attached embed, sourced from
+ * @fact-checker-ke/core's `DemonstrationMediaMisinfoStatusSchema` (same
+ * single-source-of-truth discipline as the other core-sourced enums).
+ */
+export const demonstrationMediaMisinfoStatusEnum = pgEnum(
+  "demonstration_media_misinfo_status",
+  enumValues("demonstration_media_misinfo_status", DemonstrationMediaMisinfoStatusSchema.options),
+);
 export const waitlistSourceEnum = pgEnum("waitlist_source", enumValues("waitlist_source", WaitlistSourceSchema.options));
 
 /**
@@ -393,6 +403,63 @@ export const demonstrations = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("demonstrations_org_id_idx").on(table.orgId)],
+);
+
+/**
+ * ADR-0035: iframe EMBEDS attached to an advisory — a POINTER to a
+ * source-platform post (`embedUrl` on a host-allowlisted embed host, see
+ * packages/core's `isPlatformEmbedHost`) plus a caption, when it was
+ * observed, and the misinfo-check lifecycle. NEVER media bytes: there is
+ * no column here that could hold a re-hosted file, which is the schema-
+ * level half of ADR-0035's "embeds only, never re-hosted" rule. The
+ * reverse-image check's earlier-copy URL is denormalized onto
+ * `reverseImageEarlierUrl` so the flagged-footage caveat is self-contained
+ * without a join. FK cascades with the advisory it hangs off, so the
+ * kill-switch (which withholds the advisory list) withholds its media for
+ * free — media is only ever read THROUGH a demonstration.
+ */
+export const demonstrationMedia = pgTable(
+  "demonstration_media",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    demonstrationId: uuid("demonstration_id")
+      .notNull()
+      .references(() => demonstrations.id, { onDelete: "cascade" }),
+    platform: text("platform").notNull(),
+    embedUrl: text("embed_url").notNull(),
+    caption: text("caption"),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    misinfoStatus: demonstrationMediaMisinfoStatusEnum("misinfo_status").notNull().default("unchecked"),
+    misinfoNote: text("misinfo_note"),
+    reverseImageEarlierUrl: text("reverse_image_earlier_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("demonstration_media_demonstration_id_idx").on(table.demonstrationId)],
+);
+
+/**
+ * ADR-0035 archive timeline (AT-0035-7): an append-only log of every
+ * demonstration status transition, written in the SAME transaction as the
+ * `demonstrations.status` update (see
+ * services/api/src/lib/maandamano.ts#recordDemonstrationStatus), so the
+ * archive's history is REAL, not reconstructed. Same append-only
+ * discipline as `review_actions`/`audit_log` — never updated/deleted.
+ * `changedBy` is nullable (a status change from an automated migration/
+ * seed path may have no acting user), FK to `users` when present.
+ */
+export const demonstrationStatusEvents = pgTable(
+  "demonstration_status_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    demonstrationId: uuid("demonstration_id")
+      .notNull()
+      .references(() => demonstrations.id, { onDelete: "cascade" }),
+    status: demonstrationStatusEnum("status").notNull(),
+    note: text("note"),
+    changedBy: uuid("changed_by").references(() => users.id),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("demonstration_status_events_demonstration_occurred_idx").on(table.demonstrationId, table.occurredAt)],
 );
 
 export const llmCalls = pgTable(
