@@ -11,13 +11,20 @@
       "terms": "Masharti",
       "privacy": "Faragha",
       "menu": "Menyu",
-      "submit": "Tuma"
+      "submit": "Tuma",
+      "join": "Jinsi ya kujiunga",
+      "contact": "Wasiliana"
     },
     "footer": {
       "tagline": "Mradi huru, wa chanzo-wazi wa kuhakiki habari nchini Kenya.",
       "languages": "Kiingereza, Kiswahili na Sheng",
       "builtIn": "Imetengenezwa Nairobi",
-      "legalPending": "Masharti na Faragha (yanasubiri ukaguzi wa kisheria)"
+      "legalPending": "Rasimu — inasubiri ukaguzi wa kisheria",
+      "groupProduct": "Bidhaa",
+      "groupProject": "Mradi",
+      "groupLegal": "Kisheria",
+      "sourceLink": "Tazama msimbo kwenye GitHub",
+      "rights": "© {year} fact_checker_ke. Chanzo-wazi, Apache-2.0."
     },
     "action": {
       "submit": "Hakiki hili",
@@ -412,6 +419,62 @@
         "misconfigured": "Orodha ya kusubiri haipatikani kwa sasa. Tafadhali angalia tena hivi karibuni.",
         "networkError": "Hatukuweza kufikia seva — angalia muunganisho wako na ujaribu tena."
       }
+    }
+  },
+  "contact": {
+    "title": "Wasiliana",
+    "intro": "Maswali ya vyombo vya habari, marekebisho, maombi ya haki ya kujibu, au ushirikiano — wasiliana na mwanzilishi moja kwa moja.",
+    "card": {
+      "roleLabel": "Wadhifa",
+      "role": "Mwanzilishi · Kiongozi wa Uhandisi wa Programu / Mbunifu",
+      "locationLabel": "Mahali",
+      "location": "Nairobi, Kenya",
+      "emailLabel": "Barua pepe",
+      "linksLabel": "Mahali pengine",
+      "github": "GitHub",
+      "linkedin": "LinkedIn",
+      "site": "Tovuti ya kibinafsi",
+      "download": "Pakua vCard (.vcf)",
+      "downloaded": "Imehifadhiwa — angalia upakuaji wako",
+      "sourceNote": "Taarifa zimetolewa moja kwa moja kutoka developer.ericgitangu.com; hakuna chochote hapa kilichobuniwa."
+    },
+    "rightOfReply": {
+      "heading": "Haki ya kujibu na marekebisho",
+      "body": "Ikiwa hakiki iliyochapishwa inakutaja na unaona si sahihi, si haki, au haina muktadha kamili, tuambie hapa. Kila tathmini kwenye fact_checker_ke ina njia ya haki ya kujibu na marekebisho — angalia ukurasa wa Mbinu na onyo la kudumu kwenye kila hakiki."
+    }
+  },
+  "join": {
+    "title": "Jinsi ya kujiunga na harakati",
+    "intro": "fact_checker_ke ni timu ndogo, huru inayojitahidi kufanya madai makubwa ya Kenya kuhakikiwa — kwa ushahidi, si hisia. Inasaidia tu ikiwa watu zaidi watasaidia kuijenga, kuihakiki, na kuieneza.",
+    "mission": {
+      "heading": "Kwa nini mradi huu upo",
+      "body": "Madai husafiri haraka kuliko marekebisho, hasa kwenye vikundi vya WhatsApp na mitandao ya Kenya wakati wa uchaguzi, maandamano, au mgogoro. fact_checker_ke huunganisha mfumo wa kiotomatiki wa kutafuta na kutathmini pamoja na mfumo wa kutuma madai na ukaguzi wa kihariri, hutaja vyanzo vyote, huonyesha kiwango chake cha uhakika, na humpa mtu aliyetajwa haki ya kujibu — angalia ukurasa wa Mbinu kwa mfumo mzima."
+    },
+    "ways": {
+      "heading": "Njia za kushiriki",
+      "contribute": {
+        "title": "Changia msimbo au ukaguzi",
+        "body": "Mfumo mzima ni chanzo-wazi kwenye GitHub — mfumo wa uchakataji, programu ya wavuti, miundombinu, na nyaraka. Masuala yameandikwa kwa wachangiaji wapya; ADR huelezea sababu za maamuzi magumu.",
+        "cta": "Tazama hazina"
+      },
+      "check": {
+        "title": "Tuma au ripoti dai",
+        "body": "Umeona dai linalostahili kuhakikiwa, au ushahidi tuliokosea? Kutuma ni njia ya haraka zaidi ya kusaidia sasa hivi — hauitaji kujisajili.",
+        "cta": "Tuma dai"
+      },
+      "partner": {
+        "title": "Shirikiana, fadhili, au jiunge na Premium mapema",
+        "body": "Vyumba vya habari, vikundi vya teknolojia ya kiraia, na wafadhili wanaotaka kusaidia uhakiki huru wa habari Kenya wanaweza kujiandikisha kuonyesha nia — ufadhili huendeleza kazi, kamwe si uamuzi.",
+        "cta": "Jiandikishe kuonyesha nia"
+      }
+    },
+    "futureNote": {
+      "heading": "Wazi leo — kwa uwazi, hilo linaweza kubadilika",
+      "body": "fact_checker_ke ni chanzo-wazi kabisa na bure kutumia sasa hivi. Kadri mapato yanavyokomaa (viwango vya Premium, ufadhili — angalia ukurasa wa nyumbani), sehemu za mradi zinaweza kuhamia kwenye mfumo uliofungwa au wa faragha ambapo wachangiaji wapya huomba ufikiaji badala ya kunakili kwa uhuru. Ukitaka kujiunga, njia ya haraka zaidi ni kujiandikisha kuonyesha nia hapa chini au kufungua ombi la kuunganisha (pull request) leo, wakati kila kitu bado ni wazi."
+    },
+    "register": {
+      "heading": "Jiandikishe kuonyesha nia",
+      "body": "Weka barua pepe yako na utuambie ni nini kinachokueleza vizuri zaidi — tutawasiliana nawe pindi ufikiaji wa wachangiaji na washirika unapofunguka."
     }
   }
 }
