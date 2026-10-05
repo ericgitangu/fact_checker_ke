@@ -5,6 +5,7 @@ import { healthRoutes } from "./routes/health.js";
 import { submissionRoutes } from "./routes/submissions.js";
 import { checkRoutes } from "./routes/checks.js";
 import { feedRoutes } from "./routes/feed.js";
+import { trendingRoutes } from "./routes/trending.js";
 import { waitlistRoutes } from "./routes/waitlist.js";
 import { deviceRoutes } from "./routes/device.js";
 import { internalRoutes } from "./routes/internal.js";
@@ -23,6 +24,7 @@ import {
   InMemoryDeviceTokenRepository,
   InMemoryEntitlementRepository,
   InMemorySubmissionRepository,
+  InMemoryTrendingRepository,
   InMemoryWaitlistRepository,
 } from "./repositories/in-memory.js";
 import { createPostgresRepositories } from "./repositories/postgres.js";
@@ -31,6 +33,7 @@ import type {
   DeviceTokenRepository,
   EntitlementRepository,
   SubmissionRepository,
+  TrendingRepository,
   WaitlistRepository,
 } from "./repositories/types.js";
 import { createWaitlistRateLimiter, type RateLimiter } from "./rate-limit.js";
@@ -67,6 +70,7 @@ import type { Database } from "@fact-checker-ke/db";
 export interface BuildAppOptions {
   submissions?: SubmissionRepository;
   checks?: CheckRepository;
+  trending?: TrendingRepository;
   waitlist?: WaitlistRepository;
   deviceTokens?: DeviceTokenRepository;
   entitlements?: EntitlementRepository;
@@ -132,6 +136,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   let submissions = options.submissions;
   let checks = options.checks;
+  let trending = options.trending;
   let waitlist = options.waitlist;
   let deviceTokens = options.deviceTokens;
   let entitlements = options.entitlements;
@@ -141,11 +146,12 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   // hatch below — see its docblock in lib/submission-service.ts.
   let inMemorySubmissionsStore: InMemorySubmissionRepository | null = null;
 
-  if (!submissions || !checks || !waitlist || !deviceTokens || !entitlements) {
+  if (!submissions || !checks || !trending || !waitlist || !deviceTokens || !entitlements) {
     if (config.databaseUrl) {
       const pg = createPostgresRepositories(config.databaseUrl);
       submissions ??= pg.submissions;
       checks ??= pg.checks;
+      trending ??= pg.trending;
       waitlist ??= pg.waitlist;
       deviceTokens ??= pg.deviceTokens;
       entitlements ??= pg.entitlements;
@@ -160,6 +166,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
         submissions = inMemorySubmissionsStore;
       }
       checks ??= new InMemoryCheckRepository();
+      trending ??= new InMemoryTrendingRepository();
       waitlist ??= new InMemoryWaitlistRepository();
       deviceTokens ??= new InMemoryDeviceTokenRepository();
       entitlements ??= new InMemoryEntitlementRepository();
@@ -231,6 +238,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   );
   await app.register((instance) => checkRoutes(instance, { checks: checks!, db }));
   await app.register((instance) => feedRoutes(instance, { checks: checks! }));
+  await app.register((instance) => trendingRoutes(instance, { trending: trending! }));
   await app.register((instance) => waitlistRoutes(instance, { waitlist: waitlist!, rateLimiter }));
   await app.register((instance) => deviceRoutes(instance, { deviceTokens: deviceTokens! }));
 

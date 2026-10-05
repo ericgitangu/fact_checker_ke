@@ -229,6 +229,28 @@ export const submissions = pgTable(
     // outbox-write path (services/pipeline/app/stores/outbox_postgres.py)
     // sets "fetch" explicitly.
     ingestSource: ingestSourceEnum("ingest_source").notNull().default("submission"),
+    // Trending / under-review stream (ADR-0032 refinement): discovery metadata
+    // for a FETCH-sourced submission, so a viral item is queryable and
+    // surfaceable BEFORE (or without) a published check. All four are nullable
+    // — every human-submission row and every historical fetch row has none,
+    // and they are written ONLY by the fetch engine's outbox writer
+    // (services/pipeline/app/stores/outbox_postgres.py). They are DELIBERATELY
+    // separate from `submissions.url`: that column is half of the
+    // `submissions_url_or_text` XOR check constraint (a submission is either a
+    // URL claim or a text claim), which the fetch path satisfies with
+    // `text`-only (`url` NULL). The discovered VIDEO link is a distinct concept
+    // (provenance of what we're tracking, not the claim itself), so it lives in
+    // its own `source_url` column and the XOR constraint is untouched.
+    sourceUrl: text("source_url"),
+    platform: text("platform"),
+    // Raw engagement counts observed at ingestion ({views,likes,comments}),
+    // kept as jsonb for the trending card's display; `virality_score` is the
+    // single log-weighted ranking number derived from them in the pipeline
+    // (compute_virality_score, same formula as checks.virality_score). Null
+    // (not 0) means no engagement was observed — trending orders
+    // `virality_score DESC NULLS LAST`, so those sort last rather than as zero.
+    engagement: jsonb("engagement").$type<{ views: number; likes: number; comments: number }>(),
+    viralityScore: numeric("virality_score", { precision: 12, scale: 4 }),
     status: submissionStatusEnum("status").notNull().default("received"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     // ADR-0018: the polling ETag is derived from (status, updated_at).
@@ -242,6 +264,12 @@ export const submissions = pgTable(
   (table) => [
     index("submissions_org_id_idx").on(table.orgId),
     index("submissions_device_token_hash_idx").on(table.deviceTokenHash),
+    // Trending / under-review stream: fetch-sourced rows ranked by virality,
+    // highest first, nulls last (ties broken by recency). Partial so it stays
+    // small — only the fetch engine's own rows are ever in the trending read.
+    index("submissions_fetch_trending_idx")
+      .on(table.viralityScore.desc().nullsLast(), table.createdAt.desc())
+      .where(sql`${table.ingestSource} = 'fetch'`),
     check(
       "submissions_url_or_text",
       sql`(${table.url} is not null and ${table.text} is null) or (${table.url} is null and ${table.text} is not null)`,

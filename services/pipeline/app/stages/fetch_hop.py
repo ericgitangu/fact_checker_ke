@@ -65,11 +65,14 @@ from app.stores.engine_breaker import EngineCostBreaker
 # AT-0017-C "bypasses the outbox" gap in the running system — see that
 # module's docstring. Takes (claim_text, org_id, submission_id) and
 # returns the (possibly server-confirmed) submission id.
-# (claim_text, org_id, submission_id, engagement) -> submission_id. The
-# trailing `engagement` arg (raw views/likes/comments at observation) is
-# carried so the real-outbox emitter can derive the virality score for the
-# "most viral" feed section — see app/stores/outbox_postgres.py.
-EmitSubmission = Callable[[str, str, str, dict[str, int]], str]
+# (claim_text, org_id, submission_id, engagement, source_url, platform) ->
+# submission_id. `engagement` (raw views/likes/comments at observation) lets
+# the real-outbox emitter derive the virality score; `source_url` (the
+# discovered video link) and `platform` are persisted on the submissions row
+# so the fetch-DISCOVERED item is surfaceable in the "Trending / under review"
+# stream (GET /v1/trending) before/without a published check — see
+# app/stores/outbox_postgres.py.
+EmitSubmission = Callable[[str, str, str, dict[str, int], str | None, str | None], str]
 
 # ADR-0032 §4: "per-source, per-run candidate cap" — each poll emits at
 # most this many surviving (above-tau) candidates; this slice enforces
@@ -323,8 +326,12 @@ async def _process_candidate(
     submission_id = str(uuid.uuid4())
     if emit_submission is not None:
         # Real-outbox path (AT-0017-C) — see module docstring. The raw
-        # engagement rides along so the emitter can compute the virality score.
-        submission_id = emit_submission(claim_text, org_id, submission_id, candidate.engagement)
+        # engagement rides along so the emitter can compute the virality score;
+        # the candidate's source url + platform ride along so the discovered
+        # item is surfaceable in the trending stream before a check exists.
+        submission_id = emit_submission(
+            claim_text, org_id, submission_id, candidate.engagement, candidate.url, candidate.platform
+        )
         analyze_result: AnalyzeResult | None = None
     else:
         request = AnalyzeHopRequest(

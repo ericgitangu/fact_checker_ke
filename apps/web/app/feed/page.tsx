@@ -3,7 +3,9 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { FeedSection } from "../../components/feed-section";
 import { ViralSection } from "../../components/viral-section";
+import { TrendingSection } from "../../components/trending-section";
 import { getFeedPage } from "../../lib/get-feed";
+import { getTrending } from "../../lib/get-trending";
 
 export const metadata: Metadata = {
   title: "What we're checking now — fact_checker_ke",
@@ -12,6 +14,7 @@ export const metadata: Metadata = {
 };
 
 const FEED_PAGE_LIMIT = 20;
+const TRENDING_LIMIT = 8;
 
 /**
  * ADR-0032's visible payoff, as its own route: the full "what we're
@@ -28,13 +31,26 @@ export default async function FeedPage({
 }): Promise<React.JSX.Element> {
   const { cursor } = await searchParams;
   const t = await getTranslations("feed");
-  const feed = await getFeedPage({ limit: FEED_PAGE_LIMIT, cursor: cursor ?? null });
+  // The trending stream is only shown on the first page (like the viral
+  // section) — a reader paging "load older" has already seen it. Fetched in
+  // parallel with the feed; a trending failure degrades to an empty,
+  // self-hiding section without affecting the feed.
+  const isFirstPage = !cursor;
+  const [feed, trending] = await Promise.all([
+    getFeedPage({ limit: FEED_PAGE_LIMIT, cursor: cursor ?? null }),
+    isFirstPage ? getTrending({ limit: TRENDING_LIMIT }) : Promise.resolve([]),
+  ]);
 
   return (
     <div className="shell-narrow flex flex-col gap-6">
-      {/* "Most viral right now" leads the page (top-3 by reach) above the
-          descending feed — additive, and self-hiding (renders null) when
-          nothing qualifies, so an all-submission feed is unaffected. */}
+      {/* "Trending / under review" leads the page: the fetch engine's
+          DISCOVERIES (viral items we're tracking), surfaced regardless of
+          publish status — self-hiding when there's nothing trending. */}
+      <TrendingSection items={trending} />
+
+      {/* "Most viral right now" (top-3 PUBLISHED by reach) sits below it —
+          additive, and self-hiding (renders null) when nothing qualifies, so
+          an all-submission feed is unaffected. */}
       <ViralSection items={feed.topViral} />
 
       <FeedSection

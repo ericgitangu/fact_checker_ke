@@ -152,4 +152,62 @@ Entries tagged **[GAP]** must be verified against the live source before they en
 | AT-0032-8 | A fetched item whose footage reverse-image/frame search matches an earlier-dated appearance is flagged "recycled/misattributed footage" and that earlier match is carried into the verify hop as evidence (the dominant KE tactic is a first-class check, not an afterthought). | RED |
 
 ---
+
+## Addendum (2026-10-05): the public "Trending / under review" stream
+
+**Problem the refinement closes.** The fetch engine works — it discovers viral
+Kenyan videos and runs them through the pipeline — but most discoveries do NOT
+become PUBLISHED checks: a fresh/breaking viral has no pre-existing fact-check
+evidence to cite, so ADR-0031's publish policy correctly HOLDS it as a draft
+for the editor (the existing editor queue, "decision C", is left untouched).
+The result was that the engine's core value proposition — "we catch what's
+trending, immediately" — was **invisible** to readers, because the only public
+surface (`GET /v1/feed`) shows PUBLISHED checks only. A held viral discovery
+appeared nowhere.
+
+**Decision (owner decision A+C).** Add a public read-model that surfaces the
+fetch **discoveries themselves** — the viral video + its engagement + a
+**derived tracking status** — regardless of publish status, WITHOUT touching
+the editor queue or the publish/evidence guards.
+
+- **Persistence.** The fetch outbox writer
+  (`services/pipeline/app/stores/outbox_postgres.py`) now persists the
+  discovery metadata as COLUMNS on the `submissions` row (migration `0020`,
+  EXPAND-only): `source_url` (the discovered VIDEO link), `platform`,
+  `engagement` (jsonb `{views,likes,comments}`), `virality_score`
+  (`numeric(12,4)`, same log-weighted formula as `checks.virality_score`).
+  These are deliberately **not** written to `submissions.url` — that column is
+  half of the `submissions_url_or_text` XOR constraint and the fetch path is a
+  `text`-only submission; the video link is provenance of what we're tracking,
+  a distinct concept, so it gets its own column and the constraint is
+  untouched. A partial index `submissions_fetch_trending_idx`
+  (`virality_score DESC NULLS LAST, created_at DESC` where
+  `ingest_source = 'fetch'`) serves the read.
+- **API.** `GET /v1/trending` returns fetch-sourced discoveries ordered by
+  virality DESC NULLS LAST, each with a status DERIVED (not stored) from the
+  submission status + its own check (`services/api/src/lib/trending-status.ts`):
+  `monitoring` (in-flight, or `ready` with no own check), `under_review`
+  (a HELD DRAFT check exists — a human editor is assessing it), `published`
+  (a published check exists → links its `checkId`), `dismissed` (submission
+  `failed`). Read-only, cache-friendly, no kill-switch (like `/v1/feed`, it is
+  a read surface, not an ingestion/publish one).
+- **Web.** A self-hiding "Trending now — what we're tracking" section leads the
+  `/feed` page (above "Most viral", which is published-only), with a tracking-
+  status chip per item and an honest note: **a status is not a verdict, and
+  "under review" means an editor is assessing it.**
+
+**Non-negotiable kept (decision C).** The stream exposes ONLY the discovered
+video's own metadata plus the derived status — it NEVER exposes a held draft's
+rating/summary/verdict, and a draft's `checkId` is never surfaced (only a
+PUBLISHED check is linkable). The editor queue and the ADR-0031 publish/
+evidence guards are unchanged. Virality remains a *selection/surfacing* signal,
+never a *publishing* authorization.
+
+**Trade-off accepted.** A fetch discovery that reaches `ready` with no check of
+its own (deduped to an already-published claim owned by a different submission,
+or no checkable claim) is shown as `monitoring` rather than inventing a
+`published` status from another submission's check — honest, but it means a
+small set of "resolved-elsewhere" discoveries read as still-tracked. Documented
+in `deriveTrendingStatus` rather than papered over.
+
 **See ADR-0002** (fetch engine as a first-class PRIMARY source), **ADR-0031** (tiered, caveated auto-publish is the default operating mode), **ADR-0033** (standing caveat + indemnity on every published assessment), **ADR-0017** (new `fetch.*` events + re-sized QStash quota ledger), **ADR-0005** (STT compliance subset), **ADR-0011** (per-engine cost breaker).

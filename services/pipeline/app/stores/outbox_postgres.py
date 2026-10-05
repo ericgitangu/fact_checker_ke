@@ -66,6 +66,8 @@ def emit_fetch_submission_received(
     text: str,
     submission_id: str | None = None,
     engagement: dict[str, int] | None = None,
+    source_url: str | None = None,
+    platform: str | None = None,
 ) -> str:
     """Inserts `submissions` (ingest_source='fetch'), `outbox`
     (event_type='submission.received'), and `submission_events` in one
@@ -75,6 +77,19 @@ def emit_fetch_submission_received(
     rather than discovering a server-generated one after the fact —
     mirrors how a client-supplied idempotency key, not a DB default,
     anchors identity across the rest of this codebase's outbox writers.
+
+    Trending / under-review stream (ADR-0032 refinement): `source_url`
+    (the discovered VIDEO link), `platform`, `engagement` and the derived
+    `virality_score` are persisted as COLUMNS on the `submissions` row — not
+    only inside the event payload — so a fetch-DISCOVERED viral item is
+    queryable (and surfaceable in `GET /v1/trending`) BEFORE or without a
+    published check. They are deliberately NOT written to `submissions.url`:
+    that column is half of the `submissions_url_or_text` XOR constraint and
+    the fetch path is a `text`-only submission (`url` stays NULL). The video
+    link is a distinct concept (provenance of what we're tracking, not the
+    claim), so it lands in the dedicated `source_url` column. All are
+    nullable: a source that returned no counts, or a back-compat caller that
+    passes none, leaves them NULL (trending sorts NULLS LAST, never as 0).
     """
     submission_id = submission_id or str(uuid4())
     event_id = str(uuid4())
@@ -119,13 +134,30 @@ def emit_fetch_submission_received(
         },
     }
 
+    # Trending / under-review stream: the virality column is numeric(12,4);
+    # psycopg adapts a Python float fine, but None stays SQL NULL. engagement
+    # is jsonb — serialize the normalized dict (or NULL) ourselves so psycopg
+    # sends a json string, matching the outbox/submission_events payloads.
+    engagement_json = json.dumps(engagement_payload) if engagement_payload is not None else None
+
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO submissions (id, org_id, url, text, submitted_by, ingest_source, status)
-            VALUES (%s, %s, NULL, %s, NULL, 'fetch', 'received')
+            INSERT INTO submissions
+                (id, org_id, url, text, submitted_by, ingest_source, status,
+                 source_url, platform, engagement, virality_score)
+            VALUES (%s, %s, NULL, %s, NULL, 'fetch', 'received',
+                    %s, %s, %s::jsonb, %s)
             """,
-            (submission_id, org_id, text),
+            (
+                submission_id,
+                org_id,
+                text,
+                source_url,
+                platform,
+                engagement_json,
+                virality_score,
+            ),
         )
         cur.execute(
             """
