@@ -1,4 +1,13 @@
-import type { Check, FeedItem, Submission, WaitlistSignupInput, WaitlistSignupResult } from "@fact-checker-ke/core";
+import type {
+  BillingProvider,
+  Check,
+  EntitlementStatus,
+  EntitlementTier,
+  FeedItem,
+  Submission,
+  WaitlistSignupInput,
+  WaitlistSignupResult,
+} from "@fact-checker-ke/core";
 
 /**
  * Result type for repository operations that can fail in an expected way.
@@ -62,4 +71,65 @@ export interface DeviceTokenRepository {
    * never as an error that blocks the request.
    */
   touch(token: string): Promise<RepoResult<{ tokenHash: string }>>;
+}
+
+/**
+ * ADR-0012 §3: a stored entitlement row, as the service layer sees it
+ * (dates as `Date`, not ISO strings — the HTTP projection in
+ * lib/entitlement.ts does the ISO conversion). Mirrors the `entitlements`
+ * table in packages/db/src/schema.ts.
+ */
+export interface EntitlementRecord {
+  id: string;
+  deviceTokenHash: string | null;
+  userId: string | null;
+  tier: EntitlementTier;
+  status: EntitlementStatus;
+  provider: BillingProvider;
+  providerRef: string | null;
+  currentPeriodEnd: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * ADR-0012 §3 (server-authoritative entitlement). Reads the entitlement
+ * for a reader (device-identified today) and applies verified billing
+ * webhooks. The ad-free / premium DECISION is NOT here — it is the pure
+ * `projectEntitlement` in lib/entitlement.ts, so it is unit-testable
+ * without a database. This interface only persists and fetches.
+ */
+export interface EntitlementRepository {
+  /**
+   * The most recent entitlement row for a device token hash (newest by
+   * `createdAt`), or null when the reader has never had one. "Latest, not
+   * active" deliberately: an expired/canceled row still drives the
+   * display ("expired on …"), and `projectEntitlement` decides access.
+   */
+  getLatestForDevice(deviceTokenHash: string): Promise<EntitlementRecord | null>;
+  /**
+   * Records a verified webhook idempotently on `(provider, eventId)`.
+   * `firstTime=false` means this exact event was already processed (a PSP
+   * retry) — the caller acks WITHOUT re-granting, the same inbox pattern
+   * as `processed_messages`.
+   */
+  recordBillingEvent(input: {
+    provider: BillingProvider;
+    eventId: string;
+    eventType: string;
+    payload: unknown;
+  }): Promise<{ firstTime: boolean }>;
+  /**
+   * Upserts an ACTIVE entitlement for a device subject, keyed on
+   * `(provider, providerRef)` so a webhook replay updates the one row
+   * rather than duplicating it. Used by the webhook handler once an event
+   * is verified, deduped, and carries a subject.
+   */
+  activateDeviceEntitlement(input: {
+    deviceTokenHash: string;
+    tier: EntitlementTier;
+    provider: BillingProvider;
+    providerRef: string | null;
+    currentPeriodEnd: Date | null;
+  }): Promise<RepoResult<EntitlementRecord>>;
 }

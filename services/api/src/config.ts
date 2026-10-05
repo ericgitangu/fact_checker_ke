@@ -82,6 +82,15 @@ export interface ResolvedConfig {
    * accepting an unauthenticated status write.
    */
   pipelineCallbackSecret?: string | null;
+  /**
+   * ADR-0012 §3: the Paystack secret key (lead PSP — Kenya-native M-Pesa/
+   * cards). Read ONLY from env, never hardcoded. Unset ⇒ the Paystack
+   * adapter is `configured=false` ⇒ checkout returns 503 and every webhook
+   * fails signature verification (fail-closed) — the billing surface is
+   * invisible/inert until the owner adds a real key. Optional for the same
+   * reason the fields above are: test config literals predate it.
+   */
+  paystackSecretKey?: string | null;
 }
 
 const DEFAULT_DEV_CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"];
@@ -133,5 +142,6 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     webBaseUrl: env.WEB_BASE_URL ?? null,
     revalidateSecret: env.REVALIDATE_SECRET ?? null,
     pipelineCallbackSecret: env.PIPELINE_CALLBACK_SECRET ?? null,
+    paystackSecretKey: env.PAYSTACK_SECRET_KEY ?? null,
   };
 }
