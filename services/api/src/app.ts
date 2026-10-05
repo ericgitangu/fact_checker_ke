@@ -240,7 +240,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   // adapter is built from config and fails closed when PAYSTACK_SECRET_KEY
   // is unset (checkout → 503, webhook → 401), making the whole surface
   // inert until the owner adds a real key.
-  const billing = createBillingRegistry({ paystackSecretKey: config.paystackSecretKey ?? null });
+  const billing = createBillingRegistry({
+    paystackSecretKey: config.paystackSecretKey ?? null,
+    mpesa: config.mpesa,
+    stripe: config.stripe,
+  });
   const entitlementService = new EntitlementService(entitlements!);
   await app.register((instance) =>
     entitlementRoutes(instance, {
@@ -259,6 +263,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       pipelineBaseUrl,
       verifier: signatureVerifier,
       isProduction: config.isProduction,
+      // ADR-0012 §3 (monetization v2): same entitlement repo the read/
+      // webhook paths use, so the expiry sweeper (piggyback on
+      // /internal/outbox/drain + the dedicated /internal/entitlements/sweep)
+      // transitions lapsed active rows to `expired`.
+      entitlements: entitlements!,
     }),
   );
   await app.register((instance) =>

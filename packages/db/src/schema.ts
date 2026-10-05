@@ -11,6 +11,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -1189,4 +1190,41 @@ export const billingEvents = pgTable(
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex("billing_events_provider_event_idx").on(table.provider, table.eventId)],
+);
+
+/**
+ * ADR-0012 §3 (monetization v2): the pending-checkout → subject map.
+ *
+ * WHY THIS EXISTS — a PSP webhook must reconcile a payment back to the
+ * device that started it. Paystack/Stripe echo the subject in their event
+ * metadata (we stamp `metadata.subjectRef` at checkout and they return it
+ * verbatim), so for those providers this table is just a belt-and-braces
+ * fallback. M-Pesa's Daraja STK callback, however, carries ONLY the
+ * `CheckoutRequestID` it issued — it echoes no arbitrary metadata — so the
+ * ONLY way to know whose premium a successful STK payment grants is to have
+ * recorded `(mpesa, CheckoutRequestID) → device_token_hash` at push time
+ * and look it up on the callback. The billing route writes a row here on a
+ * successful checkout (any provider) and the webhook route reads it as a
+ * fallback when the event itself carries no subject — keeping the webhook
+ * handler provider-agnostic.
+ *
+ * Keyed `(provider, reference)` (PK). Rows are short-lived: the monetization
+ * sweeper (lib/entitlement-sweep.ts) prunes stale rows, and a lost/expired
+ * mapping degrades safely to "we never guess whose premium to turn on" — the
+ * same fail-safe as a subjectless Paystack event.
+ */
+export const pendingCheckoutSubjects = pgTable(
+  "pending_checkout_subjects",
+  {
+    provider: billingProviderEnum("provider").notNull(),
+    reference: text("reference").notNull(),
+    // Keyed on the token HASH (never the raw token), same discipline as
+    // `entitlements`/`device_tokens`; cascade so rotating a device token
+    // away takes its pending mappings with it.
+    deviceTokenHash: text("device_token_hash")
+      .notNull()
+      .references(() => deviceTokens.tokenHash, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.provider, table.reference] })],
 );

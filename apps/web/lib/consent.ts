@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { useServerConsentRegion } from "../components/ads/consent-region-provider";
 
 /**
  * ADR-0012 §4 — a lightweight consent gate (CMP) for EEA/UK. The brief:
@@ -103,6 +104,12 @@ export function setConsent(choice: ConsentChoice): void {
  * consent (EEA/UK)?" heuristic. Conservative by construction (see the
  * scope note above). Returns false during SSR so the server never assumes
  * a region.
+ *
+ * NOTE (ADR-0012 §4, monetization v2): this is now only the FALLBACK. The
+ * authoritative decision is the server geo-IP flag threaded through
+ * `ConsentRegionProvider` (lib/consent-region.ts) and consumed by
+ * `useAdsConsent` below; this client heuristic is used only when the server
+ * supplied no signal (local dev / non-Vercel host).
  */
 export function regionRequiresConsent(): boolean {
   if (typeof Intl === "undefined") return false;
@@ -136,14 +143,18 @@ export interface AdsConsentState {
 }
 
 /**
- * The hook the AdSlot + ConsentBanner share. Recomputes `required` on each
- * render from the heuristic (cheap, pure) and reads the stored choice via
- * the external store so every mounted consumer stays in sync after a
- * grant/deny.
+ * The hook the AdSlot + ConsentBanner share. `required` is the AUTHORITATIVE
+ * server geo-IP decision (`x-vercel-ip-country`, threaded via
+ * `ConsentRegionProvider`) when the server supplied one; only when it didn't
+ * (null — local dev / non-Vercel host) does it fall back to the legacy
+ * client timezone heuristic, so geo availability never regresses the gate.
+ * The stored choice is read via the external store so every mounted consumer
+ * stays in sync after a grant/deny.
  */
 export function useAdsConsent(): AdsConsentState {
   const stored = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const required = regionRequiresConsent();
+  const serverRequired = useServerConsentRegion();
+  const required = serverRequired ?? regionRequiresConsent();
   const choice = stored?.choice;
   const satisfied = !required || choice === "granted";
   const showBanner = required && choice === undefined;

@@ -69,3 +69,39 @@ Builds the monetization *surfaces* as ADDITIVE, env-gated, fail-closed scaffoldi
 - Live Paystack `createCheckout` is intentionally un-shipped (501) — the purchase loop isn't closeable until the account exists.
 - Consent region detection is a client timezone heuristic, not authoritative geo-IP.
 - No proration/refund/downgrade lifecycle beyond activate + cancel-at-period-end; expiry is lazy (decided at read time, no sweeper) — a lapsed `active` row simply reads as not-active until a future sweep flips its status.
+
+---
+## Implementation amendment (2026-10-05): monetization v2 — direct M-Pesa + Stripe rails, authoritative geo-IP consent, expiry sweeper
+
+Builds on the provider-agnostic billing seam above. Still ADDITIVE and fail-closed: every rail is invisible/inert (`503`/`401`/no-op) until the owner sets its env, and nothing calls a LIVE payment endpoint (M-Pesa defaults to the Daraja **sandbox** base URL; Stripe uses the owner's test keys). Closes three of the previous amendment's "Known gaps" (live M-Pesa checkout, authoritative consent geo-IP, the expiry sweeper).
+
+### New PSP adapters (behind the same seam)
+- **M-Pesa** (`services/api/src/lib/billing/mpesa.ts`) — direct Safaricom Daraja **C2B STK push** (no Paystack intermediary; settles straight to the till). OAuth client-credentials → `POST /mpesa/stkpush/v1/processrequest` (password = `base64(shortcode+passkey+timestamp)`, `YYYYMMDDHHmmss`). Pattern ported from the moovn-backend Daraja integration; **no secret values copied** — all read from fact_checker_ke's own env. Callback authenticity: Daraja does **not** HMAC-sign its callback, so `verifyWebhook` fails closed unless a **source-IP allowlist** (`MPESA_CALLBACK_IP_ALLOWLIST`) is set AND the request IP is in it AND the body is a well-formed `stkCallback` — mirrors moovn's edge-allowlist + result-field defense. The owner MUST also keep an edge (nginx/LB) allowlist; the app check is defence-in-depth.
+- **Stripe** (`services/api/src/lib/billing/stripe.ts`) — Checkout Session (`payment` mode — a one-off Premium **pass**, not an auto-renewing subscription; see below) via the official `stripe` npm package; webhook verified with `stripe.webhooks.constructEvent` over the RAW body, grant on `checkout.session.completed` + `payment_status=paid`.
+- Both registered in `lib/billing/registry.ts`; `POST /v1/billing/checkout` selects by the request `provider ∈ {paystack,mpesa,stripe}` and returns the real checkout (STK push initiated / Stripe Checkout URL) when configured.
+
+### Contract changes (packages/core, additive)
+- `BillingProviderSchema` gains **`mpesa`** (DB `billing_provider` enum extended in **migration `0019`**).
+- `CheckoutResultSchema` gains a `kind ∈ {redirect,stk_push}` (default `redirect`, so the pre-existing `{provider,authorizationUrl,reference}` shape is unchanged) — M-Pesa returns `stk_push` with **no** `authorizationUrl` (the prompt goes to the phone) + a `customerMessage`. `CheckoutInputSchema` gains an optional `phone` (M-Pesa STK target; normalised + validated server-side; never the subject).
+
+### Subject reconciliation — `pending_checkout_subjects` (migration `0019`)
+Paystack/Stripe echo the subject in event metadata; M-Pesa's callback echoes **only** its `CheckoutRequestID`. So the checkout route records `(provider, reference) → device_token_hash` at checkout time and the webhook route falls back to it when the event carries no subject — provider-generic (hardens Paystack/Stripe too), and a missing/expired mapping degrades safely to "never guess whose premium to turn on". Rows are pruned by the sweeper (1-day cutoff).
+
+### Premium is a fixed-length PASS (not auto-renew)
+Both direct rails are one-off payments (M-Pesa C2B has no standing order; Stripe uses `payment` mode), so a successful payment grants `PREMIUM_PERIOD_DAYS` (30) from payment time. **Recurring/auto-renew subscriptions are explicitly OUT OF SCOPE** (need renewal webhooks — Stripe `invoice.paid`, an M-Pesa standing order — which neither sandbox exercises); a future recurring tier is additive. `STRIPE_PRICE_ID` must therefore be a **one-time** price.
+
+### Authoritative geo-IP consent (apps/web) — replaces the client timezone heuristic
+`lib/consent-region.ts` (`countryRequiresConsent`, EU-27 + EEA + UK) decides the region server-side from the platform geo header **`x-vercel-ip-country`** (read in `app/layout.tsx` via `next/headers`), threaded to the client via `ConsentRegionProvider`. The client banner still renders, but `useAdsConsent` now takes the server flag as authoritative; the old timezone heuristic remains only as the FALLBACK when no geo signal is present (local dev / non-Vercel host) — never a regression to "assume non-EEA".
+
+### Entitlement expiry sweeper — access is no longer only lazy
+`lib/entitlement-sweep.ts` (`runEntitlementSweep`) flips lapsed `active` rows to `expired` (durable, not only read-time) and prunes stale pending-checkout rows. Exposed as a signature-verified `POST /internal/entitlements/sweep` AND piggybacked on the existing `/internal/outbox/drain` sweeper (ADR-0021 pattern — no new cron required).
+
+### Env the owner must set to go live (all fail-closed/inert when unset)
+- **M-Pesa:** `MPESA_C2B_CONSUMER_KEY`, `MPESA_C2B_CONSUMER_SECRET`, `MPESA_C2B_SHORTCODE`, `MPESA_C2B_ONLINE_PASSKEY`, `MPESA_C2B_CALLBACK_URL`, `MPESA_CALLBACK_IP_ALLOWLIST` (Safaricom ranges), `MPESA_C2B_AMOUNT` (KES price), `MPESA_ENV` (`sandbox`→live only when flipped to `production`).
+- **Stripe:** `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` (one-time price).
+- Secrets via GCP Secret Manager only; `MPESA_ENV` stays `sandbox` until the owner deliberately goes live.
+
+### Known gaps (no silent tech debt)
+- Recurring/auto-renew subscriptions not implemented (one-off passes only) — see above.
+- M-Pesa callback app-layer authenticity relies on the source-IP allowlist + result fields; an edge allowlist is still required (Daraja sends no signature). No STK status-query reconciliation for a lost callback (the pass simply isn't granted; the reader retries).
+- No proration/refund/downgrade beyond activate + expire; the sweeper makes expiry durable but there is still no renewal path.
