@@ -36,6 +36,10 @@ class WhatWouldChangeThis(RootModel[str]):
     root: Annotated[str, Field(max_length=2000, min_length=1)]
 
 
+class Context(RootModel[str]):
+    root: Annotated[str, Field(max_length=2000, min_length=1)]
+
+
 class SpanStart(RootModel[int]):
     root: Annotated[int, Field(ge=0, le=9007199254740991)]
 
@@ -330,5 +334,6 @@ class Check(BaseModel):
     what_would_change_this: Annotated[
         WhatWouldChangeThis | None, Field(alias='whatWouldChangeThis')
     ]
+    context: Context | None
     evidence: list[EvidenceItem]
     risk_tier: Annotated[RiskTier | None, Field(alias='riskTier')]

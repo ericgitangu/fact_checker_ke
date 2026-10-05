@@ -18,6 +18,7 @@ function publishedCheck(overrides: Partial<Check> = {}): Check {
     publishedAt: new Date().toISOString(),
     calibratedConfidence: 0.75,
     whatWouldChangeThis: "A material correction.",
+    context: "The claim restates a figure the cited release corrects; the number, not the topic, is what misleads.",
     evidence: [],
     riskTier: "A",
     ...overrides,

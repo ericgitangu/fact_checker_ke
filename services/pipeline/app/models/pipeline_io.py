@@ -87,6 +87,13 @@ class DraftVerdictOutput(BaseModel):
     citations: list[Citation] = Field(default_factory=list)
     confidence: float = Field(ge=0.0, le=1.0)
     what_would_change_this: str = Field(min_length=1, max_length=2000)
+    # ADR-0034: the reader-facing context that LEADS the artifact — (a) what the
+    # claim asserts, (b) how it misleads, (c) the actual context + any kernel of
+    # truth — built only from retrieved sources (no new quotes; quotes go in
+    # citations). Nullable so the dedup-reuse path still validates; required
+    # non-empty on any rating-bearing fresh draft (enforced in verify.py) and
+    # on any PUBLISHED check (CheckSchema.superRefine).
+    context: str | None = Field(default=None, max_length=2000)
     language: str = Field(min_length=2, max_length=24)
     translation_en: str = Field(min_length=0, max_length=20000)
 

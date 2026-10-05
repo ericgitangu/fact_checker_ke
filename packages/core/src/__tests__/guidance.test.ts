@@ -20,6 +20,8 @@ const basePublishedCheck = {
   publishedAt: "2026-10-03T01:00:00.000Z",
   calibratedConfidence: 0.92,
   whatWouldChangeThis: "A corrected EPRA pricing circular.",
+  context:
+    "The claim asserts a fuel price under the September 2026 EPRA guidance; the circular shows a different capped figure, so the quoted number misstates a real price band.",
   evidence: [{ sourceId: "33333333-3333-4333-8333-333333333333", quote: "EPRA pricing guidance, Sept 2026" }],
   riskTier: "A" as const,
 };
