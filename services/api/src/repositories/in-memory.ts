@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type {
+  BillingProvider,
   Check,
+  EntitlementTier,
   FeedItem,
   IngestSource,
   Submission,
@@ -11,6 +13,8 @@ import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import type {
   CheckRepository,
   DeviceTokenRepository,
+  EntitlementRecord,
+  EntitlementRepository,
   RepoResult,
   SubmissionRepository,
   WaitlistRepository,
@@ -176,5 +180,74 @@ export class InMemoryDeviceTokenRepository implements DeviceTokenRepository {
       return { ok: false, error: { kind: "not_found", message: "device token not recognised" } };
     }
     return { ok: true, value: { tokenHash } };
+  }
+}
+
+/**
+ * ADR-0012 §3: in-memory entitlements for unit tests and local dev (no
+ * DATABASE_URL). Same "not durable, test/dev only" caveat as the other
+ * in-memory repos above. Keyed exactly like the Postgres repo:
+ * `(provider, providerRef)` for webhook idempotency, device token hash for
+ * the read path, and `(provider, eventId)` for webhook-event dedup.
+ */
+export class InMemoryEntitlementRepository implements EntitlementRepository {
+  private readonly records: EntitlementRecord[] = [];
+  private readonly seenEvents = new Set<string>();
+
+  async getLatestForDevice(deviceTokenHash: string): Promise<EntitlementRecord | null> {
+    const matches = this.records
+      .filter((r) => r.deviceTokenHash === deviceTokenHash)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return matches[0] ?? null;
+  }
+
+  async recordBillingEvent(input: {
+    provider: BillingProvider;
+    eventId: string;
+    eventType: string;
+    payload: unknown;
+  }): Promise<{ firstTime: boolean }> {
+    const key = `${input.provider}:${input.eventId}`;
+    if (this.seenEvents.has(key)) return { firstTime: false };
+    this.seenEvents.add(key);
+    return { firstTime: true };
+  }
+
+  async activateDeviceEntitlement(input: {
+    deviceTokenHash: string;
+    tier: EntitlementTier;
+    provider: BillingProvider;
+    providerRef: string | null;
+    currentPeriodEnd: Date | null;
+  }): Promise<RepoResult<EntitlementRecord>> {
+    const now = new Date();
+    // Upsert on (provider, providerRef) when a ref is present, mirroring
+    // the partial unique index in Postgres.
+    const existing =
+      input.providerRef !== null
+        ? this.records.find((r) => r.provider === input.provider && r.providerRef === input.providerRef)
+        : undefined;
+    if (existing) {
+      existing.status = "active";
+      existing.tier = input.tier;
+      existing.deviceTokenHash = input.deviceTokenHash;
+      existing.currentPeriodEnd = input.currentPeriodEnd;
+      existing.updatedAt = now;
+      return { ok: true, value: existing };
+    }
+    const created: EntitlementRecord = {
+      id: randomUUID(),
+      deviceTokenHash: input.deviceTokenHash,
+      userId: null,
+      tier: input.tier,
+      status: "active",
+      provider: input.provider,
+      providerRef: input.providerRef,
+      currentPeriodEnd: input.currentPeriodEnd,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.records.push(created);
+    return { ok: true, value: created };
   }
 }

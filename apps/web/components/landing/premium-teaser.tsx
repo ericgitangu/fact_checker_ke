@@ -23,7 +23,7 @@ export async function PremiumTeaser(): Promise<React.JSX.Element> {
   const t = await getTranslations("landing.premium");
 
   return (
-    <section className="landing-premium" aria-labelledby="landing-premium-h">
+    <section id="premium" className="landing-premium" aria-labelledby="landing-premium-h">
       <Reveal className="premium-card" motion="rise" threshold={0.01}>
         <span className="premium-eyebrow">{t("eyebrow")}</span>
         <h2 id="landing-premium-h">{t("heading")}</h2>
