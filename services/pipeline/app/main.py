@@ -166,10 +166,10 @@ def _ensure_fetch_conn() -> None:
         with _fetch_db_conn.cursor() as cur:
             cur.execute("select 1")
         return  # connection is live
-    except Exception:
+    except Exception:  # noqa: BLE001 - any probe failure means the pooled conn is unusable; reconnect
         try:
             _fetch_db_conn.close()
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 - best-effort close of an already-broken conn
             pass
     import psycopg as _psycopg
 

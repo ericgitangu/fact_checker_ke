@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import ClaimType, Rating
+from app.models.enums import ClaimType, CredibilityTier, Rating
 
 
 class UsageRecord(BaseModel):
@@ -109,12 +109,40 @@ class PublishDecisionPayload(BaseModel):
     requires_human_tap: bool = False
 
 
+class VerifyEvidence(BaseModel):
+    """A citable source behind a verdict, carried on the wire so services/api
+    (TS) can persist the `sources` + `check_evidence` rows a PUBLISHED Check
+    is required to carry (ADR-0031 AT-0031-1 / CheckSchema.superRefine).
+
+    Built ONLY from citations that already passed citation-integrity
+    verification (ADR-0023 §2) against the retrieved set — so every item here
+    is a real, quoted, non-hallucinated source. `url` is required because a
+    `sources` row (and SourceSchema) requires a URL; a cited doc with no URL
+    (shouldn't happen for the Fact Check Tools API) is dropped upstream rather
+    than emitted here with an empty one."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(min_length=1)
+    title: str = Field(min_length=1, max_length=500)
+    publisher: str = Field(min_length=1, max_length=200)
+    credibility_tier: CredibilityTier
+    quote: str = Field(min_length=1, max_length=2000)
+    published_at: str | None = None
+
+
 class VerifyResult(BaseModel):
     """Final /hops/verify response: the citation-checked, gated verdict."""
 
     model_config = ConfigDict(extra="forbid")
 
     verdict: DraftVerdictOutput | None
+    # The citation-checked sources behind `verdict`, for services/api to
+    # persist as the published Check's `evidence[]` (ADR-0031 AT-0031-1).
+    # Empty for the reused-existing-check short-circuit and for a draft the
+    # model declined to cite — the API's publish guard treats "no evidence"
+    # as "not auto-publishable" (fail-closed, held for an editor).
+    evidence: list[VerifyEvidence] = Field(default_factory=list)
     rejected: bool = False
     rejection_reason: str | None = None
     reused_existing_check: bool = False

@@ -36,6 +36,27 @@ async def test_draft_verdict_happy_path_citation_clean() -> None:
     assert result.usage is not None
 
 
+async def test_verify_emits_persistable_evidence_for_a_cited_verdict() -> None:
+    # ADR-0031 AT-0031-1: a cited verdict must surface persistable evidence
+    # (url + quote + publisher) so services/api can write the published
+    # Check's sources/check_evidence rows. The auto-publish fixture cites the
+    # fake Fact Check Tools hit.
+    result = await run_verify_hop(
+        _request(claim_text="AUTO_PUBLISH_FIXTURE_HIGH_CONFIDENCE: fuel prices rose this month."),
+        llm=FakeLlmClient(),
+        embedder=FakeEmbedder(),
+        check_store=InMemoryCheckStore(),
+        factcheck_client=FakeFactCheckClient(),
+        store=InMemoryIdempotencyStore(),
+    )
+    assert result.verdict is not None
+    assert len(result.evidence) >= 1
+    ev = result.evidence[0]
+    assert ev.url.startswith("http")
+    assert ev.quote
+    assert ev.publisher
+
+
 async def test_dedup_reuse_when_similar_claim_already_stored() -> None:
     claim_text = "KNBS reports inflation at 7% in 2026."
     embedder = FakeEmbedder()
