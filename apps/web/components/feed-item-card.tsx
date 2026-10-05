@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { ConfidenceGauge, RadarIcon, PenLineIcon } from "@fact-checker-ke/brand";
 import { VerdictChip } from "./verdict";
 import { FeedItemCaveatNote } from "./legal-caveat";
+import { MarkdownText } from "./markdown-text";
 
 /**
  * ADR-0032's visible payoff, rendered: one row in the "what we're
@@ -54,7 +55,9 @@ export async function FeedItemCard({ item }: { item: FeedItem }): Promise<React.
         )}
       </div>
 
-      <p className="feedcard-claim">{item.claim}</p>
+      <p className="feedcard-claim">
+        <MarkdownText content={item.claim} inline />
+      </p>
 
       <p className="checkcard-rationale">{tCheck("guidance.claimAttributedNote")}</p>
 

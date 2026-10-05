@@ -1,7 +1,8 @@
 import type { FeedItem } from "@fact-checker-ke/core";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
-import { Reveal } from "@fact-checker-ke/brand";
+import { Reveal, RadarIcon } from "@fact-checker-ke/brand";
+import { EmptyState, type EmptyStateAction } from "./empty-state";
 import { FeedItemCard } from "./feed-item-card";
 import { LegalCaveat } from "./legal-caveat";
 
@@ -26,10 +27,15 @@ export async function FeedSection({
   items,
   isMock,
   showViewAllLink = false,
+  emptyAction,
 }: {
   items: FeedItem[];
   isMock: boolean;
   showViewAllLink?: boolean;
+  /** Only the full `/feed` route passes this — the home-page preview
+      already sits on "home", so it has nothing useful to link the empty
+      state's action to. */
+  emptyAction?: EmptyStateAction;
 }): Promise<React.JSX.Element> {
   const t = await getTranslations("feed");
 
@@ -44,11 +50,12 @@ export async function FeedSection({
       </div>
 
       {items.length === 0 ? (
-        <p className="feed-empty" role="status">
-          <strong>{t("empty.heading")}</strong>
-          <br />
-          {t("empty.body")}
-        </p>
+        <EmptyState
+          icon={<RadarIcon size={22} />}
+          title={t("empty.heading")}
+          description={t("empty.body")}
+          action={emptyAction}
+        />
       ) : (
         <ul className="feed-list">
           {await Promise.all(

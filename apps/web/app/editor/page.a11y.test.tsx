@@ -14,6 +14,7 @@ vi.mock("next-intl/server", async () => {
 // next/navigation's useRouter — stubbed here so the shell mounts in jsdom.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/",
 }));
 
 const { default: EditorPage } = await import("./page");

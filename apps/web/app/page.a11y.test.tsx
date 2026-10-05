@@ -17,6 +17,7 @@ vi.mock("next-intl/server", async () => {
 // provide it.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/",
 }));
 
 const { default: Home } = await import("./page");
