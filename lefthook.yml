@@ -32,6 +32,16 @@ commit-msg:
 
 pre-push:
   jobs:
+    # Secret-scan gate: blocks a push that carries a leaked secret in any
+    # commit that is NOT yet on a remote (`--all --not --remotes` = exactly
+    # the commits about to leave this machine), so a secret caught locally
+    # can never reach origin even if the pre-commit gate was bypassed
+    # (`--no-verify`) or the secret predates this hook. --redact keeps the
+    # secret value out of the log; .gitleaksignore (repo root) is honored
+    # automatically. Runs before `moon ci` so a leak fails fast.
+    - name: gitleaks (push-range secrets scan)
+      run: gitleaks git --redact --verbose --log-opts="--all --not --remotes"
+
     - name: moon ci (affected projects only)
       # Dev placeholders for site:build's VITE_API_URL production guard --
       # mirrors .github/workflows/ci.yml. Real values come from Vercel at
