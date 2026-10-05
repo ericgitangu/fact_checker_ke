@@ -235,6 +235,20 @@
       "heading": "Most viral right now",
       "intro": "The published claims spreading fastest on the platforms we monitor — ranked by reach, not by rating."
     },
+    "trending": {
+        "heading": "Trending now — what we're tracking",
+        "intro": "Viral clips our engine caught on the platforms we monitor, ranked by reach. These are items we're tracking — not verdicts. \"Under review\" means a human editor is still assessing it.",
+        "statusNote": "Tracking status — not a fact-check verdict.",
+        "status": {
+            "monitoring": "Monitoring",
+            "under_review": "Under review",
+            "published": "Published",
+            "dismissed": "Not pursued"
+        },
+        "viewSource": "Watch source",
+        "viewCheck": "Read the assessment",
+        "reach": "Reach"
+    },
     "source": {
       "fetch": "Auto-surfaced",
       "submission": "Submitted"

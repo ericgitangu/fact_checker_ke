@@ -235,6 +235,20 @@
       "heading": "Yanayoenea zaidi sasa",
       "intro": "Madai yaliyochapishwa yanayoenea kwa kasi zaidi kwenye majukwaa tunayofuatilia — yamepangwa kwa ufikiaji, si kwa kiwango cha ukweli."
     },
+    "trending": {
+        "heading": "Yanayoenea sasa — tunayofuatilia",
+        "intro": "Klipu zinazoenea ambazo injini yetu imezipata kwenye majukwaa tunayofuatilia, zimepangwa kwa ufikiaji. Haya ni mambo tunayofuatilia — si maamuzi. \"Inakaguliwa\" maana yake mhariri bado anayatathmini.",
+        "statusNote": "Hali ya ufuatiliaji — si uamuzi wa ukweli.",
+        "status": {
+            "monitoring": "Inafuatiliwa",
+            "under_review": "Inakaguliwa",
+            "published": "Imechapishwa",
+            "dismissed": "Haikufuatiliwa"
+        },
+        "viewSource": "Tazama chanzo",
+        "viewCheck": "Soma tathmini",
+        "reach": "Ufikiaji"
+    },
     "source": {
       "fetch": "Imepatikana moja kwa moja",
       "submission": "Imetumwa"

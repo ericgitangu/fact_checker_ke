@@ -1651,6 +1651,124 @@ a:hover {
   text-decoration: line-through;
 }
 
+/* ---- "Trending / under review" stream (ADR-0032 refinement) -------------
+   The fetch engine's DISCOVERIES, surfaced before/without a published check.
+   Shares the brand-tinted card treatment with `.viral-section` (NOT a verdict
+   colour), but carries tracking-status chips, never a rating. */
+.trending-section {
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--brand) 9%, var(--surface) 91%) 0%,
+    var(--surface) 70%
+  );
+}
+
+/* An honest, quiet reminder directly under the intro: a tracking status is
+   not a verdict. Small and muted so it reads as a caveat, not a headline. */
+.trending-status-note {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--ink-3);
+}
+
+.trending-list {
+  counter-reset: none;
+}
+
+.trendingcard {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 18px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.trendingcard-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.trendingcard-title {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.trendingcard-reach {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+
+.trendingcard-reach svg {
+  flex: none;
+}
+
+.trendingcard-meta {
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}
+
+.trendingcard-meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Source-platform pill (youtube/tiktok/…): a neutral, lowercase tag — it is
+   provenance, not a verdict, so it stays in the neutral register. */
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  color: var(--status-neutral);
+  background: var(--status-neutral-tint);
+}
+
+/* Tracking-status chips — NOT the verdict colour scale (same restraint as the
+   maandamano `.s-*` chips). `monitoring` carries the live-signal pulse (we're
+   actively watching); `under_review` carries the active ring (a human is
+   assessing it now); `published` is brand-tinted (resolved into a public
+   assessment); `dismissed` is muted (not pursued). */
+.ts-monitoring {
+  color: var(--status-slate);
+  background: var(--status-slate-tint);
+}
+.ts-monitoring .status-chip-icon {
+  animation: status-pulse 1.8s ease-in-out infinite;
+}
+.ts-under-review {
+  color: var(--status-amber);
+  background: var(--status-amber-tint);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--status-amber) 45%, transparent);
+}
+.ts-published {
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+.ts-dismissed {
+  color: var(--ink-3);
+  background: var(--paper-2);
+}
+
 .advisory-list {
   display: flex;
   flex-direction: column;
@@ -2327,6 +2445,7 @@ a:hover {
   .verdict-hero-seal,
   .reveal-in,
   .s-ongoing .status-chip-icon,
+  .ts-monitoring .status-chip-icon,
   .street-signal-dot,
   .pipeline-step-icon {
     animation: none !important;
