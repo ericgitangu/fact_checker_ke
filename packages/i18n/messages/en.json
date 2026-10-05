@@ -24,6 +24,9 @@
       "groupProject": "Project",
       "groupLegal": "Legal",
       "sourceLink": "View source on GitHub",
+      "supportIntro": "Keep it independent —",
+      "supportCoffee": "Buy us a coffee",
+      "supportPatreon": "Support on Patreon",
       "rights": "© {year} fact_checker_ke. Open-source, Apache-2.0."
     },
     "action": {

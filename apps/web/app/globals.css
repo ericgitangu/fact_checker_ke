@@ -28,6 +28,19 @@
   /* surfaces */
   --paper: #fafaf7;
   --paper-2: #f2f1ea;
+  /*
+   * `--bg` — the page background, as a gradient rather than a flat fill.
+   * The brief ("gravitas and restraint, not flashy SaaS") rules out a
+   * visible decorative wash, so this reads as depth, not colour: a very
+   * wide radial that starts a hair lighter/warmer than --paper near the
+   * top and settles into --paper-2's slightly cooler, greyer tone at the
+   * edges. Same three stops a reader would get from an overhead light in
+   * a reading room, not a gradient "brand moment". Applied to `body` with
+   * `background-attachment: fixed` (see body{} below) so it never bands
+   * or repeats as the page scrolls — it's anchored to the viewport, not
+   * the (much taller) document.
+   */
+  --bg: radial-gradient(130% 85% at 50% -8%, #fdfcf6 0%, var(--paper) 45%, var(--paper-2) 100%);
   /* Raised card/control surface. Light = pure white; dark mode re-tunes it
      (see :root[data-theme="dark"]) so every `background: var(--surface)`
      card flips with the theme instead of staying white-on-black. */
@@ -143,6 +156,21 @@
 :root[data-theme="dark"] {
   --paper: #0c100e;
   --paper-2: #151b18;
+  /*
+   * Dark counterpart of --bg above: a near-black base that lifts very
+   * subtly toward a barely-there brand-tinted dark near the top, then
+   * settles to true black at the edges — "depth", not a glow. The lift is
+   * a 6% mix of --true (the brand green) into --paper, which at this
+   * concentration reads as warmth, not colour; text contrast is governed
+   * entirely by --ink/--ink-2 against this, unaffected by the gradient
+   * since both ends sit within a few % luminance of --paper.
+   */
+  --bg: radial-gradient(
+    130% 85% at 50% -8%,
+    color-mix(in srgb, var(--true) 6%, var(--paper) 94%) 0%,
+    var(--paper) 45%,
+    #000000 100%
+  );
   --surface: #141a17;
   --ink: #f1f3ef;
   --ink-2: #b7c0ba;
@@ -194,6 +222,27 @@
   color: #f1f3ef;
 }
 
+/*
+ * `--bg` fallback for `prefers-color-scheme: dark` with no explicit
+ * `data-theme` yet set. In practice app/layout.tsx's inline pre-paint
+ * script sets `data-theme` synchronously before first paint, so this
+ * rarely fires in a JS-capable browser — it exists for the narrow window
+ * before that script runs and for any no-JS render, so the gradient
+ * never flashes light-then-dark. Guarded by `:not([data-theme="light"])`
+ * so an explicit light choice always wins over the OS preference, same
+ * precedence the toggle itself relies on.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: radial-gradient(
+      130% 85% at 50% -8%,
+      color-mix(in srgb, var(--true) 6%, #0c100e 94%) 0%,
+      #0c100e 45%,
+      #000000 100%
+    );
+  }
+}
+
 /* --true brightens in dark to clear AA on near-black, which would then fail
    AA *for* white button text — so the primary button flips to dark
    ink-on-bright-green, matching apps/site's dark override. */
@@ -236,7 +285,10 @@ html {
 
 body {
   margin: 0;
-  background: var(--paper);
+  background: var(--bg);
+  /* Anchor the gradient to the viewport, not the (much taller) document,
+     so it never repeats, bands, or visibly shifts as the page scrolls. */
+  background-attachment: fixed;
   color: var(--ink-2);
   font: 400 1.0625rem/1.6 var(--sans);
   min-height: 100%;
@@ -521,6 +573,41 @@ a:hover {
 }
 
 .footer-links a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Individual-supporter links (Buy Me a Coffee / Patreon) — a quiet text
+   line, not a second CTA button: this is the footer, and the one unit of
+   visual boldness on the page is already spent on <PremiumTeaser>, so this
+   stays the same weight as the other footer links around it. */
+.footer-support {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.footer-support-note {
+  color: var(--ink-3);
+}
+
+.footer-support-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.footer-support-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.footer-support-links a:hover {
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;

@@ -5,7 +5,7 @@ import { LocaleSwitcher } from "./locale-switcher";
 import { NavLink } from "./nav-link";
 import { PrimaryNav } from "./primary-nav";
 import { ThemeToggle } from "./theme-toggle";
-import { GITHUB_REPO_URL } from "../lib/site";
+import { BUY_ME_A_COFFEE_URL, GITHUB_REPO_URL, PATREON_URL } from "../lib/site";
 
 export async function AppHeader(): Promise<React.JSX.Element> {
   const t = await getTranslations("common");
@@ -60,7 +60,11 @@ export async function AppHeader(): Promise<React.JSX.Element> {
  *   same destinations as the header nav.
  * - Project: `/join` ("how to join the movement") and `/contact` (the
  *   founder's contact card + downloadable vCard), plus an outbound link to
- *   the GitHub repo.
+ *   the GitHub repo. Also carries the individual-supporter links (Buy Me a
+ *   Coffee / Patreon) — distinct from <SponsorCta>'s org-focused ask — each
+ *   rendered only when its env URL (`NEXT_PUBLIC_BUYMEACOFFEE_URL` /
+ *   `NEXT_PUBLIC_PATREON_URL`, see lib/site.ts) is actually set, so an
+ *   unconfigured channel never shows a dead placeholder link.
  * - Legal: `/terms` and `/privacy`. These ARE now linked even though
  *   `ADVOCATE_SIGNOFF_COMPLETE` (@fact-checker-ke/core) is still `false` —
  *   the pages themselves render a visible DRAFT badge and every
@@ -124,6 +128,25 @@ export async function AppFooter(): Promise<React.JSX.Element> {
                   <ExternalLinkIcon size={12} aria-hidden="true" />
                 </a>
               </li>
+              {(BUY_ME_A_COFFEE_URL || PATREON_URL) && (
+                <li className="footer-support">
+                  <span className="footer-support-note">{t("footer.supportIntro")}</span>
+                  <span className="footer-support-links">
+                    {BUY_ME_A_COFFEE_URL && (
+                      <a href={BUY_ME_A_COFFEE_URL} target="_blank" rel="noreferrer noopener">
+                        {t("footer.supportCoffee")}
+                        <ExternalLinkIcon size={12} aria-hidden="true" />
+                      </a>
+                    )}
+                    {PATREON_URL && (
+                      <a href={PATREON_URL} target="_blank" rel="noreferrer noopener">
+                        {t("footer.supportPatreon")}
+                        <ExternalLinkIcon size={12} aria-hidden="true" />
+                      </a>
+                    )}
+                  </span>
+                </li>
+              )}
             </ul>
           </div>
 
