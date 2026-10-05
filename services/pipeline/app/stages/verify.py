@@ -77,11 +77,23 @@ async def _draft_once(
         credibility_context=render_registry_as_prompt_context(),
         named_person_involved=named_person_involved,
     )
-    raw, usage = await llm.complete_with_usage(prompt, stage="verify", max_tokens=1024)
+    # ADR-0034 raised the draft's output size (the new `context` field, on top
+    # of already token-dense citation URLs + rationale), so 1024 output tokens
+    # truncated the JSON mid-string -> parse failure -> reject. 3072 gives
+    # comfortable headroom for context(<=2000c) + rationale(<=4000c) + cited
+    # quotes without truncating. (Verified: 1024 reproduced "Unterminated
+    # string" on the COVID claim; 3072 returns complete JSON.)
+    raw, usage = await llm.complete_with_usage(prompt, stage="verify", max_tokens=3072)
     draft = _parse_draft(raw)
     # ADR-0023 §2 / AT-0023-2 / AT-0023-3: enforced in code, never trusted
     # from the model.
     verify_citations(draft.citations, retrieved)
+    # ADR-0034: context leads the published artifact, so a rating-bearing draft
+    # MUST carry non-empty context. Raise like a citation violation so the
+    # caller's retry-once-then-reject loop routes a context-less draft to the
+    # rejected path instead of letting it reach auto-publish.
+    if draft.rating is not None and not (draft.context and draft.context.strip()):
+        raise CitationIntegrityError("rating-bearing draft is missing required context (ADR-0034)")
     return draft, usage
 
 
@@ -171,6 +183,15 @@ async def run_verify_hop(
                     citations=[],
                     confidence=0.9,
                     what_would_change_this="A material update to the underlying facts.",
+                    # ADR-0034: a rating-bearing verdict carries context; this
+                    # dedup short-circuit reuses a prior check's assessment, so
+                    # the context points the reader to it rather than restating
+                    # synthesis this path never recomputed.
+                    context=(
+                        "This claim matches a previously assessed one; the existing "
+                        "check's context and evidence apply. See the reused assessment "
+                        f"({candidate.check_id})."
+                    ),
                     language=request.language,
                     translation_en=request.claim_text,
                 ),

@@ -94,6 +94,18 @@
             }
           ]
         },
+        "context": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "evidence": {
           "type": "array",
           "items": {
@@ -124,6 +136,7 @@
         "publishedAt",
         "calibratedConfidence",
         "whatWouldChangeThis",
+        "context",
         "evidence",
         "riskTier"
       ],

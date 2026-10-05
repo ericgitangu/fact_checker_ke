@@ -156,6 +156,7 @@ export class PostgresCheckRepository implements CheckRepository {
         publishedAt: checkRow.publishedAt ? toIsoString(checkRow.publishedAt) : null,
         calibratedConfidence: checkRow.calibratedConfidence === null ? null : Number(checkRow.calibratedConfidence),
         whatWouldChangeThis: checkRow.whatWouldChangeThis,
+        context: checkRow.context,
         riskTier: checkRow.riskTier,
         evidence: evidenceRows.map((e) => ({ sourceId: e.sourceId, quote: e.quote })),
         claims: claimRows.map((c) => ({
@@ -254,6 +255,7 @@ export class PostgresCheckRepository implements CheckRepository {
       ingestSource: row.ingestSource,
       riskTier: row.riskTier,
       whatWouldChangeThis: row.whatWouldChangeThis,
+      context: row.context,
       publishedAt: toIsoString(row.publishedAt as Date),
       sources: sourcesByCheckId.get(row.id) ?? [],
     }));

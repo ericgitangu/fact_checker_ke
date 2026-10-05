@@ -26,6 +26,7 @@ const fetchItem: FeedItem = {
   ingestSource: "fetch",
   riskTier: "A",
   whatWouldChangeThis: "A revised EPRA pricing circular.",
+  context: "The claim predicts a 10% fuel-price drop; the EPRA formula caps prices rather than guaranteeing a cut, so the figure overstates it.",
   publishedAt: "2026-09-29T07:12:00.000Z",
   sources: [
     {
