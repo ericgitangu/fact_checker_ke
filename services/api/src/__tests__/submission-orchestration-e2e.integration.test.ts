@@ -236,6 +236,13 @@ describe.skipIf(!connectionString)(
       expect((publishedEventRow!.payload as { payload: { ingest_source: string } }).payload.ingest_source).toBe(
         "fetch",
       );
+
+      // RC1 (stuck-at-"received" bug): the orchestrate path must advance
+      // the submission through the ADR-0017 state machine, not leave it
+      // frozen at `received`. An assessment WAS produced (published),
+      // so the submission is terminally `ready`.
+      const [sub] = await db.select().from(schema.submissions).where(eq(schema.submissions.id, submissionId));
+      expect(sub!.status).toBe("ready");
     }, 30_000);
 
     it("a non-checkable (rhetoric/injection) submission never reaches /hops/verify and never publishes, through the REAL relay", async () => {
@@ -255,6 +262,12 @@ describe.skipIf(!connectionString)(
 
       const rows = await db.select().from(schema.checks).where(eq(schema.checks.submissionId, submissionId));
       expect(rows).toHaveLength(0); // never even created a draft, let alone published
+
+      // RC1: a pre-verification dead-end (no checkable claim) is terminal
+      // `failed`, not a frozen `received` — the tracker must show the run
+      // ended, with a reason, rather than hanging forever.
+      const [sub] = await db.select().from(schema.submissions).where(eq(schema.submissions.id, submissionId));
+      expect(sub!.status).toBe("failed");
     }, 30_000);
 
     it("an ordinary checkable claim, at FakeLlmClient's real (uncalibrated, 0.4-confidence) draft output, is created as a draft but never auto-published", async () => {
@@ -279,6 +292,14 @@ describe.skipIf(!connectionString)(
       expect(check).toBeDefined();
       expect(check!.isDraft).toBe(true);
       expect(check!.publishedAt).toBeNull(); // never published
+
+      // RC1: verification RAN and produced an assessment (a draft held
+      // for an editor) — that is a completed run, so the submission is
+      // terminally `ready`. Whether the check is published or held is a
+      // property of the CHECK (isDraft/publishedAt), surfaced in the UI;
+      // the submission's lifecycle is still done.
+      const [sub] = await db.select().from(schema.submissions).where(eq(schema.submissions.id, submissionId));
+      expect(sub!.status).toBe("ready");
     }, 30_000);
   },
 );
