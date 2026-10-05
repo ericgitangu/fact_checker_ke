@@ -77,7 +77,13 @@ async def _draft_once(
         credibility_context=render_registry_as_prompt_context(),
         named_person_involved=named_person_involved,
     )
-    raw, usage = await llm.complete_with_usage(prompt, stage="verify", max_tokens=1024)
+    # ADR-0034 raised the draft's output size (the new `context` field, on top
+    # of already token-dense citation URLs + rationale), so 1024 output tokens
+    # truncated the JSON mid-string -> parse failure -> reject. 3072 gives
+    # comfortable headroom for context(<=2000c) + rationale(<=4000c) + cited
+    # quotes without truncating. (Verified: 1024 reproduced "Unterminated
+    # string" on the COVID claim; 3072 returns complete JSON.)
+    raw, usage = await llm.complete_with_usage(prompt, stage="verify", max_tokens=3072)
     draft = _parse_draft(raw)
     # ADR-0023 §2 / AT-0023-2 / AT-0023-3: enforced in code, never trusted
     # from the model.
