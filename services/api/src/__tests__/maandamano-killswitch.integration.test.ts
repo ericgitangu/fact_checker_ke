@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { createDb, schema, type Database } from "@fact-checker-ke/db";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../app.js";
@@ -172,12 +172,28 @@ describe.skipIf(!connectionString)("ADR-0007 maandamano kill switch (AT-0007-A, 
     // trigger CDN propagation.
     expect(flipBody.revalidated).toBe(false);
 
+    // `audit_log` is append-only and SHARED across every integration run
+    // against this persistent DB (no per-test rollback) -- and the
+    // maandamano-media-archive suite flips the same global key too. So
+    // scope the assertion to THIS run's own actor and order explicitly by
+    // createdAt: the query otherwise returns the whole accumulated set in
+    // an arbitrary (no-ORDER-BY) order, and `rows[last]` lands on some
+    // prior run's admin, failing `actorId === adminId` intermittently.
+    // This asserts the real contract -- MY flip logged MY action -- which
+    // is deterministic regardless of how many global rows exist.
     const auditRows = await db
       .select()
       .from(schema.auditLog)
-      .where(and(eq(schema.auditLog.targetType, "policy_flag"), eq(schema.auditLog.targetId, MAANDAMANO_KILL_SWITCH_KEY)));
+      .where(
+        and(
+          eq(schema.auditLog.targetType, "policy_flag"),
+          eq(schema.auditLog.targetId, MAANDAMANO_KILL_SWITCH_KEY),
+          eq(schema.auditLog.actorId, adminId),
+        ),
+      )
+      .orderBy(desc(schema.auditLog.createdAt));
     expect(auditRows.length).toBeGreaterThanOrEqual(1);
-    const latest = auditRows[auditRows.length - 1]!;
+    const latest = auditRows[0]!;
     expect(latest.action).toBe("policy.kill_switch_flipped");
     expect(latest.actorId).toBe(adminId);
 
