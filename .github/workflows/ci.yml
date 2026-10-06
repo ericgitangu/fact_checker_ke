@@ -68,6 +68,20 @@ jobs:
           else
             moon ci
           fi
+      # The integration step below calls `test:integration` DIRECTLY (via
+      # pnpm --filter), NOT through moon -- so it must not rely on the
+      # `moon ci` step above having happened to build packages/db in its
+      # affected set. @fact-checker-ke/db + @fact-checker-ke/core resolve via
+      # their package `exports` to ./dist (not src), `pnpm install` has no
+      # prepare/build hook, and a stale/absent dist missing the ADR-0035
+      # `demonstrationMedia`/`demonstrationStatusEvents` exports makes
+      # `schema.demonstrationMedia` undefined at runtime -> GET /v1/maandamano
+      # 500s (drizzle getTableColumns(undefined)) when the kill switch is OFF.
+      # `moon run db:build` builds core first (db dependsOn core + ^:build),
+      # is a cache hit when `moon ci` already built it, and guarantees a
+      # current dist regardless of the affected set.
+      - name: Build @fact-checker-ke/db (+ core) so the integration tests import a current dist
+        run: moon run db:build
       - name: Test (integration, real Postgres)
         run: pnpm --filter @fact-checker-ke/api test:integration
   contracts-drift:
