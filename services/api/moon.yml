@@ -24,6 +24,19 @@ tasks:
 
   test-integration:
     command: 'pnpm run test:integration'
+    # `^:build` (every upstream project's build) is declared explicitly here
+    # because this is a CUSTOM task -- it does NOT inherit the `deps:
+    # ['^:build']` that .moon/tasks/node.yml puts on the stock `test`/`build`
+    # tasks. Without it, `moon run api:test-integration` runs the vitest suite
+    # against WHATEVER packages/db + packages/core dist happens to be on disk.
+    # @fact-checker-ke/db resolves via its package `exports` to ./dist (not
+    # src), and a stale/absent dist missing e.g. the ADR-0035
+    # `demonstrationMedia` export makes `schema.demonstrationMedia` undefined
+    # at runtime -> GET /v1/maandamano 500s (drizzle getTableColumns(undefined))
+    # whenever the kill switch is OFF. Ordering core-before-db is handled by
+    # db's own `dependsOn: ['core']` + this `^:build`.
+    deps:
+      - '^:build'
     inputs:
       - '@group(sources)'
       - '@group(tests)'
