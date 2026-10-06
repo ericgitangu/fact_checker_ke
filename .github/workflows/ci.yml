@@ -5,7 +5,12 @@ on:
   pull_request:
 jobs:
   moon-ci:
-    name: moon ci (affected: lint, typecheck, test, build — Node + Python)
+    # Quoted: the unquoted "affected: " (colon-space) made this a YAML
+    # mapping-value error, which GitHub Actions rejects at workflow-PARSE
+    # time -- every run failed at 0s with "workflow file issue" and NO job
+    # (lint/typecheck/integration/docker-scan) ever executed. Quoting the
+    # scalar fixes the parse so CI actually runs.
+    name: "moon ci (affected: lint, typecheck, test, build — Node + Python)"
     runs-on: ubuntu-latest
     services:
       # Real Postgres + pgvector for packages/db and services/api
