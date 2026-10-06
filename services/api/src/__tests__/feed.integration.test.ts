@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresRepositories } from "../repositories/postgres.js";
 import type { CheckRepository } from "../repositories/types.js";
-import { createDb, schema, type Database } from "@fact-checker-ke/db";
+import { schema, type Database } from "@fact-checker-ke/db";
 import { requireIntegrationDatabaseUrl } from "./integration-env.js";
 
 /**
@@ -14,6 +14,24 @@ import { requireIntegrationDatabaseUrl } from "./integration-env.js";
  * excluded and provenance/sources carried through.
  */
 const connectionString = requireIntegrationDatabaseUrl();
+
+/**
+ * `listPublished` is a GLOBAL newest-first feed (ORDER BY published_at DESC
+ * LIMIT n) over a live, shared test Postgres with NO per-test rollback, and
+ * the other integration files publish checks against the same DB every run.
+ * Seeding this test's rows at a FIXED past date (the former Sept-2026 values)
+ * let that accumulation push them off the page once the DB held more newer
+ * published checks than the limit -- an isolation artefact, not a real claim
+ * about `listPublished`. Anchoring `published_at` to `Date.now()` + ~100 years
+ * makes THIS run's rows the globally-newest published checks (and unique per
+ * run, since Date.now() is monotonic across runs), so they always lead the
+ * feed and the contract assertions below -- presence, newest-first ordering,
+ * provenance, viral ranking -- stay deterministic no matter how many rows have
+ * accumulated. ~100y ahead is still well within Postgres timestamptz range.
+ */
+const FUTURE_EPOCH_MS = Date.now() + 1000 * 60 * 60 * 24 * 365 * 100;
+const DAY_MS = 1000 * 60 * 60 * 24;
+const futureDate = (offsetDays: number): Date => new Date(FUTURE_EPOCH_MS + offsetDays * DAY_MS);
 
 describe.skipIf(!connectionString)("GET /v1/feed — CheckRepository.listPublished (integration)", () => {
   let db: Database;
@@ -101,24 +119,20 @@ describe.skipIf(!connectionString)("GET /v1/feed — CheckRepository.listPublish
     const older = await seedPublishedCheck({
       ingestSource: "submission",
       summary: "feed-test: a submitted claim, older",
-      publishedAt: new Date("2026-09-01T00:00:00.000Z"),
+      publishedAt: futureDate(0),
     });
     const newer = await seedPublishedCheck({
       ingestSource: "fetch",
       summary: "feed-test: an autonomously-fetched claim, newer",
-      publishedAt: new Date("2026-09-02T00:00:00.000Z"),
+      publishedAt: futureDate(1),
       withSource: true,
     });
     const draftId = await seedDraftCheck();
 
-    // A generous limit: this integration suite's OTHER test files also
-    // publish checks (with `publishedAt: new Date()`, i.e. newer than
-    // this test's fixed Sept 2026 dates) against the same shared test
-    // database, all in the same `api:test-integration` run — a small
-    // limit would let those push this test's rows off the page purely
-    // on recency, which is a test-isolation artefact, not a real
-    // assertion about `listPublished`'s behaviour.
-    const items = await checks.listPublished({ limit: 5000 });
+    // These two rows are far-future dated (see `futureDate`), so they are the
+    // globally-newest published checks and always lead the feed regardless of
+    // how many rows the shared DB has accumulated — a modest limit suffices.
+    const items = await checks.listPublished({ limit: 50 });
     const ids = items.map((i) => i.id);
 
     expect(ids).not.toContain(draftId);
@@ -144,10 +158,14 @@ describe.skipIf(!connectionString)("GET /v1/feed — CheckRepository.listPublish
     // above anything other suites seed, which leave virality null), plus a
     // null-score published item that must be EXCLUDED from the ranking.
     const marker = `viral-${randomUUID()}`;
-    const low = await seedPublishedCheck({ ingestSource: "fetch", summary: `${marker}-low`, publishedAt: new Date("2026-09-10T00:00:00.000Z"), viralityScore: 900.1 });
-    const highOld = await seedPublishedCheck({ ingestSource: "fetch", summary: `${marker}-highOld`, publishedAt: new Date("2026-09-11T00:00:00.000Z"), viralityScore: 999.9 });
-    const highNew = await seedPublishedCheck({ ingestSource: "fetch", summary: `${marker}-highNew`, publishedAt: new Date("2026-09-12T00:00:00.000Z"), viralityScore: 999.9 });
-    const nullScore = await seedPublishedCheck({ ingestSource: "submission", summary: `${marker}-null`, publishedAt: new Date("2026-09-13T00:00:00.000Z"), viralityScore: null });
+    // Far-future, strictly-increasing dates (see `futureDate`) keep highNew
+    // newer than highOld — the recency tie-break between the two equal 999.9
+    // scores — and make all four the globally-newest published rows so the
+    // `listPublished` presence checks below are accumulation-robust.
+    const low = await seedPublishedCheck({ ingestSource: "fetch", summary: `${marker}-low`, publishedAt: futureDate(10), viralityScore: 900.1 });
+    const highOld = await seedPublishedCheck({ ingestSource: "fetch", summary: `${marker}-highOld`, publishedAt: futureDate(11), viralityScore: 999.9 });
+    const highNew = await seedPublishedCheck({ ingestSource: "fetch", summary: `${marker}-highNew`, publishedAt: futureDate(12), viralityScore: 999.9 });
+    const nullScore = await seedPublishedCheck({ ingestSource: "submission", summary: `${marker}-null`, publishedAt: futureDate(13), viralityScore: null });
 
     // A top-3 call returns at most 3, all non-null, globally sorted desc —
     // asserted without pinning WHICH rows (other runs may leave viral rows in
@@ -167,7 +185,9 @@ describe.skipIf(!connectionString)("GET /v1/feed — CheckRepository.listPublish
 
     // listPublished (descending feed) still returns every published row,
     // including the null-score one — the viral ranking is purely additive.
-    const published = await checks.listPublished({ limit: 5000 });
+    // These rows are far-future dated (see `futureDate`), so they lead the
+    // feed and a modest limit captures them regardless of accumulation.
+    const published = await checks.listPublished({ limit: 50 });
     const publishedIds = published.map((i) => i.id);
     expect(publishedIds).toContain(nullScore);
     expect(publishedIds).toContain(highNew);
