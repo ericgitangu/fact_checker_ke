@@ -140,7 +140,8 @@ module "pipeline_service" {
     # DB-backed fetch_engine_kill_switch (migration 0014) remains the runtime
     # guard. publishedAfter window pinned to 2 days ("current virals only").
     FETCH_ENGINE_ENABLED         = "true"
-    YOUTUBE_PUBLISHED_AFTER_DAYS = "2"
+    YOUTUBE_PUBLISHED_AFTER_DAYS = "3"
+    YOUTUBE_FETCH_QUERY          = "Kenya Ruto maandamano"
     API_BASE_URL                 = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
   }
 }
