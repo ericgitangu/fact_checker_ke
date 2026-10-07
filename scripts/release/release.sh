@@ -202,7 +202,7 @@ fi
 step "F: smoke candidate (healthz — must NOT touch the DB, ADR-0016 amendment)"
 if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "[dry-run] CANDIDATE_URL=\$(gcloud run services describe fact-checker-ke-api --region=$REGION --format='value(status.traffic[0].url)')"
-  echo "[dry-run] curl -fsS --max-time 10 \"\$CANDIDATE_URL/healthz\""
+  echo "[dry-run] curl -fsS --max-time 10 \"\$CANDIDATE_URL/health\""
   echo "[dry-run] on failure: ABORT, traffic stays on the previous revision (AT-0016-3)."
 elif [[ "$ENABLE_SERVICES" != "true" ]]; then
   echo "SKIP: no candidate URL yet (ENABLE_SERVICES is not 'true')."
@@ -212,7 +212,7 @@ else
     echo "ABORT: could not resolve candidate URL — leaving traffic on the previous revision (AT-0016-3 behaviour)."
     exit 1
   fi
-  if run curl -fsS --max-time 10 "$CANDIDATE_URL/healthz"; then
+  if run curl -fsS --max-time 10 "$CANDIDATE_URL/health"; then
     echo "smoke PASS"
   else
     echo "ABORT: healthz smoke failed. Traffic stays on the previous revision — no traffic shift, no promote."
