@@ -120,10 +120,13 @@ async def run_corroboration(
         return no_second_opinion()
 
     # Cost breaker (pre-spend): if adding the estimated cost would hard-stop the
-    # engine, do not make the call.
+    # engine, do not make the call. Metering must never crash the verify hop — a
+    # breaker error fails closed to no_second_opinion.
     if breaker is not None:
-        state = breaker.record_spend(engine, _estimated_call_usd())
-        if state.hard_stopped:
+        try:
+            if breaker.record_spend(engine, _estimated_call_usd()).hard_stopped:
+                return no_second_opinion()
+        except Exception:  # noqa: BLE001 - cost metering must never crash the hop
             return no_second_opinion()
 
     try:

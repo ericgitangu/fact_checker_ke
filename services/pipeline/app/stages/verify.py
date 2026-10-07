@@ -311,7 +311,10 @@ async def run_verify_hop(
     if not retrieved and _grounded_rescue_enabled() and request.claim_text.strip():
         allow = True
         if corroboration_breaker is not None:
-            allow = not corroboration_breaker.record_spend("corroboration", GROUNDED_RESCUE_USD).hard_stopped
+            try:
+                allow = not corroboration_breaker.record_spend("corroboration", GROUNDED_RESCUE_USD).hard_stopped
+            except Exception:  # noqa: BLE001 - cost metering must NEVER crash the verify hop
+                allow = False  # fail-closed: skip the billable rescue if we can't meter it
         if allow:
             try:
                 _rescue_stance, assessment_text, cite_urls, _usd = await corroboration_client.rescue(
