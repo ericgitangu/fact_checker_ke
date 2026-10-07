@@ -35,7 +35,7 @@ class FastEmbedEmbedder:
     """Lazily imports `fastembed` on first use so importing this module (and
     the rest of the app) never requires the model download / onnxruntime
     import at process startup — only when a real embedding is actually
-    requested. The `/healthz` dry run and most tests never touch this path.
+    requested. The `/health` dry run and most tests never touch this path.
     """
 
     def __init__(self) -> None:

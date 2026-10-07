@@ -64,7 +64,7 @@ if [ -n "${DATABASE_URL_TEST:-}" ] && command -v curl >/dev/null 2>&1; then
   trap cleanup EXIT
 
   for _ in $(seq 1 30); do
-    curl -fsS "$AT18_BASE/healthz" >/dev/null 2>&1 && break
+    curl -fsS "$AT18_BASE/health" >/dev/null 2>&1 && break
     sleep 0.5
   done
 
@@ -153,7 +153,7 @@ if [ -n "${DATABASE_URL_TEST:-}" ] && command -v curl >/dev/null 2>&1; then
       pnpm --filter @fact-checker-ke/api exec tsx src/server.ts >/tmp/at-0018-live-server-restarted.log 2>&1 &
     AT18_SERVER_PID2=$!
     for _ in $(seq 1 30); do
-      curl -fsS "$AT18_BASE2/healthz" >/dev/null 2>&1 && break
+      curl -fsS "$AT18_BASE2/health" >/dev/null 2>&1 && break
       sleep 0.5
     done
 

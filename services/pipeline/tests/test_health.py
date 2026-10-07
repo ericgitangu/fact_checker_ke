@@ -5,7 +5,7 @@ from app.main import app
 client = TestClient(app)
 
 
-def test_healthz_ok() -> None:
-    res = client.get("/healthz")
+def test_health_ok() -> None:
+    res = client.get("/health")
     assert res.status_code == 200
     assert res.json() == {"status": "ok"}

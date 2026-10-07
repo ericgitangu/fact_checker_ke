@@ -47,7 +47,7 @@ async function waitForHealthy(url: string, timeoutMs = 20_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`${url}/healthz`);
+      const res = await fetch(`${url}/health`);
       if (res.ok) return;
     } catch {
       // not up yet
