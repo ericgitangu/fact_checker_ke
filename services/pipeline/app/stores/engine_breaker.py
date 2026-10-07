@@ -25,7 +25,12 @@ from typing import Literal, Protocol
 
 import psycopg
 
-Engine = Literal["fetch", "submission"]
+# "corroboration" (ADR-0036) is a THIRD, independent daily-spend lane for the
+# grounded second-opinion gate — isolated from fetch/submission so a second-
+# opinion spike can never starve either real engine (and vice-versa). Its budget
+# defaults deliberately tiny (near-0 MVP cost cap) so the per-day CALL count is
+# bounded even on the free tier where each call's USD is ~0.
+Engine = Literal["fetch", "submission", "corroboration"]
 
 # ADR-0032 §4's two breaker thresholds, as fractions of the configured
 # daily budget. Not tier-specific, not tunable per call — a single
@@ -39,7 +44,11 @@ HARD_STOP_FRACTION = 1.00
 # conservative default so the breaker is exercisable out of the box).
 # Overridable per engine via env (`FETCH_ENGINE_DAILY_BUDGET_USD` /
 # `SUBMISSION_ENGINE_DAILY_BUDGET_USD`).
-DEFAULT_DAILY_BUDGET_USD: dict[Engine, float] = {"fetch": 5.00, "submission": 20.00}
+# corroboration: ~$0.30/day. Combined with ESTIMATED_CALL_USD=0.003 in
+# app/stages/corroboration.py, that is a hard ~100-calls/day cap — a near-0 MVP
+# allocation (owner cost rule: stay at/near free-tier until monetization).
+# Override via CORROBORATION_ENGINE_DAILY_BUDGET_USD.
+DEFAULT_DAILY_BUDGET_USD: dict[Engine, float] = {"fetch": 5.00, "submission": 20.00, "corroboration": 0.30}
 
 
 def _budget_env_var(engine: Engine) -> str:

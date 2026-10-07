@@ -99,7 +99,7 @@ async def run_corroboration(
     client: Corroboration,
     calibration_present: bool = False,
     breaker: EngineCostBreaker | None = None,
-    engine: Engine = "submission",
+    engine: Engine = "corroboration",
 ) -> CorroborationResult:
     if not is_boundary_draft(
         draft,

@@ -11,21 +11,38 @@ without the key is a pure no-op: Fake -> stage fails closed -> no_second_opinion
 
 from __future__ import annotations
 
+import logging
 import os
 
 from app.protocols.corroboration import Corroboration
 
 GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
+VERTEX_ENV = "GOOGLE_GENAI_USE_VERTEXAI"
+
+_logger = logging.getLogger(__name__)
+
+
+def _vertex_enabled() -> bool:
+    return os.environ.get(VERTEX_ENV, "").strip().lower() == "true"
 
 
 def make_corroboration_client() -> Corroboration:
-    if os.environ.get(GEMINI_API_KEY_ENV):
-        from app.clients.corroboration_gemini import RealGeminiCorroboration
+    # Activate the real client on EITHER a Gemini Developer API key OR the Vertex
+    # flag (GCP-native, authed by the Cloud Run SA via ADC — no raw key). If the
+    # real client can't be constructed (SDK missing, misconfig), degrade to the
+    # Fake so the pipeline still boots and the verify hop fails closed to
+    # no_second_opinion — activation must never take the service down.
+    if os.environ.get(GEMINI_API_KEY_ENV) or _vertex_enabled():
+        try:
+            from app.clients.corroboration_gemini import RealGeminiCorroboration
 
-        return RealGeminiCorroboration()
+            return RealGeminiCorroboration()
+        except Exception:
+            _logger.warning("corroboration: real client unavailable, falling back to Fake", exc_info=True)
+
     from app.fakes.fake_corroboration import FakeCorroboration
 
     return FakeCorroboration()
 
 
-__all__ = ["GEMINI_API_KEY_ENV", "make_corroboration_client"]
+__all__ = ["GEMINI_API_KEY_ENV", "VERTEX_ENV", "make_corroboration_client"]
