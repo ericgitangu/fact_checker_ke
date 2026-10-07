@@ -13,6 +13,7 @@ import type {
 } from "@fact-checker-ke/core";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import { deriveTrendingStatus, type TrendingCheckPointer } from "../lib/trending-status.js";
+import { cleanTrendingTitle } from "../lib/trending-title.js";
 import type {
   CheckRepository,
   DeviceTokenRepository,
@@ -203,7 +204,9 @@ export class InMemoryTrendingRepository implements TrendingRepository {
         const { status, checkId } = deriveTrendingStatus(row.submissionStatus, row.check);
         return {
           submissionId: row.submissionId,
-          title: row.title,
+          // Display-cleaned (ad/hashtag/echo stripped) to match the Postgres
+          // repo's contract — see lib/trending-title.ts.
+          title: cleanTrendingTitle(row.title),
           platform: row.platform,
           sourceUrl: row.sourceUrl,
           viralityScore: row.viralityScore,
