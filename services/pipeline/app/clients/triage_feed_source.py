@@ -71,7 +71,10 @@ class TriageFeedSource:
         # source" rather than silently returning empty on a total outage).
         candidates: list[FetchCandidate] = []
         failures: list[str] = []
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        # follow_redirects: PesaCheck's tag feeds 301 (e.g. /tagged/kenya/feed ->
+        # /tag/kenya/feed); httpx does NOT follow by default, so without this the
+        # redirect stub parses as invalid XML and the feed looks "failed".
+        async with httpx.AsyncClient(timeout=self._timeout, follow_redirects=True) as client:
             for url in urls:
                 try:
                     response = await client.get(url)
