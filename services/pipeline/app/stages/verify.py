@@ -50,6 +50,7 @@ from app.stages.dedup_guard import may_reuse
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
 from app.stages.json_extract import strip_code_fences
 from app.stages.publish import finalize_publish
+from app.stores.engine_breaker import EngineCostBreaker
 
 # Cosine-similarity threshold for dedup reuse (ADR-0004 step 3 / amendment
 # #8). Not yet tuned against a real eval set (tracked as tech debt — see
@@ -151,6 +152,7 @@ async def run_verify_hop(
     store: InMemoryIdempotencyStore | None = None,
     reverse_image_search: ReverseImageSearch | None = None,
     corroboration_client: Corroboration | None = None,
+    corroboration_breaker: EngineCostBreaker | None = None,
 ) -> VerifyResult:
     store = store or InMemoryIdempotencyStore()
     if corroboration_client is None:
@@ -325,6 +327,7 @@ async def run_verify_hop(
                 named_person_involved=request.named_person_involved,
                 attribution=request.attribution.value,
                 client=corroboration_client,
+                breaker=corroboration_breaker,
             )
             outcome = finalize_publish(
                 result,

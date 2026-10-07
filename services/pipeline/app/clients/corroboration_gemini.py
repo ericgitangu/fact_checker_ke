@@ -21,7 +21,7 @@ import os
 
 from app.protocols.corroboration import CorroborationError, Stance
 
-_MODEL = os.environ.get("GEMINI_CORROBORATION_MODEL", "gemini-2.0-flash")
+_MODEL = os.environ.get("GEMINI_CORROBORATION_MODEL", "gemini-3.8-flash")
 
 _PROMPT = (
     "You are an independent fact-checking assistant with web search. Using Google "
@@ -41,13 +41,35 @@ def _parse_stance(text: str) -> Stance:
     return "inconclusive"
 
 
+def _use_vertex() -> bool:
+    return os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").strip().lower() == "true"
+
+
+def _grounding_enabled() -> bool:
+    # Default OFF: grounding (Google Search tool) is billable and quota-exhausts
+    # on the free tier. Near-0 MVP runs ungrounded; flip to true with billing on.
+    return os.environ.get("GEMINI_CORROBORATION_GROUNDED", "").strip().lower() == "true"
+
+
 class RealGeminiCorroboration:
+    """Two auth modes (ADR-0036 activation):
+    - Vertex AI (preferred on GCP, no raw key): GOOGLE_GENAI_USE_VERTEXAI=true,
+      authenticated by the Cloud Run service account via ADC
+      (roles/aiplatform.user). Uses GOOGLE_CLOUD_PROJECT + GOOGLE_CLOUD_LOCATION
+      (default "global").
+    - Gemini Developer API: a GEMINI_API_KEY from AI Studio.
+    Construction makes no network call (the SDK client is lazy); a bad config
+    surfaces at assess() -> CorroborationError -> the stage fails closed."""
+
     def __init__(self) -> None:
+        use_vertex = _use_vertex()
         key = os.environ.get("GEMINI_API_KEY")
-        if not key:
-            # Defensive: the factory guards this, but never let a keyless
+        if not use_vertex and not key:
+            # Defensive: the factory guards this, but never let an unconfigured
             # instance exist.
-            raise CorroborationError("RealGeminiCorroboration constructed without GEMINI_API_KEY")
+            raise CorroborationError(
+                "RealGeminiCorroboration needs GOOGLE_GENAI_USE_VERTEXAI=true or GEMINI_API_KEY"
+            )
         try:
             from google import genai
             from google.genai import types
@@ -55,13 +77,25 @@ class RealGeminiCorroboration:
             raise CorroborationError(f"google-genai SDK not available: {exc}") from exc
         self._genai = genai
         self._types = types
-        self._client = genai.Client(api_key=key)
+        if use_vertex:
+            self._client = genai.Client(
+                vertexai=True,
+                project=os.environ.get("GOOGLE_CLOUD_PROJECT"),
+                location=os.environ.get("GOOGLE_CLOUD_LOCATION", "global"),
+            )
+        else:
+            self._client = genai.Client(api_key=key)
 
     async def assess(self, *, claim_text: str, language: str) -> tuple[Stance, list[str], float]:
         types = self._types
         try:
+            # GROUNDING IS BILLABLE and 429s on the free tier (verified) — default
+            # OFF for the near-0 MVP: an ungrounded second opinion is free-tier
+            # eligible. Flip GEMINI_CORROBORATION_GROUNDED=true once billing is on
+            # to get fresh web evidence + citations.
+            grounded = _grounding_enabled()
             config = types.GenerateContentConfig(
-                tools=[types.Tool(google_search=types.GoogleSearch())],
+                tools=[types.Tool(google_search=types.GoogleSearch())] if grounded else None,
                 temperature=0.0,
                 max_output_tokens=256,
             )

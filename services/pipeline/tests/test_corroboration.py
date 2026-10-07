@@ -11,7 +11,11 @@ from pathlib import Path
 
 import pytest
 
-from app.clients.corroboration_factory import GEMINI_API_KEY_ENV, make_corroboration_client
+from app.clients.corroboration_factory import (
+    GEMINI_API_KEY_ENV,
+    VERTEX_ENV,
+    make_corroboration_client,
+)
 from app.eval.calibrate import (
     CalibrationArtifact,
     StratifiedCalibrationArtifact,
@@ -66,9 +70,21 @@ def _stratified_artifact(tmp_path: Path, *, agree_to: float, disagree_to: float)
     return path
 
 
-def test_activate_on_keys_no_key_returns_fake(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_activate_on_keys_no_key_no_vertex_returns_fake(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(GEMINI_API_KEY_ENV, raising=False)
+    monkeypatch.delenv(VERTEX_ENV, raising=False)
     assert isinstance(make_corroboration_client(), FakeCorroboration)
+
+
+def test_vertex_activation_never_crashes_boot(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The Vertex path activates the real client without a key; even if it can't
+    # be fully configured (no project), the factory must fail safe to a usable
+    # Corroboration and never raise at pipeline boot.
+    monkeypatch.delenv(GEMINI_API_KEY_ENV, raising=False)
+    monkeypatch.setenv(VERTEX_ENV, "true")
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    client = make_corroboration_client()
+    assert hasattr(client, "assess")  # duck-typed Corroboration, no exception raised
 
 
 async def test_sampling_bound_already_above_threshold_never_calls() -> None:
@@ -119,6 +135,30 @@ async def test_cost_breaker_hard_stop_skips_call() -> None:
         engine="submission",
     )
     assert res.agreement_state == NO_SECOND_OPINION
+
+
+async def test_near0_corroboration_lane_is_isolated_and_capped() -> None:
+    # ADR-0036 near-0 MVP: the gate spends on its OWN tiny "corroboration" lane
+    # (default ~$0.30/day). Exhausting that lane hard-stops the gate even while
+    # the submission engine ($20/day) is untouched — a second-opinion spike can
+    # never starve a real engine, and the daily call count stays near-0.
+    draft = _draft(rating=Rating.true, confidence=_NEAR_MISS)
+    breaker = InMemoryEngineCostBreaker()
+    breaker.record_spend("corroboration", 1.0)  # over the 0.30 corroboration budget
+    client = FakeCorroboration()
+    client.seed_stance("the claim text", "supported")
+    res = await run_corroboration(
+        draft=draft,
+        claim_text="the claim text",
+        language="en",
+        named_person_involved=False,
+        attribution="not_applicable",
+        client=client,
+        breaker=breaker,  # default engine is "corroboration"
+    )
+    assert res.agreement_state == NO_SECOND_OPINION
+    # the submission engine lane is untouched by the corroboration spend
+    assert breaker.current_state("submission").hard_stopped is False
 
 
 async def test_agreement_derivation() -> None:
