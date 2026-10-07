@@ -44,10 +44,11 @@ import os
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from app.models.hop_requests import AnalyzeHopRequest, HopContent
 from app.models.pipeline_io import AnalyzeResult
-from app.protocols.fetch_dedup_store import FetchDedupStore
+from app.protocols.fetch_dedup_store import FetchDedupStore, FetchObservationHistory
 from app.protocols.fetch_source import FetchCandidate, FetchSource, FetchSourceError
 from app.protocols.llm_client import LlmClient
 from app.protocols.transcriber import Transcriber, TranscriptionError
@@ -95,6 +96,42 @@ FETCH_EMISSION_ESTIMATED_USD_COST = float(os.environ.get("FETCH_EMISSION_ESTIMAT
 
 def _normalize_claim_text(text: str) -> str:
     return " ".join(text.strip().lower().split())
+
+
+def _reobserve_enabled() -> bool:
+    """ADR-0037 FETCH_VELOCITY_REOBSERVE kill-switch. Read FRESH on every
+    candidate (same discipline as app/main.py's FETCH_ENGINE_ENABLED read),
+    default OFF so this ships dark: flipping it on makes re-observation
+    recorded and velocity real within one propagation cycle, with no code
+    change and no restart."""
+    return os.environ.get("FETCH_VELOCITY_REOBSERVE", "false").lower() == "true"
+
+
+def _velocity_from_history(
+    history: FetchObservationHistory, *, observed_at: datetime, total_engagement: float
+) -> tuple[float, float, float]:
+    """ADR-0037: turn an item's prior observation history + the current
+    snapshot into the REAL (hours_since_previous, engagement_delta, age_hours)
+    the scorer needs — replacing the pre-ADR-0037 constant placeholders
+    (1.0 / total_engagement / 0.0).
+
+    First-ever observation (no prior snapshot): velocity is 0, not an error
+    (FetchScoringInput's documented contract) — engagement_delta 0.0 and
+    age_hours 0.0 (brand-new), with a nominal 1.0h denominator that a 0 delta
+    makes irrelevant.
+
+    Otherwise: engagement_delta = growth since the latest prior snapshot
+    (clamped at 0 — a dip in reported counts is not negative virality), over
+    the real wall-clock gap; age_hours measured from the FIRST observation."""
+    if history.count == 0 or history.latest_observed_at is None:
+        return 1.0, 0.0, 0.0
+
+    prev_total = float(sum(history.latest_engagement.values()))
+    engagement_delta = max(0.0, total_engagement - prev_total)
+    hours_since_previous = (observed_at - history.latest_observed_at).total_seconds() / 3600.0
+    first_observed_at = history.first_observed_at or history.latest_observed_at
+    age_hours = max(0.0, (observed_at - first_observed_at).total_seconds() / 3600.0)
+    return hours_since_previous, engagement_delta, age_hours
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,9 +284,20 @@ async def _process_candidate(
     emit_submission: EmitSubmission | None,
     transcriber: Transcriber | None = None,
 ) -> None:
+    reobserve = _reobserve_enabled()
+
     # Layer 1 (ADR-0032 §3): exact (platform, native_id) already seen ->
     # drop immediately, no scoring at all.
-    if dedup_store.seen_platform_item(candidate.platform, candidate.native_id):
+    #
+    # ADR-0037 FETCH_VELOCITY_REOBSERVE (default OFF): when ON, a re-observed
+    # item is NOT dropped here — it is recorded as a fresh engagement snapshot
+    # (below) so velocity becomes a real Δengagement/Δtime rate instead of the
+    # static placeholder. Emission idempotency is unaffected: a re-observed
+    # claim whose candidate is already `emitted` still short-circuits at the
+    # status check downstream (-> attached_observation_only), so re-observation
+    # updates trend/velocity but NEVER re-emits (AT-0032-3). When OFF this is
+    # the exact pre-ADR-0037 behaviour, byte-for-byte.
+    if not reobserve and dedup_store.seen_platform_item(candidate.platform, candidate.native_id):
         result.duplicate_platform_item_skipped += 1
         return
 
@@ -266,30 +314,48 @@ async def _process_candidate(
     normalized_text = _normalize_claim_text(claim_text)
     claim_hash = content_hash(normalized_text)
 
-    dedup_store.record_observation(
-        platform=candidate.platform,
-        native_id=candidate.native_id,
-        content_hash=claim_hash,
-        observed_at=candidate.observed_at,
-    )
-
     # Scoring signals derived purely from this candidate — no embedding,
     # no LLM call (AT-0032-2's "before any embedding/LLM call"). Scoring
     # must happen BEFORE any dedup-store upsert of the claim-identity
     # record, since a below-tau candidate is dropped without ever
     # becoming a tracked fetch_candidates row (see module docstring).
     total_engagement = float(sum(candidate.engagement.values()))
-    # Best-effort velocity/age proxies: see module docstring's "Claim
-    # identity for dedup" note and app/stages/fetch_scoring.py's module
-    # docstring for why these are deliberately simple, not a real
-    # time-series rate — flagged, not hidden.
-    hours_since_previous = 1.0
-    age_hours = 0.0
     platforms_seen: frozenset[str] = frozenset({candidate.platform})
+
+    if reobserve:
+        # ADR-0037: read the item's prior snapshots (BEFORE recording this
+        # one), record this observation as a new engagement snapshot, then
+        # derive the REAL velocity deltas from latest-prior -> current.
+        history = dedup_store.observation_history(candidate.platform, candidate.native_id)
+        dedup_store.record_engagement_snapshot(
+            platform=candidate.platform,
+            native_id=candidate.native_id,
+            content_hash=claim_hash,
+            observed_at=candidate.observed_at,
+            engagement=candidate.engagement,
+        )
+        hours_since_previous, engagement_delta, age_hours = _velocity_from_history(
+            history, observed_at=candidate.observed_at, total_engagement=total_engagement
+        )
+    else:
+        dedup_store.record_observation(
+            platform=candidate.platform,
+            native_id=candidate.native_id,
+            content_hash=claim_hash,
+            observed_at=candidate.observed_at,
+        )
+        # Best-effort velocity/age proxies: see module docstring's "Claim
+        # identity for dedup" note and app/stages/fetch_scoring.py's module
+        # docstring for why these are deliberately simple, not a real
+        # time-series rate — flagged, not hidden. (ADR-0037 replaces these
+        # with the real deltas above when FETCH_VELOCITY_REOBSERVE is on.)
+        hours_since_previous = 1.0
+        engagement_delta = total_engagement
+        age_hours = 0.0
 
     signals = FetchScoringInput(
         text=claim_text,
-        engagement_delta=total_engagement,
+        engagement_delta=engagement_delta,
         hours_since_previous_observation=hours_since_previous,
         platforms_seen=platforms_seen,
         age_hours=age_hours,
