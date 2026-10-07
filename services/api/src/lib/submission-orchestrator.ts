@@ -81,6 +81,11 @@ interface VerifyHopResponseBody {
     publish_mode: string | null;
     queued_for_async_audit: boolean;
     requires_human_tap: boolean;
+    // ADR-0036: the grounded second-opinion agreement feature behind this
+    // decision ("agree"|"disagree"|"no_second_opinion"), persisted onto the
+    // check for the calibration flywheel. Optional — absent on a pre-ADR-0036
+    // pipeline response (the API tolerates extra/missing fields, see postJson).
+    corroboration_state?: string | null;
   } | null;
 }
 
@@ -283,6 +288,14 @@ export async function runSubmissionOrchestration(
       publishedAt: null,
       riskTier: verify.publish.risk_tier,
       calibratedConfidence: verify.verdict ? String(verify.verdict.confidence) : null,
+      // ADR-0036 Phase-2 flywheel: persist the draft's RAW confidence + the
+      // grounded second-opinion agreement_state per check, so editor
+      // corrections can later be joined into fresh calibration samples that
+      // re-fit the corroboration lift (the "robust over weeks" loop). Both are
+      // nullable on the wire — a verify response from a pre-ADR-0036 pipeline,
+      // or an item that got no second opinion, simply stores null.
+      rawConfidence: verify.verdict ? String(verify.verdict.confidence) : null,
+      agreementState: verify.publish.corroboration_state ?? null,
       whatWouldChangeThis: verify.verdict?.what_would_change_this ?? null,
       context: verify.verdict?.context ?? null,
       ingestSource,

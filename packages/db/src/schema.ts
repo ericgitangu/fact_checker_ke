@@ -347,6 +347,16 @@ export const checks = pgTable(
     // ADR-0034: reader-facing context that leads the artifact (nullable at
     // rest; required-on-publish is enforced in CheckSchema, not the DB).
     context: text("context"),
+    // ADR-0036 Phase-2 flywheel: the draft's RAW self-reported confidence and
+    // the grounded second-opinion agreement_state ("agree"|"disagree"|
+    // "no_second_opinion"), captured per check so editor corrections
+    // (training_eval_labels, joined on check_id) can be turned into fresh
+    // (raw_confidence, agreement_state, correct) calibration samples over time —
+    // the data flywheel that re-fits the corroboration lift. Both nullable:
+    // older rows + rows drafted before this landed carry NULL, and the
+    // recalibration join simply ignores them.
+    rawConfidence: numeric("raw_confidence", { precision: 5, scale: 4 }),
+    agreementState: text("agreement_state"),
     riskTier: riskTierEnum("risk_tier"),
     // ADR-0032 (two-engine pivot) / AT-0032-6: "every published fetched
     // assessment carries ingest_source: 'fetch' provenance" — carried

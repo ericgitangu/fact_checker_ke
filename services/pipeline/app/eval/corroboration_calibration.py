@@ -28,27 +28,31 @@ from app.clients.corroboration_factory import make_corroboration_client
 from app.clients.factcheck_api import make_factcheck_client
 from app.clients.llm_anthropic import make_llm_client
 from app.eval.calibrate import (
+    CalibrationArtifact,
     StratifiedCalibrationArtifact,
-    apply_calibration,
     compute_ece,
-    fit_stratified_calibration,
+    compute_reliability_curve,
+    fit_isotonic_calibration,
     write_stratified_calibration_artifact,
 )
 from app.models.enums import Rating
 from app.protocols.corroboration import CorroborationError
 from app.stages.citation_guard import RetrievedDoc
-from app.stages.corroboration import BOUNDARY_BAND, stance_from_rating
+from app.stages.corroboration import stance_from_rating
 from app.stages.publish import STRATIFIED_CALIBRATION_ARTIFACT_PATH
 from app.stages.publish_policy import TAU_A_PRE_CALIBRATION
 from app.stages.verify import _draft_once
 
-# Release-gate bars (ADR-0023 eval-gate discipline). ECE_MAX: the agree stratum
-# must be reasonably calibrated. The non-saturation check below rejects a
-# degenerate isotonic fit that maps the BOTTOM of the boundary band straight to
-# ~1.0 (which would auto-publish any mid-confidence agreed draft, not only
-# genuinely high-confidence ones) — a real failure mode on small, bimodally-
-# distributed confidence data.
-ECE_MAX = 0.15
+# Agreement-gated FLOOR model (ADR-0036 Phase-2). The draft's confidence is
+# bimodal, so a full isotonic fit saturates; instead the agree stratum is a
+# non-saturating STEP: below the floor -> 0 (runtime `max(baseline, .)` => no
+# lift), at/above the floor -> the MEASURED correctness of the
+# `agree AND conf >= floor` slice. That measured value must clear both the
+# correctness bar AND the Tier-A auto threshold to flip a draft, and the slice
+# must have enough samples (min_per_stratum). Disagreement is a flat low curve
+# (runtime `min` => lowers). ECE is reported for transparency.
+AGREEMENT_FLOOR = 0.90
+CORRECTNESS_BAR = 0.95
 
 GOLDEN_PATH = Path(__file__).resolve().parent / "fixtures" / "corroboration_golden.jsonl"
 
@@ -127,7 +131,7 @@ def _stratum_report(samples: list[tuple[float, bool]]) -> str:
 
 
 def calibrate_and_gate(
-    samples: list[tuple[float, str, bool]], *, min_per_stratum: int
+    samples: list[tuple[float, str, bool]], *, min_per_stratum: int, floor: float = AGREEMENT_FLOOR
 ) -> tuple[StratifiedCalibrationArtifact, dict[str, object], bool]:
     by_stratum: dict[str, list[tuple[float, bool]]] = {"agree": [], "disagree": [], "baseline": []}
     for conf, agreement, correct in samples:
@@ -135,48 +139,62 @@ def calibrate_and_gate(
         if agreement in ("agree", "disagree"):
             by_stratum[agreement].append((conf, correct))
 
-    artifact = fit_stratified_calibration(by_stratum, min_per_stratum=min_per_stratum)
+    by_art: dict[str, CalibrationArtifact] = {}
 
-    agree_acc = (
-        sum(1 for _, c in by_stratum["agree"] if c) / len(by_stratum["agree"]) if by_stratum["agree"] else 0.0
-    )
-    base_acc = (
-        sum(1 for _, c in by_stratum["baseline"] if c) / len(by_stratum["baseline"])
-        if by_stratum["baseline"]
-        else 0.0
-    )
-    agree_fitted = "agree" in artifact.by_stratum
-    agree_ece = compute_ece(by_stratum["agree"]) if by_stratum["agree"] else 1.0
-    # Non-saturation: the agree curve at the BOTTOM of the boundary band
-    # (threshold - BOUNDARY_BAND) must stay BELOW the auto-publish threshold, so
-    # only genuinely high-confidence agreed drafts can be lifted across — a
-    # saturated "everything -> 1.0" curve is rejected.
-    band_floor = TAU_A_PRE_CALIBRATION - BOUNDARY_BAND
-    agree_at_floor = (
-        apply_calibration(artifact.by_stratum["agree"], band_floor) if agree_fitted else 1.0
-    )
-    not_saturated = agree_at_floor < TAU_A_PRE_CALIBRATION
+    # baseline: isotonic fallback (used for no_second_opinion).
+    base = by_stratum["baseline"]
+    if len(base) >= min_per_stratum:
+        by_art["baseline"] = CalibrationArtifact(
+            fitted_points=fit_isotonic_calibration(base),
+            reliability_curve=compute_reliability_curve(base),
+            ece=compute_ece(base),
+            n_samples=len(base),
+        )
+
+    # agree: non-saturating FLOOR STEP. measured_high = correctness of the
+    # flip-relevant slice (agree AND conf >= floor).
+    agree_hi = [(c, ok) for c, ok in by_stratum["agree"] if c >= floor]
+    measured_high = (sum(1 for _, ok in agree_hi if ok) / len(agree_hi)) if agree_hi else 0.0
+    if len(agree_hi) >= min_per_stratum:
+        by_art["agree"] = CalibrationArtifact(
+            fitted_points=[(0.0, 0.0), (floor, round(measured_high, 4))],
+            reliability_curve=[],
+            ece=compute_ece(agree_hi),
+            n_samples=len(agree_hi),
+        )
+
+    # disagree: flat low curve at measured correctness (runtime `min` lowers).
+    dis = by_stratum["disagree"]
+    dis_acc = (sum(1 for _, ok in dis if ok) / len(dis)) if dis else 0.0
+    if len(dis) >= min_per_stratum:
+        by_art["disagree"] = CalibrationArtifact(
+            fitted_points=[(0.0, round(dis_acc, 4)), (1.0, round(dis_acc, 4))],
+            reliability_curve=[],
+            ece=compute_ece(dis),
+            n_samples=len(dis),
+        )
+
+    artifact = StratifiedCalibrationArtifact(by_stratum=by_art)
 
     report = {
         "agree": _stratum_report(by_stratum["agree"]),
         "disagree": _stratum_report(by_stratum["disagree"]),
         "baseline": _stratum_report(by_stratum["baseline"]),
-        "agree_fitted": agree_fitted,
-        "agree_ece": round(agree_ece, 3),
-        "agree_cal_at_band_floor": round(agree_at_floor, 3),
-        "agree_minus_baseline_correct": round(agree_acc - base_acc, 3),
+        "floor": floor,
+        "agree_floor_n": len(agree_hi),
+        "agree_floor_correct": round(measured_high, 3),
+        "agree_floor_ece": round(compute_ece(agree_hi), 3) if agree_hi else 1.0,
     }
-    # Release gate (ADR-0036 hybrid C, provisional pilot): ALL must hold —
-    #  (1) agree fitted (>= min_per_stratum) and a baseline fallback exists,
-    #  (2) a positive measured correctness lift over baseline,
-    #  (3) agree stratum reasonably calibrated (ECE <= ECE_MAX),
-    #  (4) the agree curve is NOT saturated (does not auto-credit mid-confidence).
+    # Release gate (ADR-0036 Phase-2 floor model): ALL must hold —
+    #  (1) the flip-relevant slice (agree & conf>=floor) has >= min_per_stratum,
+    #  (2) a baseline fallback exists,
+    #  (3) that slice's MEASURED correctness clears the bar AND the Tier-A auto
+    #      threshold (so it genuinely lifts a draft across) — never a chosen bonus.
     gate_clears = (
-        agree_fitted
-        and "baseline" in artifact.by_stratum
-        and agree_acc > base_acc
-        and agree_ece <= ECE_MAX
-        and not_saturated
+        len(agree_hi) >= min_per_stratum
+        and "baseline" in by_art
+        and measured_high >= CORRECTNESS_BAR
+        and measured_high >= TAU_A_PRE_CALIBRATION
     )
     return artifact, report, gate_clears
 
@@ -207,9 +225,11 @@ async def _amain() -> int:
     print("=== per-stratum ===")
     for k in ("agree", "disagree", "baseline"):
         print(f"  {k:9} {report[k]}")
-    print(f"  agree_fitted={report['agree_fitted']}  agree_ece={report['agree_ece']} "
-          f"(max {ECE_MAX})  agree_cal@band_floor={report['agree_cal_at_band_floor']} "
-          f"(must be < {TAU_A_PRE_CALIBRATION})  lift={report['agree_minus_baseline_correct']:+}")
+    print(
+        f"  FLIP SLICE  agree & conf>={report['floor']}:  n={report['agree_floor_n']}  "
+        f"measured_correct={report['agree_floor_correct']}  ece={report['agree_floor_ece']}  "
+        f"(need n>={args.min_per_stratum}, correct>={max(CORRECTNESS_BAR, TAU_A_PRE_CALIBRATION)})"
+    )
     print(f"\nRELEASE GATE (min_per_stratum={args.min_per_stratum}): "
           f"{'CLEARS' if gate_clears else 'does NOT clear'}")
 

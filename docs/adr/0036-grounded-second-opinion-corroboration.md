@@ -149,16 +149,30 @@ claims with independent verdicts, real draft + Vertex-grounded corroboration):
   positive lift, agree ECE ≤ 0.15, AND the agree curve not saturated at the
   boundary-band floor. The harness refuses to write an artifact unless all hold.
 
-**Consequence for the lift model (ADR-0036 amendment needed before a flip):**
-isotonic-on-the-draft's-raw-confidence is the wrong shape for a bimodal signal.
-The measured data instead supports an **agreement-gated rule with a high
-raw-confidence floor** (auto-publish a held Tier-A/B draft only when `agree` AND
-`raw_conf ≥ ~0.97` AND a hard verdict, still 100%-audited), once that slice
-reaches a defensible N (≈ ≥30, incl. Swahili/Sheng) via a larger golden set
-and/or accumulated live flywheel labels. Until then: **shadow stays ON, lift = 0.**
-The harness re-gates saved samples for free (`--samples-in`) and re-runs as the
-golden set grows or on exported live labels, so the flip becomes one command
-when the data clears the hardened bar.
+**Consequence for the lift model — IMPLEMENTED (agreement-gated FLOOR):**
+isotonic-on-the-draft's-raw-confidence is the wrong shape for a bimodal signal,
+so the lift model is now an **agreement-gated floor**: the agree stratum is a
+non-saturating STEP — below a confidence `floor` (default 0.90) it contributes
+0 (runtime `max(baseline, ·)` ⇒ no lift); at/above the floor it is the MEASURED
+correctness of the `agree AND conf ≥ floor` slice. Agreement may only RAISE,
+disagreement only LOWER (runtime `max`/`min`). The release gate requires that
+flip-relevant slice to have ≥ min_per_stratum samples AND a measured correctness
+clearing both the bar and the Tier-A auto threshold. Verified: on the saved
+samples the slice measured 100% correct (ece 0.056) but N was still below bar, so
+the gate correctly withheld — the only remaining blocker is **slice N**, grown via
+a larger golden set and/or the live flywheel.
+
+**Flywheel wired (the "robust over weeks" loop):** `checks.raw_confidence` +
+`checks.agreement_state` are now persisted per check (migration 0021, set by the
+API orchestrator from the verify response). Editor corrections already land in
+`training_eval_labels` keyed by `check_id`, so fresh calibration samples are a
+join — e.g. `SELECT c.raw_confidence, c.agreement_state, (c.rating = corrected)
+AS correct FROM checks c JOIN training_eval_labels l ON l.check_id = c.id WHERE
+c.agreement_state IS NOT NULL` → export to JSONL → feed the harness `--samples-in`.
+As corrections accumulate, re-running the harness re-fits the floor and the flip
+becomes one command; the editor's own work continuously sharpens the thresholds
+(ADR-0031 data flywheel). Until the slice clears the bar: **shadow stays ON,
+lift = 0.**
 
 ## Activation log (2026-10-07)
 
