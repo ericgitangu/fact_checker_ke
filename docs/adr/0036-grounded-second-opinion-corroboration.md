@@ -226,3 +226,40 @@ lift = 0.**
 P(correct | raw_confidence, agreement_state) is measured per stratum on held-out
 labels with a reported ECE — never a raw-confidence blend, and never a path that
 moves a Tier-C named-person item toward auto-publish.
+
+---
+
+## Amendment 2026-10-08 — translate-then-ground for Swahili/Sheng claims
+
+**Problem (measured, not assumed):** grounding a raw Swahili claim returns few or
+zero citations and sometimes the **wrong** stance. Verified through the real
+`RealGeminiCorroboration.rescue()` against Vertex: a Nairobi-governor claim
+(`Gavana wa Nairobi amekamatwa na EACC`) grounded as **refuted / 0 citations** in
+raw Swahili, but **inconclusive / 15 citations** (correctly hedged — past
+governors arrested, current one not) once translated to English. Same pattern
+across a batch (English consistently yields more citations: 6 vs 4, 13 vs 4).
+
+**Decision:** for a non-English claim, translate to English **first** (one cheap,
+ungrounded, temp-0 Flash call) and ground the English. The stance is
+language-agnostic, so the returned verdict still describes the original claim;
+only the text handed to the grounding model changes. Applied in BOTH `assess()`
+(agreement gate) and `rescue()` (no-source path), covering the real draft and the
+corroboration second opinion.
+
+**Flag:** `CORROBORATION_TRANSLATE` (default **on** — cheap, free-tier-eligible,
+a measured correctness win; audit/disable with `=false`). Gated on the detected
+`language` the analyze hop emits, which the orchestrator already forwards to the
+verify hop (en*/empty → no translation, so an English claim is never distorted).
+
+**Negation/entity guard (MVP):** temp=0 + an explicit "preserve negations and
+named entities" instruction in the translate prompt. Fails **open** to the
+original text on any translation error — no worse than today.
+
+**Trade-offs accepted / tech-debt (flagged, not buried):**
+- RE-TRANSLATES rather than reusing analyze's `translation_en` (the verify hop
+  currently drops it; `VerifyHopRequest` has no field for it). Costs one extra
+  ~$0.00002 ungrounded Flash call per non-English claim. The real fix — carry
+  `translation_en` analyze→orchestrator→verify→client and skip the re-translation
+  — is the ADR-0037 wire-up.
+- A back-translation agreement check (catch a flipped negation / mangled entity)
+  is deferred to ADR-0037; the temp-0 + preserve-instruction is the interim guard.
