@@ -237,7 +237,7 @@
     },
     "trending": {
         "heading": "Yanayoenea sasa — tunayofuatilia",
-        "intro": "Klipu zinazoenea ambazo injini yetu imezipata kwenye majukwaa tunayofuatilia, zimepangwa kwa ufikiaji. Haya ni mambo tunayofuatilia — si maamuzi. \"Inakaguliwa\" maana yake mhariri bado anayatathmini.",
+        "intro": "Klipu zinazoenea ambazo injini yetu imezipata kwenye majukwaa tunayofuatilia, zimepangwa kwa ufikiaji. Tunafuatilia kuenea kwake — si maamuzi. Uamuzi huchapishwa tu baada ya kipengele kupita ukaguzi.",
         "statusNote": "Hali ya ufuatiliaji — si uamuzi wa ukweli.",
         "status": {
             "monitoring": "Inafuatiliwa",
@@ -273,10 +273,25 @@
       "empty": "Hakuna rasimu zinazosubiri ukaguzi.",
       "heading": "Rasimu zinazosubiri"
     },
+    "queue": {
+      "tokenLabel": "Tokeni ya kipindi cha mhariri",
+      "tokenHint": "Bandika tokeni ya kuingia kwa mhariri. Hutumwa tu kwa API ya ukaguzi, ambayo huidhinisha kila hatua.",
+      "load": "Pakia foleni",
+      "loading": "Inapakia…",
+      "reach": "Ufikiaji",
+      "riskTier": "Kiwango cha hatari",
+      "approved": "Imeidhinishwa na kuchapishwa.",
+      "dismissed": "Imeondolewa.",
+      "authError": "Hauruhusiwi. Angalia tokeni ya kipindi na jukumu lako la mhariri.",
+      "loadError": "Imeshindwa kupakia foleni ya ukaguzi.",
+      "actionError": "Hatua hiyo haikukamilika. Jaribu tena."
+    },
     "action": {
       "approve": "Idhinisha na uchapishe",
       "correct": "Sahihisha na uchapishe",
-      "publishing": "Inachapisha…"
+      "dismiss": "Ondoa",
+      "publishing": "Inachapisha…",
+      "dismissing": "Inaondoa…"
     },
     "noRatingToSubmitter": "Uamuzi umefichwa kwa mtumaji hadi uchapishwe (AT-0004-B)."
   },
