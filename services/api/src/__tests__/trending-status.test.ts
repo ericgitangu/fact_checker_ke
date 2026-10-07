@@ -36,6 +36,18 @@ describe("deriveTrendingStatus", () => {
     expect(deriveTrendingStatus("failed", null)).toEqual({ status: "dismissed", checkId: null });
   });
 
+  it("dismissed OUTRANKS a lingering held draft when the submission is failed", () => {
+    // The editor-Dismiss / auto-expiry path terminally closes a gated item by
+    // driving its submission to `failed` WITHOUT deleting the (now-abandoned)
+    // held draft row (lib/editorial.ts#applyCheckDismissal). Such an item must
+    // read as `dismissed`, never a perpetual `under_review` — so a failed
+    // submission takes precedence over a held draft. (In normal pipeline flow a
+    // failed submission never has a check at all, so this only ever fires for a
+    // dismissed/expired item.)
+    const lingeringDraft = { checkId: "44444444-4444-4444-4444-444444444444", isDraft: true, publishedAt: null };
+    expect(deriveTrendingStatus("failed", lingeringDraft)).toEqual({ status: "dismissed", checkId: null });
+  });
+
   it("monitoring when ready but the item has no check of its own (deduped / no checkable claim)", () => {
     // e.g. the orchestrator deduped this discovery to an already-published
     // claim owned by a DIFFERENT submission — this item advanced to `ready`

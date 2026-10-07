@@ -53,6 +53,16 @@ export interface ResolvedConfig {
   /** ADR-0018: Upstash Redis TCP (SUBSCRIBE/PUBLISH) endpoint, `rediss://...`. */
   redisTcpUrl: string | null;
   /**
+   * Gated-item lifecycle: a held draft that no editor has actioned within
+   * this many days is auto-expired to a terminal state by the
+   * `/internal/checks/sweep-expired` sweep (see routes/internal.ts +
+   * lib/editorial.ts#sweepExpiredChecks). Env `CHECK_EXPIRY_DAYS`, default
+   * 7. Optional (not just defaulted) for the same reason as the fields
+   * below: several tests construct a `ResolvedConfig` literal directly, so
+   * an omitted value is treated as the 7-day default by the route wiring.
+   */
+  checkExpiryDays?: number;
+  /**
    * ADR-0007 kill-switch mechanism (AT-0007-A): the apps/web origin and
    * shared secret for the `/api/revalidate` webhook (see
    * apps/web/app/api/revalidate/route.ts) that the kill-switch route
@@ -190,6 +200,10 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     qstashNextSigningKey: env.QSTASH_NEXT_SIGNING_KEY ?? null,
     capabilityTokenSecret: capabilityTokenSecret ?? "dev-only-insecure-capability-secret",
     redisTcpUrl: env.REDIS_TCP_URL ?? null,
+    // A non-positive / non-numeric CHECK_EXPIRY_DAYS falls back to 7 rather
+    // than silently sweeping with 0 days (which would expire every draft on
+    // the next run).
+    checkExpiryDays: env.CHECK_EXPIRY_DAYS && Number(env.CHECK_EXPIRY_DAYS) > 0 ? Number(env.CHECK_EXPIRY_DAYS) : 7,
     webBaseUrl: env.WEB_BASE_URL ?? null,
     revalidateSecret: env.REVALIDATE_SECRET ?? null,
     pipelineCallbackSecret: env.PIPELINE_CALLBACK_SECRET ?? null,

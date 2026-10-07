@@ -49,6 +49,23 @@ describe("internal routes — signature verification", () => {
     await app.close();
   });
 
+  it("rejects /internal/checks/sweep-expired with no/invalid signature (fail closed)", async () => {
+    const app = await buildApp({ logger: false, signatureVerifier: deny });
+    const res = await app.inject({ method: "POST", url: "/internal/checks/sweep-expired", payload: {} });
+    expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("503s /internal/checks/sweep-expired past verification when DB is unavailable (in-memory mode)", async () => {
+    // Like the drain route, the expiry sweep writes checks/submissions/
+    // audit_log, so it needs a real DB — past signature verification it 503s
+    // in in-memory mode rather than silently no-opping.
+    const app = await buildApp({ logger: false, signatureVerifier: allow });
+    const res = await app.inject({ method: "POST", url: "/internal/checks/sweep-expired", payload: {} });
+    expect(res.statusCode).toBe(503);
+    await app.close();
+  });
+
   it("runs /internal/entitlements/sweep past verification via the (in-memory) repo — no DB 503", async () => {
     // Unlike the db-gated drain route, the sweep goes through the entitlement
     // REPOSITORY, so it works in in-memory mode and returns a count.

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, lt, ne } from "drizzle-orm";
 import { schema, type Database } from "@fact-checker-ke/db";
 import type { EditorQueueItem } from "@fact-checker-ke/core";
 import { writeOutboxEvent } from "./outbox.js";
@@ -11,15 +11,43 @@ export type EditorialResult<T> = { ok: true; value: T } | { ok: false; error: { 
 const RIGHT_OF_REPLY_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 /**
- * ADR-0025 §2: the editor queue is every draft, unpublished check,
- * oldest first (FIFO matches the ADR's "sustainable throughput"
- * framing — no reordering by claim severity in this wave).
+ * A "held draft" is `checks.isDraft && publishedAt IS NULL`, AND whose
+ * owning submission has NOT yet been driven to its terminal `failed`
+ * status. That last clause is what makes a dismissal (an editor Dismiss
+ * or the auto-expiry sweep) actually REMOVE an item from the queue:
+ * neither flips `isDraft`/`publishedAt` (that pair means "published" —
+ * see `applyCheckDismissal`'s docblock for why we can't overload it), so
+ * the only durable "this draft is terminally closed" signal available
+ * without a schema change is the owning submission's `failed` status.
+ * The predicate is spelled out inline in each of the three queries below
+ * (editor queue, held-check list, expiry sweep) so each reads as a plain
+ * Drizzle `where`.
+ *
+ * ADR-0025 §2: the editor queue is every draft, unpublished check whose
+ * submission is not terminally closed, oldest first (FIFO matches the
+ * ADR's "sustainable throughput" framing — no reordering by claim
+ * severity in this wave). The `submissions` join + `status != 'failed'`
+ * filter is what drops a dismissed/auto-expired draft out of the queue
+ * (see `applyCheckDismissal`).
  */
 export async function getEditorQueue(db: Database): Promise<EditorQueueItem[]> {
   const draftChecks = await db
-    .select()
+    .select({
+      id: schema.checks.id,
+      submissionId: schema.checks.submissionId,
+      summary: schema.checks.summary,
+      rating: schema.checks.rating,
+      createdAt: schema.checks.createdAt,
+    })
     .from(schema.checks)
-    .where(and(eq(schema.checks.isDraft, true), isNull(schema.checks.publishedAt)))
+    .innerJoin(schema.submissions, eq(schema.submissions.id, schema.checks.submissionId))
+    .where(
+      and(
+        eq(schema.checks.isDraft, true),
+        isNull(schema.checks.publishedAt),
+        ne(schema.submissions.status, "failed"),
+      ),
+    )
     .orderBy(schema.checks.createdAt);
 
   const items: EditorQueueItem[] = [];
@@ -37,6 +65,61 @@ export async function getEditorQueue(db: Database): Promise<EditorQueueItem[]> {
     });
   }
   return items;
+}
+
+/**
+ * The richer sibling of `getEditorQueue` for the minimal editor-review
+ * UI (`apps/web/app/editor`): the same held-draft set, but carrying the
+ * ADR-0031 fields the review surface ranks/triages by (`riskTier`,
+ * `viralityScore`) and NO per-claim fan-out (the list view needs a row
+ * per check, not its named-person claim breakdown — that's the detail
+ * view's job). Deliberately NOT folded into `EditorQueueItem`
+ * (packages/core) so the shared type and its other consumers are
+ * untouched; this shape is local to the API read model.
+ */
+export interface HeldCheckListItem {
+  checkId: string;
+  submissionId: string;
+  summary: string;
+  rating: (typeof schema.checks.$inferSelect)["rating"];
+  riskTier: (typeof schema.checks.$inferSelect)["riskTier"];
+  viralityScore: number | null;
+  createdAt: string;
+}
+
+export async function listHeldChecks(db: Database): Promise<HeldCheckListItem[]> {
+  const rows = await db
+    .select({
+      checkId: schema.checks.id,
+      submissionId: schema.checks.submissionId,
+      summary: schema.checks.summary,
+      rating: schema.checks.rating,
+      riskTier: schema.checks.riskTier,
+      viralityScore: schema.checks.viralityScore,
+      createdAt: schema.checks.createdAt,
+    })
+    .from(schema.checks)
+    .innerJoin(schema.submissions, eq(schema.submissions.id, schema.checks.submissionId))
+    .where(
+      and(
+        eq(schema.checks.isDraft, true),
+        isNull(schema.checks.publishedAt),
+        ne(schema.submissions.status, "failed"),
+      ),
+    )
+    .orderBy(schema.checks.createdAt);
+
+  return rows.map((r) => ({
+    checkId: r.checkId,
+    submissionId: r.submissionId,
+    summary: r.summary,
+    rating: r.rating,
+    riskTier: r.riskTier,
+    // `virality_score` is a Postgres numeric -> string over the wire (same
+    // Number() coercion the feed/trending repositories apply).
+    viralityScore: r.viralityScore === null ? null : Number(r.viralityScore),
+    createdAt: r.createdAt.toISOString(),
+  }));
 }
 
 /**
@@ -235,6 +318,80 @@ export async function approveCheck(db: Database, args: ApproveArgs): Promise<Edi
   return { ok: true, value: { publishedAt: publishedAt.toISOString() } };
 }
 
+/**
+ * The ONE terminal-close transition for a held draft that will never be
+ * published — shared by an editor's explicit Dismiss (`rejectCheck`,
+ * actor = the signed-in editor) and the auto-expiry sweep
+ * (`sweepExpiredChecks`, actor = null, no human). Must run inside a
+ * caller-supplied transaction (`tx`).
+ *
+ * Terminal LEVER: it drives the OWNING SUBMISSION to `failed` — the only
+ * terminal value the submission status enum has — and deliberately does
+ * NOT touch `checks.isDraft`/`publishedAt`. Rationale:
+ *   - `isDraft=false && publishedAt IS NOT NULL` is THE "published"
+ *     invariant every read path keys off (feed, trending, repositories).
+ *     Flipping `isDraft=false` with a null `publishedAt` would also
+ *     un-redact a named-person draft at `GET /v1/checks/:id`
+ *     (routes/checks.ts gates the rating redaction on `check.isDraft`),
+ *     leaking a verdict that was never published. So the draft row is
+ *     left exactly as it is.
+ *   - Setting the submission `failed` instead (a) drops the draft from
+ *     the editor queue (getEditorQueue / listHeldChecks exclude
+ *     `submissions.status = 'failed'`) and (b) flips the item's PUBLIC
+ *     trending status `under_review -> dismissed`
+ *     (lib/trending-status.ts: a failed submission now outranks a held
+ *     draft).
+ *
+ * This is an out-of-band ADMIN transition: ADR-0017's state machine
+ * (`SUBMISSION_STATUS_TRANSITIONS`, where `ready: []`) forbids
+ * `ready -> failed` as a PIPELINE hop, but a human Dismiss / the expiry
+ * sweep is not a pipeline hop, so it writes the status directly rather
+ * than through `advanceWithInbox`.
+ *
+ * TECH DEBT (flagged, not hidden): the clean fix is a dedicated terminal
+ * state on `checks` itself (e.g. a `checks.status` enum with a
+ * `dismissed`/`expired` value) rather than overloading the owning
+ * submission's `failed`. That needs a schema migration (packages/db),
+ * which is out of this change's scope — see the handoff note. The
+ * overload's observable cost: a user-submitted (non-fetch) gated draft
+ * that expires shows `failed` on its submission tracker, which reads as
+ * "we couldn't process it" rather than "closed without a verdict".
+ */
+async function applyCheckDismissal(
+  tx: Database,
+  args: { checkId: string; submissionId: string; actorId: string | null; notes: string | null; reason: string },
+): Promise<void> {
+  await tx
+    .update(schema.submissions)
+    .set({ status: "failed", updatedAt: new Date() })
+    .where(eq(schema.submissions.id, args.submissionId));
+
+  // `review_actions.actor_id` is NOT NULL + FK to users, so the sweep
+  // (no human actor) records its terminal close in the audit log only;
+  // an editor Dismiss additionally writes the review_actions row.
+  if (args.actorId) {
+    await tx.insert(schema.reviewActions).values({
+      checkId: args.checkId,
+      actorId: args.actorId,
+      action: "reject",
+      notes: args.notes,
+      publicSafetyReason: null,
+    });
+  }
+  await writeAuditLog(tx, {
+    actorId: args.actorId,
+    action: "check.rejected",
+    targetType: "check",
+    targetId: args.checkId,
+    metadata: { reason: args.reason, ...(args.notes ? { notes: args.notes } : {}) },
+  });
+}
+
+/**
+ * Editor "Dismiss": terminally close a held draft (see
+ * `applyCheckDismissal`). Only a held draft can be dismissed — a
+ * published check is immutable (corrections are additive, `correctCheck`).
+ */
 export async function rejectCheck(
   db: Database,
   actorId: string,
@@ -243,12 +400,75 @@ export async function rejectCheck(
 ): Promise<EditorialResult<{ rejected: true }>> {
   const [check] = await db.select().from(schema.checks).where(eq(schema.checks.id, checkId)).limit(1);
   if (!check) return { ok: false, error: { kind: "not_found", message: "No such check." } };
+  if (!check.isDraft || check.publishedAt) {
+    return { ok: false, error: { kind: "already_published", message: "Only a held draft can be dismissed." } };
+  }
 
   await db.transaction(async (tx) => {
-    await tx.insert(schema.reviewActions).values({ checkId, actorId, action: "reject", notes, publicSafetyReason: null });
-    await writeAuditLog(tx, { actorId, action: "check.rejected", targetType: "check", targetId: checkId, metadata: { notes } });
+    await applyCheckDismissal(tx, {
+      checkId,
+      submissionId: check.submissionId,
+      actorId,
+      notes,
+      reason: "editor_dismiss",
+    });
   });
   return { ok: true, value: { rejected: true } };
+}
+
+export interface SweepExpiredResult {
+  expired: number;
+}
+
+/**
+ * Auto-expire sweep (ADR gated-item lifecycle): terminally closes every
+ * held draft older than `expiryDays` whose owning submission is not
+ * already `failed`, so gated named-person/political items that no editor
+ * ever actioned stop piling up in `under_review` forever. Idempotent:
+ * the `status != 'failed'` filter means a re-run skips rows a prior
+ * sweep already closed (no duplicate audit rows).
+ *
+ * Intended to be driven by a QStash cron hitting
+ * `POST /internal/checks/sweep-expired` (routes/internal.ts) — the
+ * schedule itself is created out-of-band, same no-always-on-worker
+ * policy as the outbox/retention sweeps (ADR-0017/0021).
+ *
+ * Performance: one UPDATE + (optionally) one audit insert per expired
+ * row inside a single transaction — O(n) in the number of expired
+ * drafts, which for a daily sweep of a human-review backlog is small.
+ * Flagged rather than micro-optimised to a bulk statement so the
+ * terminal-close path stays identical (one shared `applyCheckDismissal`)
+ * to the editor Dismiss.
+ */
+export async function sweepExpiredChecks(db: Database, opts: { expiryDays: number }): Promise<SweepExpiredResult> {
+  const cutoff = new Date(Date.now() - opts.expiryDays * 24 * 60 * 60 * 1000);
+  const expired = await db
+    .select({ checkId: schema.checks.id, submissionId: schema.checks.submissionId })
+    .from(schema.checks)
+    .innerJoin(schema.submissions, eq(schema.submissions.id, schema.checks.submissionId))
+    .where(
+      and(
+        eq(schema.checks.isDraft, true),
+        isNull(schema.checks.publishedAt),
+        lt(schema.checks.createdAt, cutoff),
+        ne(schema.submissions.status, "failed"),
+      ),
+    );
+
+  if (expired.length === 0) return { expired: 0 };
+
+  await db.transaction(async (tx) => {
+    for (const row of expired) {
+      await applyCheckDismissal(tx, {
+        checkId: row.checkId,
+        submissionId: row.submissionId,
+        actorId: null,
+        notes: null,
+        reason: "auto_expired",
+      });
+    }
+  });
+  return { expired: expired.length };
 }
 
 /**
