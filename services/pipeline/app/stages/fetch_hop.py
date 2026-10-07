@@ -39,6 +39,7 @@ is not yet collapsed by this hop. Flagged, not hidden.
 
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from collections.abc import Callable
@@ -47,13 +48,15 @@ from dataclasses import dataclass, field
 from app.models.hop_requests import AnalyzeHopRequest, HopContent
 from app.models.pipeline_io import AnalyzeResult
 from app.protocols.fetch_dedup_store import FetchDedupStore
-from app.protocols.fetch_source import FetchCandidate, FetchSource
+from app.protocols.fetch_source import FetchCandidate, FetchSource, FetchSourceError
 from app.protocols.llm_client import LlmClient
 from app.protocols.transcriber import Transcriber, TranscriptionError
 from app.stages.analyze import run_analyze_hop
 from app.stages.fetch_scoring import FetchScoringConfig, FetchScoringInput, score_candidate
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
 from app.stores.engine_breaker import EngineCostBreaker
+
+_log = logging.getLogger(__name__)
 
 # A pluggable "how does a surviving candidate actually become a tracked
 # submission" strategy. `run_fetch_hop`'s DEFAULT (`emit_submission=None`)
@@ -161,7 +164,15 @@ async def run_fetch_hop(
         return result
 
     for source in sources:
-        candidates = await source.poll(limit=limit_per_source)
+        # Per-source isolation: one source's typed failure (a 403'd RSS feed, a
+        # YouTube quota/network error) must NEVER abort the whole engine and the
+        # other sources with it. Log it and move on — the engine degrades to the
+        # sources that are up rather than returning nothing.
+        try:
+            candidates = await source.poll(limit=limit_per_source)
+        except FetchSourceError as exc:
+            _log.warning("fetch source %s failed, skipping: %s", source.platform, exc)
+            continue
         for candidate in candidates:
             result.candidates_observed += 1
             await _process_candidate(

@@ -14,7 +14,7 @@ from app.clients.triage_feed_source import TRIAGE_FEED_URLS_ENV
 from app.clients.youtube_fetch_source import YOUTUBE_API_KEY_ENV
 from app.fakes.fake_fetch_source import FakeFetchSource
 from app.fakes.fake_llm_client import FakeLlmClient
-from app.protocols.fetch_source import FetchCandidate
+from app.protocols.fetch_source import FetchCandidate, FetchSourceError
 from app.stages.fetch_hop import run_fetch_hop
 from app.stages.fetch_scoring import FetchScoringConfig
 from app.stores.fetch_dedup_memory import InMemoryFetchDedupStore
@@ -226,3 +226,26 @@ async def test_at_0032_3_max_emissions_per_run_caps_further_emissions() -> None:
 
     assert len(result.emitted) == 2
     assert result.capped_by_max_emissions == 1
+
+
+async def test_failing_source_is_isolated_not_fatal() -> None:
+    """ADR-0037 regression: a single source raising FetchSourceError (a 403'd RSS
+    feed, a YouTube quota error) must be skipped, never abort the whole engine.
+    Before the per-source try/except, one bad source 500'd the entire fetch hop."""
+
+    class _BoomSource:
+        platform = "triage_feed"
+
+        async def poll(self, *, limit: int = 20) -> list[FetchCandidate]:
+            raise FetchSourceError("feed 403 behind Cloudflare")
+
+    good = FakeFetchSource(platform="youtube", fixtures=[_candidate("youtube", "vid-high")])
+    result = await run_fetch_hop(
+        sources=[_BoomSource(), good],  # bad source first — must not block the good one
+        dedup_store=InMemoryFetchDedupStore(),
+        llm=FakeLlmClient(),
+        org_id="org-1",
+    )
+    assert result.candidates_observed == 1  # the good source still ran end-to-end
+    assert len(result.emitted) == 1
+    assert good.poll_count == 1
