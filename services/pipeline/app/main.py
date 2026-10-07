@@ -201,8 +201,11 @@ def _ensure_fetch_conn() -> None:
     _fetch_cost_breaker = PostgresEngineCostBreaker(_fetch_db_conn)
 
 
-@app.get("/healthz")
-async def healthz() -> dict[str, str]:
+# `/health` (NOT `/healthz`): Cloud Run's frontend intercepts any `*z` path on a
+# *.run.app URL and returns a branded 404 that never reaches the container, so
+# `/healthz` was unreachable in prod (see reference-cloudrun-gotchas). DB-free.
+@app.get("/health")
+async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
