@@ -12,6 +12,7 @@ from app.protocols.corroboration import CorroborationError, Stance
 class FakeCorroboration:
     def __init__(self) -> None:
         self._seeded: dict[str, tuple[Stance, list[str], float]] = {}
+        self._rescues: dict[str, tuple[Stance, str, list[str], float]] = {}
 
     def seed_stance(
         self, claim_text: str, stance: Stance, *, citations: list[str] | None = None, usd: float = 0.0
@@ -22,6 +23,15 @@ class FakeCorroboration:
         seeded = self._seeded.get(claim_text)
         if seeded is None:
             raise CorroborationError("FakeCorroboration: no seeded stance for this claim (default no-op).")
+        return seeded
+
+    def seed_rescue(self, claim_text: str, stance: Stance, text: str, *, citations: list[str], usd: float = 0.0) -> None:
+        self._rescues[claim_text] = (stance, text, citations, usd)
+
+    async def rescue(self, *, claim_text: str, language: str) -> tuple[Stance, str, list[str], float]:
+        seeded = self._rescues.get(claim_text)
+        if seeded is None:
+            raise CorroborationError("FakeCorroboration: no seeded rescue for this claim (default no-op).")
         return seeded
 
 

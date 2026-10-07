@@ -75,6 +75,18 @@ class Corroboration(Protocol):
         """
         ...
 
+    async def rescue(self, *, claim_text: str, language: str) -> tuple[Stance, str, list[str], float]:
+        """ADR-0036 grounded RESCUE: when the primary retrieval (Fact Check Tools
+        API) returns NO sources, grounded web search assesses the claim and
+        returns `(stance, assessment_text, citation_urls, usd_cost)` — a reader-
+        facing sourced paragraph the verify draft can cite as evidence, so a
+        claim the sparse Fact Check DB misses gets a cited verdict instead of
+        dying at "inconclusive". Grounding is ALWAYS on for a rescue (it is the
+        whole point). Must raise `CorroborationError` on any expected failure so
+        the caller degrades to the normal no-source draft (unchanged behaviour).
+        """
+        ...
+
 
 __all__ = [
     "NO_SECOND_OPINION",

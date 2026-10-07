@@ -125,6 +125,35 @@ against production labels, and the UI transparency chip. These do not weaken the
 zero-lift safety guarantee (no key ⇒ no agreement data to persist; shadow +
 artifact-absence ⇒ no lift regardless).
 
+## Grounded RESCUE (2026-10-08) — the change that unsticks the feed
+
+Discovered by pushing live test claims: the verify draft's ONLY retrieval source
+is the Google Fact Check Tools API, which is SPARSE (it matches only claims
+already in a fact-check DB). Most claims return NO sources → the draft rates
+"inconclusive" (~0.30) → held → nothing publishes. Corroboration only fires on
+boundary drafts (0.85–0.95), so it never rescued that no-source mass. Proven: 3
+claims FactCheck returned nothing for were each assessed correctly by grounded
+Gemini (4–10 citations).
+
+**Decision:** when Fact Check retrieval returns NO sources, call
+`Corroboration.rescue(claim)` — grounded Gemini web search returns a stance + a
+sourced assessment paragraph + citation URLs. The assessment is added as a
+retrieved doc the draft cites (ADR-0023 citation integrity holds: the quoted span
+is a substring of the provided grounded text), and the citation URLs become
+`tier4_unverified` evidence (clearly AI-grounded). The claim then flows through
+the normal publish policy + audit. Flagged (`GROUNDED_RESCUE_ENABLED`, default
+on), cost-bounded (shared "corroboration" daily lane), and FAIL-OPEN (any error
+degrades to the unchanged no-source draft). Verified end-to-end with real models:
+"bleach cures COVID-19" (FactCheck: nothing) → rescue → draft False @0.97, cites
+the grounded assessment, 2 tier4 evidence items, auto_publish=True (Tier A,
+100%-audited). Tier C (named-person) still never auto-publishes.
+
+Trade-offs: grounded citations are AI-selected (tier4, not primary-verified) and
+arrive as Vertex grounding-redirect URLs; a Gemini call per no-source claim
+(bounded by the cost lane — raise `CORROBORATION_ENGINE_DAILY_BUDGET_USD` for
+volume). This is where a cheap primary drafter (e.g. DeepSeek) + grounded Gemini
+rescue is the strong low-cost combination.
+
 ## Phase-2 calibration run (2026-10-07) — signal proven, flip correctly withheld
 
 Ran the golden-set harness (`app/eval/corroboration_calibration.py`, 55 curated
