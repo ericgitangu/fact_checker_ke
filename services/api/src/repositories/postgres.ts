@@ -12,6 +12,7 @@ import { createDb, schema, type Database } from "@fact-checker-ke/db";
 import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import { deriveTrendingStatus } from "../lib/trending-status.js";
+import { cleanTrendingTitle } from "../lib/trending-title.js";
 import type {
   CheckRepository,
   DeviceTokenRepository,
@@ -387,8 +388,11 @@ export class PostgresTrendingRepository implements TrendingRepository {
         // The fetch submission's `text` is the discovered claim/video title
         // (youtube_fetch_source.py sets it to "title\ndescription"). It is
         // always present for a fetch row (the XOR constraint: fetch is a
-        // text submission), but guard defensively.
-        title: row.text ?? "",
+        // text submission), but guard defensively. Cleaned for DISPLAY only
+        // (drops the ad block + hashtag wall + repeated-title echo that
+        // YouTube descriptions carry); the raw `submissions.text` is left
+        // intact for the pipeline's claim detection — see lib/trending-title.ts.
+        title: cleanTrendingTitle(row.text),
         platform: row.platform,
         sourceUrl: row.sourceUrl,
         viralityScore: row.viralityScore === null ? null : Number(row.viralityScore),
