@@ -125,6 +125,25 @@ against production labels, and the UI transparency chip. These do not weaken the
 zero-lift safety guarantee (no key ⇒ no agreement data to persist; shadow +
 artifact-absence ⇒ no lift regardless).
 
+## Activation log (2026-10-07)
+
+- **Ungrounded, free (Developer API key):** verified `gemini-3.8-flash` works on
+  the free tier (`gemini-2.0-flash` retired); grounding 429s on free. Key stored
+  in Secret Manager; pipeline rev 00018-7vq ran ungrounded + shadow + a dedicated
+  ~$0.30/day corroboration spend lane.
+- **Grounded, via Vertex AI (billed in the fact-checker-ke project):** enabled
+  `aiplatform.googleapis.com`, granted `fcke-pipeline-runtime` `roles/aiplatform.user`,
+  set `GOOGLE_GENAI_USE_VERTEXAI=true` + `GEMINI_CORROBORATION_GROUNDED=true`,
+  model `gemini-2.5-flash` (Vertex serves this, not 3.8-flash), location `global`.
+  Smoke-verified through the real client: the Dangote-refinery claim → `supported`
+  (7 grounding citations), the COVID-microchip claim → `refuted` (15 citations).
+  Cost stays near-0 by the grounding-aware pre-spend estimate ($0.04/grounded
+  call) against the ~$0.30/day lane (~7 grounded calls/day). Vertex uses the
+  Cloud Run SA via ADC — **no raw key, no new billing slot** (the separate
+  Developer-key project is unbilled; `fact-checker-ke` is already billed on
+  01C382). Still **shadow mode**: grounding improves the agreement DATA; it does
+  not move any decision until the Phase-2 per-stratum artifact is fitted.
+
 **The single most important thing:** agreement contributes **zero** until
 P(correct | raw_confidence, agreement_state) is measured per stratum on held-out
 labels with a reported ECE — never a raw-confidence blend, and never a path that
