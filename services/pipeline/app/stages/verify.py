@@ -20,6 +20,7 @@ any other source).
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -38,7 +39,18 @@ from app.models.pipeline_io import (
 )
 from app.prompts.templates import build_draft_verdict_prompt
 from app.protocols.check_store import CheckStore
-from app.protocols.corroboration import Corroboration
+from app.protocols.corroboration import Corroboration, CorroborationError
+
+# ADR-0036 grounded rescue: a grounded web assessment call costs ~$0.04 (same as
+# a grounded corroboration), charged to the shared "corroboration" daily lane.
+GROUNDED_RESCUE_USD = 0.04
+
+
+def _grounded_rescue_enabled() -> bool:
+    """When the Fact Check Tools API returns NO sources, consult grounded Gemini
+    for a sourced assessment the draft can cite (instead of an inconclusive,
+    held draft). Default ON; set GROUNDED_RESCUE_ENABLED=false to disable."""
+    return os.environ.get("GROUNDED_RESCUE_ENABLED", "true").strip().lower() != "false"
 from app.protocols.embedder import Embedder
 from app.protocols.factcheck_client import FactCheckClient
 from app.protocols.llm_client import LlmClient, LlmCompletionError
@@ -287,6 +299,39 @@ async def run_verify_hop(
                 credibility_tier=tier_for_url(hit.url),
                 published_at=hit.review_date,
             )
+
+    # --- grounded RESCUE (ADR-0036): the Fact Check Tools API is sparse — it only
+    # matches claims already in a fact-check database. When it returns NO sources
+    # the draft would rate "inconclusive" and be held, which is why most claims
+    # never publish. Instead, consult grounded Gemini web search for a sourced
+    # assessment the draft can cite (tier4_unverified, clearly AI-grounded), so
+    # the claim gets a real, cited verdict that flows through the normal publish
+    # policy + audit. Cost-bounded (shared "corroboration" daily lane) and
+    # fail-open: any error degrades to the unchanged no-source draft. ---
+    if not retrieved and _grounded_rescue_enabled() and request.claim_text.strip():
+        allow = True
+        if corroboration_breaker is not None:
+            try:
+                allow = not corroboration_breaker.record_spend("corroboration", GROUNDED_RESCUE_USD).hard_stopped
+            except Exception:  # noqa: BLE001 - cost metering must NEVER crash the verify hop
+                allow = False  # fail-closed: skip the billable rescue if we can't meter it
+        if allow:
+            try:
+                _rescue_stance, assessment_text, cite_urls, _usd = await corroboration_client.rescue(
+                    claim_text=request.claim_text, language=request.language
+                )
+                if assessment_text.strip() and cite_urls:
+                    rescue_doc_id = "grounded-web-assessment"
+                    retrieved.append(RetrievedDoc(doc_id=rescue_doc_id, text=assessment_text))
+                    source_meta[rescue_doc_id] = _SourceMeta(
+                        url=cite_urls[0],
+                        title="AI grounded web assessment (unverified)",
+                        publisher="grounded web search",
+                        credibility_tier=CredibilityTier.tier4_unverified,
+                        published_at=None,
+                    )
+            except CorroborationError:
+                pass  # fail-open: unchanged no-source draft path
 
     # --- draft verdict + citation integrity, retry once then fail ---
     last_error: Exception | None = None
