@@ -20,6 +20,14 @@ dependencies = [
   # Postgres-backed implementations sync avoids an async-Protocol
   # refactor across every existing caller/test double.
   "psycopg[binary]>=3.2.3",
+  # ADR-0036: the grounded second-opinion gate (Gemini API + Google Search
+  # grounding). Only app/clients/corroboration_gemini.py imports it, and that
+  # module is only imported when GEMINI_API_KEY is set (activate-on-keys), so a
+  # keyless deployment never touches it. anyio is already transitive (FastAPI),
+  # pinned here because corroboration_gemini.py imports it directly to run the
+  # sync SDK call off the event loop.
+  "google-genai>=0.3.0",
+  "anyio>=4.0.0",
 ]
 
 [dependency-groups]
