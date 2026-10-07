@@ -1112,10 +1112,25 @@ export const fetchObservations = pgTable(
     platform: text("platform").notNull(),
     nativeId: text("native_id").notNull(),
     contentHash: text("content_hash").notNull(),
+    // ADR-0037 (migration 0023): raw engagement counts observed at THIS
+    // snapshot ({views,likes,comments}) — same jsonb idiom as
+    // `submissions.engagement`. Velocity (Δengagement / Δtime) is only
+    // computable when the SAME (platform, native_id) can be recorded more
+    // than once over time, so this row is now one OBSERVATION in a
+    // time-series, not a single static "have we seen it" marker. Nullable:
+    // the pre-ADR-0037 layer-1 `record_observation` path (and every re-poll
+    // while FETCH_VELOCITY_REOBSERVE is off) still writes the marker row
+    // without an engagement snapshot, leaving this NULL.
+    engagement: jsonb("engagement").$type<{ views: number; likes: number; comments: number }>(),
     observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    uniqueIndex("fetch_observations_platform_native_id_idx").on(table.platform, table.nativeId),
+    // ADR-0037: was a UNIQUE index on (platform, native_id) — that made a
+    // second observation of the same viral item impossible, so velocity was
+    // forever a single static snapshot. Now a NON-unique composite index
+    // (platform, native_id, observed_at) so an item's observation history is
+    // still looked up cheaply, but re-observation is allowed.
+    index("fetch_observations_platform_native_id_idx").on(table.platform, table.nativeId, table.observedAt),
     index("fetch_observations_content_hash_idx").on(table.contentHash),
   ],
 );

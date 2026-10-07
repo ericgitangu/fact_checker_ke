@@ -20,10 +20,12 @@ from __future__ import annotations
 from datetime import datetime
 
 import psycopg
+from psycopg.types.json import Jsonb
 
 from app.protocols.fetch_dedup_store import (
     FetchCandidateRecord,
     FetchDedupStore,
+    FetchObservationHistory,
 )
 
 
@@ -43,15 +45,89 @@ class PostgresFetchDedupStore(FetchDedupStore):
         self, *, platform: str, native_id: str, content_hash: str, observed_at: datetime
     ) -> None:
         with self._conn.cursor() as cur:
+            # ADR-0037: the layer-1 "seen" marker — ONE row per item,
+            # idempotent on repeat (the OFF / pre-ADR-0037 behaviour). This
+            # used to be `ON CONFLICT (platform, native_id) DO NOTHING`, but
+            # migration 0023 dropped that UNIQUE index (to allow re-observation
+            # snapshots), so `ON CONFLICT` would now error with "no unique or
+            # exclusion constraint matching". A `WHERE NOT EXISTS` guard keeps
+            # this method's one-marker-per-item idempotency byte-for-byte
+            # identical without depending on the dropped constraint. The
+            # re-observation path uses `record_engagement_snapshot` instead.
             cur.execute(
                 """
                 INSERT INTO fetch_observations (platform, native_id, content_hash, observed_at)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (platform, native_id) DO NOTHING
+                SELECT %s, %s, %s, %s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM fetch_observations WHERE platform = %s AND native_id = %s
+                )
                 """,
-                (platform, native_id, content_hash, observed_at),
+                (platform, native_id, content_hash, observed_at, platform, native_id),
             )
         self._conn.commit()
+
+    def record_engagement_snapshot(
+        self,
+        *,
+        platform: str,
+        native_id: str,
+        content_hash: str,
+        observed_at: datetime,
+        engagement: dict[str, int],
+    ) -> None:
+        # ADR-0037: append a NEW observation row every time (no dedup) — the
+        # engagement time-series the velocity scorer diffs. Safe because
+        # migration 0023 replaced the UNIQUE (platform, native_id) index with
+        # a non-unique (platform, native_id, observed_at) one.
+        with self._conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO fetch_observations (platform, native_id, content_hash, observed_at, engagement)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (platform, native_id, content_hash, observed_at, Jsonb(engagement)),
+            )
+        self._conn.commit()
+
+    def observation_history(self, platform: str, native_id: str) -> FetchObservationHistory:
+        with self._conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT count(*)::int, min(observed_at), max(observed_at)
+                FROM fetch_observations
+                WHERE platform = %s AND native_id = %s
+                """,
+                (platform, native_id),
+            )
+            count_row = cur.fetchone()
+            assert count_row is not None
+            count, first_observed_at, latest_observed_at = count_row
+            if count == 0:
+                return FetchObservationHistory(
+                    count=0, first_observed_at=None, latest_observed_at=None, latest_engagement={}
+                )
+            # The engagement counts of the most-recent prior snapshot — the
+            # baseline the current observation's Δengagement is measured against.
+            cur.execute(
+                """
+                SELECT engagement FROM fetch_observations
+                WHERE platform = %s AND native_id = %s
+                ORDER BY observed_at DESC, id DESC
+                LIMIT 1
+                """,
+                (platform, native_id),
+            )
+            latest_row = cur.fetchone()
+            assert latest_row is not None
+            (latest_engagement,) = latest_row
+        return FetchObservationHistory(
+            count=count,
+            first_observed_at=first_observed_at,
+            latest_observed_at=latest_observed_at,
+            # NULL engagement (a marker-only row from the OFF path) reads as no
+            # measured engagement — treated as an empty snapshot, not an error.
+            latest_engagement=latest_engagement or {},
+        )
 
     def upsert_candidate(
         self, *, content_hash: str, claim_text: str, score: float, platform: str, observed_at: datetime
