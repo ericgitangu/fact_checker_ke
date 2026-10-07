@@ -45,6 +45,22 @@ module "secret_upstash_redis_rest_token" {
   ]
 }
 
+# ADR-0036: the grounded second-opinion gate's Gemini Developer API key.
+# Container + IAM only (no `_version` resource — value populated out-of-band via
+# `gcloud secrets versions add`, 2026-10-07). pipeline_runtime only (the api
+# never calls Gemini). Created live via gcloud; import before the next apply:
+#   terraform import 'module.secret_gemini_api_key.google_secret_manager_secret.this' \
+#     projects/fact-checker-ke/secrets/fact-checker-ke-gemini-api-key
+# (plus the per-accessor IAM member — see imports.tf for the convention).
+module "secret_gemini_api_key" {
+  source     = "../../modules/secret"
+  project_id = var.project_id
+  secret_id  = "fact-checker-ke-gemini-api-key"
+  accessors = [
+    google_service_account.pipeline_runtime.email,
+  ]
+}
+
 /**
  * Go-live plumbing (docs/runbooks/activate-on-keys-audit.md gap table).
  * Containers ONLY — no `_version` resource below either, same rule as

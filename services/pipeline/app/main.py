@@ -238,6 +238,10 @@ async def hop_verify(payload: VerifyHopRequest) -> VerifyResult:
         store=_hop_idempotency_store,
         reverse_image_search=_reverse_image_search,
         corroboration_client=_corroboration_client,
+        # ADR-0036 near-0 cost cap: the grounded second gate spends on its OWN
+        # daily "corroboration" budget lane (~$0.30/day ≈ 100 calls), isolated
+        # from the fetch/submission engines — reuses the same Postgres breaker.
+        corroboration_breaker=_fetch_cost_breaker,
     )
 
 
