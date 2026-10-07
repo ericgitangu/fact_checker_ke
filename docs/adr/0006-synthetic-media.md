@@ -29,6 +29,9 @@ Slower and less "magical" than an instant deepfake meter, but defensible.
 ## Review trigger
 Revisit if an independent benchmark shows a detector above 0.95 AUC in the wild on African-language audio or video.
 
+## Amendment 2026-10-07 — SynthID Detector went globally available (still no API)
+Google expanded the **SynthID Detector** to global availability (English) as a free **web tool** at synthid.com, covering AI-generated **images, video, and audio** (not text) and interoperating with content from Google, OpenAI, NVIDIA, Kakao, and soon Apple (per Google's announcement; figures are theirs). **This does NOT change Signal #2's status in our pipeline: there is still no public SynthID API**, so it cannot be called from `app/stages/synthetic_media_triage.py`. What changed: it is now a usable **manual** check — an editor reviewing a flagged image/video/audio item can run it through synthid.com by hand (surfaced as the existing "Synthetic-media signals detected — under review" path), rather than it being waitlist-gated. A missing watermark still does not prove authenticity (unchanged). Auto-integration remains blocked on an API; keep provenance-first (C2PA) + reverse-image as the automated signals. Note: SynthID is a *watermark/provenance* detector, orthogonal to the ADR-0036 grounded second-opinion gate (which corroborates textual CLAIMS, not media authenticity).
+
 ---
 ## Research round 2 (2026-10-03): amendments for grooming
 

@@ -150,12 +150,18 @@ module "pipeline_service" {
     YOUTUBE_PUBLISHED_AFTER_DAYS = "3"
     YOUTUBE_FETCH_QUERY          = "Kenya Ruto maandamano"
     API_BASE_URL                 = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
-    # ADR-0036 corroboration gate, near-0 MVP posture (reconciled 2026-10-07):
-    # SHADOW on (zero confidence lift until a per-stratum artifact is fitted),
-    # grounding OFF (billable/429s on free tier — ungrounded is free-tier
-    # eligible), and the dedicated daily spend lane capped tiny (~100 calls/day).
+    # ADR-0036 corroboration gate (reconciled 2026-10-07, rev w/ Vertex grounding):
+    # SHADOW on (zero confidence lift until a per-stratum artifact is fitted).
+    # GROUNDING ON via Vertex AI — authed by the pipeline SA's ADC
+    # (aiplatform.user), billed to this already-billed project, NO raw key. The
+    # dedicated daily spend lane stays tiny (~$0.30/day ≈ 7 grounded calls at the
+    # grounding-aware $0.04 estimate) to hold near-0 until monetization. Flip
+    # GEMINI_CORROBORATION_GROUNDED=false to fall back to free ungrounded.
     CORROBORATION_SHADOW_MODE             = "true"
-    GEMINI_CORROBORATION_GROUNDED         = "false"
+    GOOGLE_GENAI_USE_VERTEXAI             = "true"
+    GOOGLE_CLOUD_PROJECT                  = var.project_id
+    GOOGLE_CLOUD_LOCATION                 = "global"
+    GEMINI_CORROBORATION_GROUNDED         = "true"
     CORROBORATION_ENGINE_DAILY_BUDGET_USD = "0.30"
   }
 }

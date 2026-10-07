@@ -21,7 +21,11 @@ import os
 
 from app.protocols.corroboration import CorroborationError, Stance
 
-_MODEL = os.environ.get("GEMINI_CORROBORATION_MODEL", "gemini-3.8-flash")
+# Model availability differs by backend (verified 2026-10-07): the Developer API
+# serves gemini-3.8-flash (2.0-flash retired); Vertex AI serves gemini-2.5-flash
+# (3.8-flash not published there). Pick per-mode unless overridden explicitly.
+_DEVELOPER_MODEL = "gemini-3.8-flash"
+_VERTEX_MODEL = "gemini-2.5-flash"
 
 _PROMPT = (
     "You are an independent fact-checking assistant with web search. Using Google "
@@ -49,6 +53,13 @@ def _grounding_enabled() -> bool:
     # Default OFF: grounding (Google Search tool) is billable and quota-exhausts
     # on the free tier. Near-0 MVP runs ungrounded; flip to true with billing on.
     return os.environ.get("GEMINI_CORROBORATION_GROUNDED", "").strip().lower() == "true"
+
+
+def _model() -> str:
+    override = os.environ.get("GEMINI_CORROBORATION_MODEL")
+    if override:
+        return override
+    return _VERTEX_MODEL if _use_vertex() else _DEVELOPER_MODEL
 
 
 class RealGeminiCorroboration:
@@ -104,7 +115,7 @@ class RealGeminiCorroboration:
 
             response = await anyio.to_thread.run_sync(
                 lambda: self._client.models.generate_content(
-                    model=_MODEL,
+                    model=_model(),
                     contents=_PROMPT.format(claim=claim_text),
                     config=config,
                 )

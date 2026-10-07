@@ -16,6 +16,8 @@ the publish decision exactly as it would have been without a second gate.
 
 from __future__ import annotations
 
+import os
+
 from app.models.enums import Rating
 from app.models.pipeline_io import DraftVerdictOutput
 from app.protocols.corroboration import (
@@ -39,11 +41,19 @@ from app.stores.engine_breaker import Engine, EngineCostBreaker
 # where a confidence lift from agreement could actually flip hold -> auto.
 BOUNDARY_BAND = 0.10
 
-# Conservative flat pre-spend estimate (USD) charged to the cost breaker before
-# a grounded call; the real post-call cost is returned in CorroborationResult.usd
-# and reconciled by the caller/flywheel. Mirrors the "named, not magic" default
-# discipline used for the breaker budgets themselves.
-ESTIMATED_CALL_USD = 0.003
+# Pre-spend estimate (USD) charged to the cost breaker BEFORE a call. Grounding
+# (Google Search tool) is materially more expensive than a plain token call
+# (~$0.035/request for the search alone), so the estimate is grounding-aware:
+# with the default ~$0.30/day corroboration budget that is ~7 grounded calls/day
+# vs ~100 ungrounded — the daily cap is honoured in real dollars either way. The
+# real post-call cost is returned in CorroborationResult.usd for reconciliation.
+UNGROUNDED_CALL_USD = 0.003
+GROUNDED_CALL_USD = 0.04
+
+
+def _estimated_call_usd() -> float:
+    grounded = os.environ.get("GEMINI_CORROBORATION_GROUNDED", "").strip().lower() == "true"
+    return GROUNDED_CALL_USD if grounded else UNGROUNDED_CALL_USD
 
 
 def stance_from_rating(rating: Rating | None) -> Stance:
@@ -112,7 +122,7 @@ async def run_corroboration(
     # Cost breaker (pre-spend): if adding the estimated cost would hard-stop the
     # engine, do not make the call.
     if breaker is not None:
-        state = breaker.record_spend(engine, ESTIMATED_CALL_USD)
+        state = breaker.record_spend(engine, _estimated_call_usd())
         if state.hard_stopped:
             return no_second_opinion()
 
@@ -135,7 +145,8 @@ async def run_corroboration(
 
 __all__ = [
     "BOUNDARY_BAND",
-    "ESTIMATED_CALL_USD",
+    "GROUNDED_CALL_USD",
+    "UNGROUNDED_CALL_USD",
     "is_boundary_draft",
     "run_corroboration",
     "stance_from_rating",
