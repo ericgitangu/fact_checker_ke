@@ -30,6 +30,17 @@ resource "google_service_account" "migrate_runtime" {
   display_name = "DB migration Cloud Run Job identity (ADR-0016) — DIRECT connection only"
 }
 
+# ADR-0036: the grounded second-opinion gate reaches Gemini via Vertex AI
+# (GOOGLE_GENAI_USE_VERTEXAI) authenticated by this SA's ADC — not a raw key —
+# so grounding bills to the already-billed fact-checker-ke project. project-level
+# aiplatform.user is the minimum for generate_content + Search grounding.
+# Granted live 2026-10-07; mirrors the deploy SA's project_iam_member pattern.
+resource "google_project_iam_member" "pipeline_aiplatform_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.pipeline_runtime.email}"
+}
+
 # --- Deploy SA least privilege (bootstrap created the SA; IAM bindings
 # that need concrete resources live here, once those resources exist) ---
 
