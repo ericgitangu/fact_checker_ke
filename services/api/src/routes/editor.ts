@@ -10,9 +10,18 @@ import {
   correctCheck,
   getEditorQueue,
   issueRightOfReply,
+  listHeldChecks,
   recordRightOfReply,
   rejectCheck,
 } from "../lib/editorial.js";
+
+// The held-draft set is a single lifecycle state (`isDraft &&
+// publishedAt IS NULL`, submission not terminally failed). The `status`
+// query param is accepted for forward-compatible API shape and
+// validated, but every allowed value selects that same set today — the
+// UI passes it so the contract is explicit, not because the server
+// branches on it.
+const HeldStatusSchema = z.enum(["under_review", "draft"]).optional();
 
 const ApproveBodySchema = z.object({
   notes: z.string().max(4000).optional(),
@@ -37,6 +46,16 @@ export async function editorRoutes(app: FastifyInstance, deps: { db: Database; a
     return reply.status(200).send({ items: queue });
   });
 
+  // The minimal editor-review list (apps/web/app/editor): held, unpublished
+  // drafts carrying the ADR-0031 triage fields (riskTier, viralityScore).
+  // Same `guard` as every other editor route.
+  app.get<{ Querystring: { status?: string } }>("/v1/editor/checks", { preHandler: guard }, async (request, reply) => {
+    const parsed = HeldStatusSchema.safeParse(request.query?.status);
+    if (!parsed.success) return reply.status(400).send({ error: "validation_error", issues: parsed.error.issues });
+    const items = await listHeldChecks(db);
+    return reply.status(200).send({ items });
+  });
+
   app.post<{ Params: { id: string } }>("/v1/editor/checks/:id/approve", { preHandler: guard }, async (request, reply) => {
     const parsed = ApproveBodySchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.status(400).send({ error: "validation_error", issues: parsed.error.issues });
@@ -59,7 +78,10 @@ export async function editorRoutes(app: FastifyInstance, deps: { db: Database; a
     const parsed = RejectBodySchema.safeParse(request.body ?? {});
     if (!parsed.success) return reply.status(400).send({ error: "validation_error", issues: parsed.error.issues });
     const result = await rejectCheck(db, request.authUser!.id, request.params.id, parsed.data.notes ?? null);
-    if (!result.ok) return reply.status(404).send({ error: result.error.kind, message: result.error.message });
+    if (!result.ok) {
+      const status = result.error.kind === "not_found" ? 404 : 422;
+      return reply.status(status).send({ error: result.error.kind, message: result.error.message });
+    }
     return reply.status(200).send(result.value);
   });
 

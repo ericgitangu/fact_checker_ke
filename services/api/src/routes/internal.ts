@@ -12,6 +12,7 @@ import { advanceWithInbox } from "../lib/advance.js";
 import { runRetentionSweep } from "../lib/retention.js";
 import { runEntitlementSweep } from "../lib/entitlement-sweep.js";
 import { runSubmissionOrchestration } from "../lib/submission-orchestrator.js";
+import { sweepExpiredChecks } from "../lib/editorial.js";
 import type { EntitlementRepository } from "../repositories/types.js";
 
 const SubmissionAdvancedBodySchema = z.object({
@@ -46,6 +47,13 @@ export interface InternalRoutesDeps {
    * fail-safe spirit as the `db`-gated branches below.
    */
   entitlements?: EntitlementRepository;
+  /**
+   * Gated-item lifecycle: the held-draft auto-expiry window in days, used
+   * by `/internal/checks/sweep-expired`. Optional + defaulted to 7 so
+   * existing `InternalRoutesDeps` literals (predating this route) keep
+   * compiling; app.ts wires `config.checkExpiryDays`.
+   */
+  checkExpiryDays?: number;
 }
 
 async function verifyOrReject(
@@ -119,6 +127,24 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
       return reply.status(200).send({ expired: 0, note: "entitlement repository not wired; no-op" });
     }
     const result = await runEntitlementSweep(deps.entitlements);
+    return reply.status(200).send(result);
+  });
+
+  // Gated-item lifecycle: terminally close held drafts older than
+  // CHECK_EXPIRY_DAYS (default 7) that no editor ever actioned, so gated
+  // named-person/political items stop piling up in `under_review`
+  // forever. Same QStash signature verification as every other /internal
+  // route (fail-closed when no signing keys are set), and the same
+  // db-gated 503 as the drain route (it writes checks/submissions/
+  // audit_log, which the in-memory mode has no store for). The QStash
+  // CRON schedule is created out-of-band (no always-on worker, ADR-0017/
+  // 0021 policy) — see the handoff note for the exact command.
+  app.post("/internal/checks/sweep-expired", async (request, reply) => {
+    if (!(await verifyOrReject(request, reply, deps.verifier))) return;
+    if (!deps.db) {
+      return reply.status(503).send({ error: "db_unavailable" });
+    }
+    const result = await sweepExpiredChecks(deps.db, { expiryDays: deps.checkExpiryDays ?? 7 });
     return reply.status(200).send(result);
   });
 

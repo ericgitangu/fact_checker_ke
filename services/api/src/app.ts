@@ -271,6 +271,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       pipelineBaseUrl,
       verifier: signatureVerifier,
       isProduction: config.isProduction,
+      // Gated-item lifecycle: held-draft auto-expiry window for
+      // /internal/checks/sweep-expired (CHECK_EXPIRY_DAYS, default 7).
+      checkExpiryDays: config.checkExpiryDays,
       // ADR-0012 §3 (monetization v2): same entitlement repo the read/
       // webhook paths use, so the expiry sweeper (piggyback on
       // /internal/outbox/drain + the dedicated /internal/entitlements/sweep)
