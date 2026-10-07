@@ -196,10 +196,15 @@ def finalize_publish(
         stratified = load_stratified_calibration_artifact(stratified_calibration_artifact_path)
         if stratified is not None:
             stratum_conf = apply_stratified_calibration(stratified, agreement_state, raw_confidence)
+            # Agreement may only RAISE, disagreement may only LOWER — never the
+            # reverse. With the agreement-gated-floor artifact (ADR-0036 Phase-2),
+            # the agree curve is ~0 below the confidence floor, so `max` leaves a
+            # below-floor agreed draft at its baseline (no lift) and only lifts a
+            # genuinely high-confidence agreed draft to the measured correctness.
             calibrated_confidence = (
                 min(calibrated_confidence, stratum_conf)
                 if agreement_state == "disagree"
-                else stratum_conf
+                else max(calibrated_confidence, stratum_conf)
             )
 
     decision = decide_publish_policy(
