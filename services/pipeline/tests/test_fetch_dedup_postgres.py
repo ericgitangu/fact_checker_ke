@@ -5,7 +5,7 @@ otherwise."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from app.stores.fetch_dedup_postgres import PostgresFetchDedupStore
 
@@ -72,3 +72,41 @@ def test_mark_emitted_then_mark_dropped_is_a_noop_once_emitted(pg_conn) -> None:
     # mark_dropped is a no-op once status is already "emitted" (per the
     # Protocol's contract) -- status must still read "emitted".
     assert final_record.status == "emitted"
+
+
+# ADR-0037 (migration 0023): re-observation is now possible — the UNIQUE
+# (platform, native_id) index was replaced by a non-unique one, so the same
+# item can be recorded as MULTIPLE engagement snapshots over time. Requires
+# DATABASE_URL_TEST (skipped otherwise, like the tests above).
+
+
+def test_record_observation_marker_stays_idempotent_without_the_unique_index(pg_conn) -> None:
+    # The OFF-path layer-1 marker must still be ONE row per item even though
+    # the UNIQUE index (and its ON CONFLICT) is gone — the NOT EXISTS guard.
+    store = PostgresFetchDedupStore(pg_conn)
+    now = datetime.now(UTC)
+    store.record_observation(platform="youtube", native_id="vid-m", content_hash="h", observed_at=now)
+    store.record_observation(platform="youtube", native_id="vid-m", content_hash="h", observed_at=now)
+    assert store.observation_history("youtube", "vid-m").count == 1
+
+
+def test_record_engagement_snapshot_appends_rows_and_history_reads_them(pg_conn) -> None:
+    store = PostgresFetchDedupStore(pg_conn)
+    t0 = datetime.now(UTC)
+    t1 = t0 + timedelta(hours=2)
+    store.record_engagement_snapshot(
+        platform="youtube", native_id="vid-s", content_hash="h", observed_at=t0, engagement={"views": 1000}
+    )
+    store.record_engagement_snapshot(
+        platform="youtube", native_id="vid-s", content_hash="h", observed_at=t1, engagement={"views": 9000}
+    )
+
+    # A BRAND NEW store instance (simulating an instance recycle) still reads
+    # the full time-series back from Postgres.
+    fresh = PostgresFetchDedupStore(pg_conn)
+    history = fresh.observation_history("youtube", "vid-s")
+    assert history.count == 2  # both snapshots persisted — re-observation works
+    assert history.first_observed_at == t0
+    assert history.latest_observed_at == t1
+    assert history.latest_engagement == {"views": 9000}
+    assert fresh.seen_platform_item("youtube", "vid-s") is True

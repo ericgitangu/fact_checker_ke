@@ -74,3 +74,32 @@ def test_mark_dropped_on_pending_sets_dropped() -> None:
     store.mark_dropped("h1")
     record, _ = store.upsert_candidate(content_hash="h1", claim_text="t", score=0.1, platform="youtube", observed_at=_T1)
     assert record.status == "dropped"
+
+
+# ADR-0037: engagement-snapshot time-series (the inputs real velocity needs).
+
+
+def test_observation_history_empty_before_any_snapshot() -> None:
+    store = InMemoryFetchDedupStore()
+    history = store.observation_history("youtube", "vid-1")
+    assert history.count == 0
+    assert history.first_observed_at is None
+    assert history.latest_observed_at is None
+    assert history.latest_engagement == {}
+
+
+def test_record_engagement_snapshot_appends_a_time_series() -> None:
+    store = InMemoryFetchDedupStore()
+    store.record_engagement_snapshot(
+        platform="youtube", native_id="vid-1", content_hash="h1", observed_at=_T0, engagement={"views": 100}
+    )
+    store.record_engagement_snapshot(
+        platform="youtube", native_id="vid-1", content_hash="h1", observed_at=_T1, engagement={"views": 900}
+    )
+    history = store.observation_history("youtube", "vid-1")
+    assert history.count == 2  # both recorded — re-observation is possible
+    assert history.first_observed_at == _T0
+    assert history.latest_observed_at == _T1
+    assert history.latest_engagement == {"views": 900}  # most recent snapshot
+    # A snapshot also marks the item as seen (layer-1 consistency).
+    assert store.seen_platform_item("youtube", "vid-1") is True

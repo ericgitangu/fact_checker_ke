@@ -22,6 +22,7 @@ from app.protocols.fetch_dedup_store import (
     FetchCandidateRecord,
     FetchCandidateStatus,
     FetchDedupStore,
+    FetchObservationHistory,
 )
 
 
@@ -67,6 +68,12 @@ class InMemoryFetchDedupStore(FetchDedupStore):
     def __init__(self) -> None:
         self._seen_platform_items: set[tuple[str, str]] = set()
         self._candidates: dict[str, _MutableRecord] = {}
+        # ADR-0037: the engagement time-series per (platform, native_id),
+        # mirroring the Postgres `fetch_observations` rows the
+        # FETCH_VELOCITY_REOBSERVE path appends. Only written by
+        # `record_engagement_snapshot`; the pre-ADR-0037 `record_observation`
+        # path leaves this empty (it only needs the layer-1 "seen" set).
+        self._snapshots: dict[tuple[str, str], list[tuple[datetime, dict[str, int]]]] = {}
 
     def seen_platform_item(self, platform: str, native_id: str) -> bool:
         return (platform, native_id) in self._seen_platform_items
@@ -75,6 +82,33 @@ class InMemoryFetchDedupStore(FetchDedupStore):
         self, *, platform: str, native_id: str, content_hash: str, observed_at: datetime
     ) -> None:
         self._seen_platform_items.add((platform, native_id))
+
+    def record_engagement_snapshot(
+        self,
+        *,
+        platform: str,
+        native_id: str,
+        content_hash: str,
+        observed_at: datetime,
+        engagement: dict[str, int],
+    ) -> None:
+        self._seen_platform_items.add((platform, native_id))
+        self._snapshots.setdefault((platform, native_id), []).append((observed_at, dict(engagement)))
+
+    def observation_history(self, platform: str, native_id: str) -> FetchObservationHistory:
+        snaps = self._snapshots.get((platform, native_id))
+        if not snaps:
+            return FetchObservationHistory(
+                count=0, first_observed_at=None, latest_observed_at=None, latest_engagement={}
+            )
+        ordered = sorted(snaps, key=lambda s: s[0])
+        latest_at, latest_engagement = ordered[-1]
+        return FetchObservationHistory(
+            count=len(ordered),
+            first_observed_at=ordered[0][0],
+            latest_observed_at=latest_at,
+            latest_engagement=dict(latest_engagement),
+        )
 
     def upsert_candidate(
         self, *, content_hash: str, claim_text: str, score: float, platform: str, observed_at: datetime

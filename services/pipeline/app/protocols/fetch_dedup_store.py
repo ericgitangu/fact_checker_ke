@@ -38,6 +38,24 @@ class FetchCandidateRecord:
     last_observed_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class FetchObservationHistory:
+    """ADR-0037: a summary of the engagement snapshots already recorded for
+    one (platform, native_id) — the inputs the velocity scorer needs to turn
+    a static engagement snapshot into a real Δengagement/Δtime rate.
+
+    `count` is how many prior snapshots exist; `first_observed_at` /
+    `latest_observed_at` / `latest_engagement` describe the earliest and most
+    recent of them. All three are None/empty when `count == 0` (the first-ever
+    observation of this item — velocity is then 0, not an error). Only read on
+    the FETCH_VELOCITY_REOBSERVE path."""
+
+    count: int
+    first_observed_at: datetime | None
+    latest_observed_at: datetime | None
+    latest_engagement: dict[str, int]
+
+
 class FetchDedupStore(Protocol):
     def seen_platform_item(self, platform: str, native_id: str) -> bool:
         """Layer 1: has this exact (platform, native_id) already been
@@ -73,6 +91,30 @@ class FetchDedupStore(Protocol):
         revisits)."""
         ...
 
+    def record_engagement_snapshot(
+        self,
+        *,
+        platform: str,
+        native_id: str,
+        content_hash: str,
+        observed_at: datetime,
+        engagement: dict[str, int],
+    ) -> None:
+        """ADR-0037: append a NEW engagement observation of (platform,
+        native_id). Unlike `record_observation` (which keeps a single
+        layer-1 "seen" marker per item, idempotent on repeat), this stores
+        a time-series row on EVERY call, so velocity can be measured across
+        re-polls. Called only on the FETCH_VELOCITY_REOBSERVE path; it must
+        also mark the item as seen so `seen_platform_item` stays consistent."""
+        ...
+
+    def observation_history(self, platform: str, native_id: str) -> FetchObservationHistory:
+        """ADR-0037: summarize the engagement snapshots recorded for this
+        item BEFORE the current observation (see `FetchObservationHistory`).
+        Read only on the FETCH_VELOCITY_REOBSERVE path, to compute the real
+        velocity deltas that replace the pre-ADR-0037 constant placeholders."""
+        ...
+
     def mark_emitted(self, content_hash: str, *, submission_id: str) -> None:
         """Record that this candidate has produced its one
         submission.received emission (ADR-0032 §3/AT-0032-3) — a future
@@ -88,4 +130,9 @@ class FetchDedupStore(Protocol):
         ...
 
 
-__all__ = ["FetchCandidateRecord", "FetchCandidateStatus", "FetchDedupStore"]
+__all__ = [
+    "FetchCandidateRecord",
+    "FetchCandidateStatus",
+    "FetchDedupStore",
+    "FetchObservationHistory",
+]
