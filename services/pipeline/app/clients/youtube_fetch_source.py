@@ -60,6 +60,27 @@ def _published_after() -> str:
     return cutoff.isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+# ADR-0037 discovery-driver: keyword `search.list` (the default "search" mode)
+# surfaces whatever matches a query string, NOT what is actually trending in KE,
+# and costs 100 quota units. "trending" mode instead pulls YouTube's own
+# most-popular chart for Kenya (`videos.list?chart=mostPopular&regionCode=KE`),
+# filtered to a video category (default 25 = News & Politics, so the chart is KE
+# news rather than global entertainment) — 1 quota unit and virality-native. The
+# category id is overridable; "0" disables the category filter (whole-chart).
+_DISCOVERY_MODE_ENV = "YOUTUBE_DISCOVERY_MODE"
+_TRENDING_CATEGORY_ENV = "YOUTUBE_TRENDING_CATEGORY_ID"
+_DEFAULT_TRENDING_CATEGORY = "25"  # News & Politics
+
+
+def _discovery_mode() -> str:
+    return os.environ.get(_DISCOVERY_MODE_ENV, "search").strip().lower()
+
+
+def _trending_category_id() -> str | None:
+    cat = os.environ.get(_TRENDING_CATEGORY_ENV, _DEFAULT_TRENDING_CATEGORY).strip()
+    return cat if cat and cat != "0" else None
+
+
 class YouTubeFetchSource:
     """Real client. Requires YOUTUBE_API_KEY; raises FetchSourceError on
     first use without one (mirrors GoogleFactCheckClient's pattern) so a
@@ -79,7 +100,36 @@ class YouTubeFetchSource:
             raise FetchSourceError(
                 "YOUTUBE_API_KEY is not set; use FakeFetchSource in dev/test"
             )
+        if _discovery_mode() == "trending":
+            return await self._poll_trending(api_key=api_key, limit=limit)
+        return await self._poll_search(api_key=api_key, limit=limit)
 
+    async def _poll_trending(self, *, api_key: str, limit: int) -> list[FetchCandidate]:
+        """ADR-0037: YouTube's own most-popular chart for Kenya (virality-native,
+        1 quota unit) — no search.list, no keyword query. `videos.list` returns
+        snippet+statistics directly, so one call yields candidates."""
+        params = {
+            "part": "snippet,statistics",
+            "chart": "mostPopular",
+            "regionCode": "KE",
+            "maxResults": str(min(limit, 50)),
+            "key": api_key,
+        }
+        category = _trending_category_id()
+        if category:
+            params["videoCategoryId"] = category
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.get(_VIDEOS_URL, params=params)
+                resp.raise_for_status()
+                payload = resp.json()
+        except httpx.HTTPError as exc:
+            raise FetchSourceError(f"YouTube trending request failed: {exc}") from exc
+        except ValueError as exc:
+            raise FetchSourceError(f"YouTube trending returned invalid JSON: {exc}") from exc
+        return [_to_candidate(item) for item in payload.get("items", [])]
+
+    async def _poll_search(self, *, api_key: str, limit: int) -> list[FetchCandidate]:
         search_params = {
             "part": "snippet",
             "q": _env_query(),

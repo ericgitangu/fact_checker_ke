@@ -96,3 +96,49 @@ async def test_assess_also_translates(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(seen) == 2
     assert "Governor of Nairobi" in seen[1]
     assert stance == "supported"
+
+
+# --- ADR-0037 citation redirect resolution ---------------------------------
+import httpx
+
+from app.clients.corroboration_gemini import _resolve_citations
+
+_VERTEX = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/ABC"
+
+
+def _patch_httpx(monkeypatch: pytest.MonkeyPatch, handler) -> None:
+    orig = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx, "AsyncClient", lambda *a, **k: orig(*a, transport=httpx.MockTransport(handler), **k)
+    )
+
+
+async def test_resolves_vertex_redirect_to_real_domain(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CORROBORATION_RESOLVE_CITATIONS", "true")
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if "vertexaisearch" in str(req.url):
+            return httpx.Response(302, headers={"location": "https://nation.africa/kenya/news"})
+        return httpx.Response(200)
+
+    _patch_httpx(monkeypatch, handler)
+    out = await _resolve_citations([_VERTEX, "https://already.real/x"])
+    assert out[0] == "https://nation.africa/kenya/news"  # redirect followed
+    assert out[1] == "https://already.real/x"  # non-vertex URL left untouched
+
+
+async def test_resolve_flag_off_returns_raw(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CORROBORATION_RESOLVE_CITATIONS", "false")
+    out = await _resolve_citations([_VERTEX])
+    assert out == [_VERTEX]
+
+
+async def test_resolve_failure_keeps_raw_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CORROBORATION_RESOLVE_CITATIONS", "true")
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom")
+
+    _patch_httpx(monkeypatch, handler)
+    out = await _resolve_citations([_VERTEX])
+    assert out == [_VERTEX]  # fail-safe: never drop a source

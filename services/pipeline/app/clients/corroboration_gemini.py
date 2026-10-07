@@ -97,6 +97,53 @@ def _parse_stance(text: str) -> Stance:
     return "inconclusive"
 
 
+_VERTEX_REDIRECT_HOST = "vertexaisearch.cloud.google.com"
+
+
+def _resolve_citations_enabled() -> bool:
+    # Default ON: Vertex grounding returns opaque redirect URLs
+    # (vertexaisearch.cloud.google.com/grounding-api-redirect/...) that hide the
+    # real publisher. Resolving them surfaces the actual Kenyan source domain
+    # (nation.africa, standardmedia.co.ke, pesacheck.org, ...) in the evidence we
+    # show readers. Audit/disable via CORROBORATION_RESOLVE_CITATIONS=false.
+    return os.environ.get("CORROBORATION_RESOLVE_CITATIONS", "true").strip().lower() != "false"
+
+
+async def _resolve_citations(urls: list[str], *, timeout: float = 6.0) -> list[str]:
+    """Follow each Vertex grounding redirect to its real destination URL.
+    Best-effort and fail-safe: a URL that doesn't resolve (timeout, error, or
+    isn't a Vertex redirect) is kept as-is, so this can only improve the citation
+    list, never drop a source. Non-redirect URLs are passed through untouched."""
+    if not urls or not _resolve_citations_enabled():
+        return urls
+    import anyio
+    import httpx
+
+    resolved: dict[int, str] = {}
+
+    async def _one(i: int, url: str, client: httpx.AsyncClient) -> None:
+        if _VERTEX_REDIRECT_HOST not in url:
+            return
+        try:
+            resp = await client.head(url)
+            final = str(resp.url)
+            if final and _VERTEX_REDIRECT_HOST not in final:
+                resolved[i] = final
+        except Exception:  # noqa: BLE001 - keep the raw URL on any failure
+            return
+
+    try:
+        async with (
+            httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client,
+            anyio.create_task_group() as tg,
+        ):
+            for i, url in enumerate(urls):
+                tg.start_soon(_one, i, url, client)
+    except Exception:  # noqa: BLE001 - whole-batch failure -> return originals
+        return urls
+    return [resolved.get(i, u) for i, u in enumerate(urls)]
+
+
 def _use_vertex() -> bool:
     return os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").strip().lower() == "true"
 
@@ -206,7 +253,7 @@ class RealGeminiCorroboration:
             raise CorroborationError(f"Gemini corroboration call failed: {exc}") from exc
 
         stance = _parse_stance(getattr(response, "text", "") or "")
-        citations = _extract_citations(response)
+        citations = await _resolve_citations(_extract_citations(response))
         usd = _estimate_usd(response) + translate_usd
         return stance, citations, usd
 
@@ -234,7 +281,8 @@ class RealGeminiCorroboration:
         text = (getattr(response, "text", "") or "").strip()
         if not text:
             raise CorroborationError("Gemini rescue returned no text")
-        return _parse_stance(text), text, _extract_citations(response), _estimate_usd(response) + translate_usd
+        citations = await _resolve_citations(_extract_citations(response))
+        return _parse_stance(text), text, citations, _estimate_usd(response) + translate_usd
 
 
 def _extract_citations(response: object) -> list[str]:
