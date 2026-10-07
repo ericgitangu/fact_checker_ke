@@ -19,6 +19,7 @@ subset used here (item/title/link/pubDate/guid) needs nothing heavier.
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -29,6 +30,8 @@ import httpx
 from app.protocols.fetch_source import FetchCandidate, FetchSourceError
 
 TRIAGE_FEED_URLS_ENV = "TRIAGE_FEED_URLS"
+
+_log = logging.getLogger(__name__)
 
 
 def _parse_pub_date(raw: str | None) -> datetime:
@@ -61,17 +64,27 @@ class TriageFeedSource:
             )
         urls = [u.strip() for u in raw_urls.split(",") if u.strip()]
 
+        # Per-feed resilience (verified need 2026-10-08: Africa Check's RSS 403s
+        # behind Cloudflare server-side). A failing feed is logged and SKIPPED so
+        # it can never zero the whole Kenyan feed; we raise only if EVERY
+        # configured feed failed (so the caller logs "no candidates from this
+        # source" rather than silently returning empty on a total outage).
         candidates: list[FetchCandidate] = []
-        try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                for url in urls:
+        failures: list[str] = []
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            for url in urls:
+                try:
                     response = await client.get(url)
                     response.raise_for_status()
                     candidates.extend(_parse_rss(response.text))
-        except httpx.HTTPError as exc:
-            raise FetchSourceError(f"triage RSS feed request failed: {exc}") from exc
-        except ElementTree.ParseError as exc:
-            raise FetchSourceError(f"triage RSS feed returned invalid XML: {exc}") from exc
+                except (httpx.HTTPError, ElementTree.ParseError) as exc:
+                    _log.warning("triage feed skipped (%s): %s", url, exc)
+                    failures.append(url)
+
+        if failures and len(failures) == len(urls):
+            raise FetchSourceError(
+                f"all {len(urls)} triage RSS feed(s) failed; most recent: {failures[-1]}"
+            )
 
         candidates.sort(key=lambda c: c.observed_at, reverse=True)
         return candidates[:limit]
