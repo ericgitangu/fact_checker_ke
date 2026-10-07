@@ -11,8 +11,10 @@ import { TrendingCard } from "./trending-card";
  *  - renders NOTHING when there is nothing trending (self-hides, like
  *    `ViralSection`), so an instance with no fetch discoveries is unaffected;
  *  - degrades gracefully with any count;
- *  - leads with an honest note: these are items we're TRACKING, and a status
- *    of "Under review" means a human editor is assessing it — NOT a verdict.
+ *  - leads with an honest note: these are items we're TRACKING, not verdicts;
+ *    a status of "Under review" is a tracking state (a verdict is published
+ *    only once an item clears review), NOT a promise that a human is actively
+ *    assessing each one.
  *
  * It shows only each discovered video's own metadata + a tracking status — it
  * never renders a held draft's rating/summary (decision C).
