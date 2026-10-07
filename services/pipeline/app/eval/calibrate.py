@@ -204,6 +204,93 @@ def load_calibration_artifact(path: Path) -> CalibrationArtifact | None:
     )
 
 
+# --- ADR-0036: stratified calibration by second-opinion agreement_state ---
+# Agreement with the grounded second gate is a calibration FEATURE, not a
+# confidence. We fit a SEPARATE isotonic curve per agreement stratum ("agree",
+# "disagree", "no_second_opinion") and apply the curve for the item's stratum.
+# The confidence "lift" from agreement is then EXACTLY the measured gap between
+# the agree curve and the baseline on held-out data — an empirical number, never
+# a chosen bonus or a raw-confidence blend (ADR-0031 hard constraint 1). The
+# publish path only ever uses this when such an artifact EXISTS; its absence is
+# precisely what keeps the shadow-mode lift at zero.
+
+
+@dataclass(frozen=True)
+class StratifiedCalibrationArtifact:
+    """One `CalibrationArtifact` per `agreement_state` stratum. `apply` falls
+    back to the "baseline" stratum (then to raw) when a stratum is missing or
+    under-sampled, so a never-seen stratum can never fabricate a lift."""
+
+    by_stratum: dict[str, CalibrationArtifact]
+    fitted_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
+def fit_stratified_calibration(
+    samples_by_stratum: dict[str, list[tuple[float, bool]]],
+    *,
+    min_per_stratum: int = 30,
+) -> StratifiedCalibrationArtifact:
+    """Fit one isotonic curve per stratum that clears `min_per_stratum` samples
+    (ADR-0023 eval-gate discipline). Strata below the floor are OMITTED — never
+    fit on too-few points — so `apply_stratified_calibration` falls back for
+    them. Requires a 'baseline' stratum (all samples, or the no-second-opinion
+    slice) to exist as the fallback."""
+    by_stratum: dict[str, CalibrationArtifact] = {}
+    for stratum, samples in samples_by_stratum.items():
+        if len(samples) < min_per_stratum:
+            continue
+        fitted_points = fit_isotonic_calibration(samples)
+        by_stratum[stratum] = CalibrationArtifact(
+            fitted_points=fitted_points,
+            reliability_curve=compute_reliability_curve(samples),
+            ece=compute_ece(samples),
+            n_samples=len(samples),
+        )
+    return StratifiedCalibrationArtifact(by_stratum=by_stratum)
+
+
+def apply_stratified_calibration(
+    artifact: StratifiedCalibrationArtifact, stratum: str, raw_confidence: float
+) -> float:
+    """Calibrate `raw_confidence` using the curve for `stratum`, falling back to
+    the 'baseline' stratum, then to raw. Never raises; a missing stratum yields
+    the baseline (i.e. no lift), which is the safe default."""
+    curve = artifact.by_stratum.get(stratum) or artifact.by_stratum.get("baseline")
+    if curve is None:
+        return raw_confidence
+    return apply_calibration(curve, raw_confidence)
+
+
+def write_stratified_calibration_artifact(artifact: StratifiedCalibrationArtifact, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "by_stratum": {k: asdict(v) for k, v in artifact.by_stratum.items()},
+        "fitted_at": artifact.fitted_at,
+    }
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def load_stratified_calibration_artifact(path: Path) -> StratifiedCalibrationArtifact | None:
+    if not path.exists() or path.stat().st_size == 0:
+        return None
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    by_stratum = {
+        k: CalibrationArtifact(
+            fitted_points=[tuple(p) for p in v["fitted_points"]],
+            reliability_curve=[ReliabilityBin(**b) for b in v["reliability_curve"]],
+            ece=v["ece"],
+            n_samples=v["n_samples"],
+            fitted_at=v["fitted_at"],
+        )
+        for k, v in payload["by_stratum"].items()
+    }
+    return StratifiedCalibrationArtifact(by_stratum=by_stratum, fitted_at=payload["fitted_at"])
+
+
+def stratified_calibration_artifact_exists(path: Path) -> bool:
+    return path.exists() and path.stat().st_size > 0
+
+
 # ADR-0031 amendment (two-engine pivot) / AT-0031-9, AT-0025-7: the
 # human-audit sampling rate is a FUNCTION of measured calibration (an
 # output), not a hardcoded constant. No calibration artifact at all
@@ -257,13 +344,19 @@ __all__ = [
     "PILOT_AUDIT_SAMPLE_RATE",
     "CalibrationArtifact",
     "ReliabilityBin",
+    "StratifiedCalibrationArtifact",
     "apply_calibration",
+    "apply_stratified_calibration",
     "calibration_artifact_exists",
     "compute_audit_sample_rate",
     "compute_ece",
     "compute_reliability_curve",
     "fit_calibration_from_fixtures",
     "fit_isotonic_calibration",
+    "fit_stratified_calibration",
     "load_calibration_artifact",
+    "load_stratified_calibration_artifact",
+    "stratified_calibration_artifact_exists",
     "write_calibration_artifact",
+    "write_stratified_calibration_artifact",
 ]

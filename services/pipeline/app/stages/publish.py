@@ -25,16 +25,21 @@ pure policy function's already-tested contract.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.eval.calibrate import (
     apply_calibration,
+    apply_stratified_calibration,
     calibration_artifact_exists,
     load_calibration_artifact,
+    load_stratified_calibration_artifact,
+    stratified_calibration_artifact_exists,
 )
 from app.models.generated import Attribution
 from app.models.pipeline_io import VerifyResult
+from app.protocols.corroboration import NO_SECOND_OPINION, CorroborationResult
 from app.stages.publish_policy import PublishDecision, PublishPolicyFlags, decide_publish_policy
 from app.stages.risk_tier import (
     ImputationSeverity,
@@ -52,6 +57,23 @@ from app.stages.risk_tier import (
 # the stricter TAU_*_PRE_CALIBRATION thresholds.
 CALIBRATION_ARTIFACT_PATH = Path(__file__).resolve().parent.parent / "data" / "calibration_artifact.json"
 
+# ADR-0036: the per-agreement-stratum calibration artifact. Absent in this
+# build (no stratified fit run against production labels yet), so the second-
+# opinion lift is zero by construction — the same "absence gates it" discipline
+# as CALIBRATION_ARTIFACT_PATH above.
+STRATIFIED_CALIBRATION_ARTIFACT_PATH = (
+    Path(__file__).resolve().parent.parent / "data" / "calibration_artifact_by_agreement.json"
+)
+
+
+def _corroboration_shadow() -> bool:
+    """ADR-0036 shadow mode (default ON): capture agreement_state on the
+    flywheel but contribute ZERO confidence lift, until per-stratum correctness
+    is measured (calibration-before-thresholds). Belt-and-suspenders with the
+    artifact-absence gate — EITHER being true means no lift. Env override:
+    CORROBORATION_SHADOW_MODE=false (only once a stratified artifact is trusted)."""
+    return os.environ.get("CORROBORATION_SHADOW_MODE", "true").strip().lower() != "false"
+
 
 @dataclass(frozen=True)
 class PublishOutcome:
@@ -64,6 +86,10 @@ class PublishOutcome:
     risk_tier: RiskTier
     decision: PublishDecision
     summary: str | None
+    # ADR-0036: the second-opinion agreement feature, for the flywheel +
+    # transparency. Recorded on EVERY outcome (defaults to no_second_opinion);
+    # whether it moved the confidence depends on shadow mode + artifact presence.
+    corroboration_state: str = NO_SECOND_OPINION
 
 
 def _rendered_summary(verify_result: VerifyResult) -> str | None:
@@ -88,6 +114,8 @@ def finalize_publish(
     attribution: str = Attribution.not_applicable.value,
     flags: PublishPolicyFlags | None = None,
     calibration_artifact_path: Path = CALIBRATION_ARTIFACT_PATH,
+    corroboration: CorroborationResult | None = None,
+    stratified_calibration_artifact_path: Path = STRATIFIED_CALIBRATION_ARTIFACT_PATH,
 ) -> PublishOutcome:
     """The ONE call site for `decide_publish_policy` in the real pipeline.
     Called by `run_verify_hop` for every successful draft -- see
@@ -120,6 +148,10 @@ def finalize_publish(
         imputation_severity=resolved_severity,
     )
 
+    # ADR-0036: recorded on every outcome (flywheel + transparency), independent
+    # of whether it moves the confidence below.
+    agreement_state = corroboration.agreement_state if corroboration is not None else NO_SECOND_OPINION
+
     summary = _rendered_summary(verify_result)
     if summary is None:
         # FAIL CLOSED: never reach decide_publish_policy (and therefore
@@ -136,6 +168,7 @@ def finalize_publish(
                 "AT-0023-7 publish-time framing gate — refusing to auto-publish",
             ),
             summary=None,
+            corroboration_state=agreement_state,
         )
 
     calibration_present = calibration_artifact_exists(calibration_artifact_path)
@@ -146,6 +179,29 @@ def finalize_publish(
         if artifact is not None:
             calibrated_confidence = apply_calibration(artifact, raw_confidence)
 
+    # ADR-0036: a second-opinion AGREEMENT may adjust the calibrated confidence,
+    # but ONLY through the measured per-stratum calibration map — never a raw
+    # blend of two models' self-reported numbers. Four independent guards keep
+    # the shadow-mode lift at exactly zero: no second opinion, Tier C (named-
+    # person never auto), shadow mode ON (default), or no stratified artifact on
+    # disk. Agreement may raise confidence; disagreement may only lower it.
+    if (
+        agreement_state != NO_SECOND_OPINION
+        and raw_confidence is not None
+        and calibrated_confidence is not None
+        and tier is not RiskTier.C
+        and not _corroboration_shadow()
+        and stratified_calibration_artifact_exists(stratified_calibration_artifact_path)
+    ):
+        stratified = load_stratified_calibration_artifact(stratified_calibration_artifact_path)
+        if stratified is not None:
+            stratum_conf = apply_stratified_calibration(stratified, agreement_state, raw_confidence)
+            calibrated_confidence = (
+                min(calibrated_confidence, stratum_conf)
+                if agreement_state == "disagree"
+                else stratum_conf
+            )
+
     decision = decide_publish_policy(
         tier=tier,
         calibrated_confidence=calibrated_confidence,
@@ -153,7 +209,9 @@ def finalize_publish(
         flags=flags,
         summary=summary,
     )
-    return PublishOutcome(risk_tier=tier, decision=decision, summary=summary)
+    return PublishOutcome(
+        risk_tier=tier, decision=decision, summary=summary, corroboration_state=agreement_state
+    )
 
 
 __all__ = ["CALIBRATION_ARTIFACT_PATH", "PublishOutcome", "finalize_publish"]
