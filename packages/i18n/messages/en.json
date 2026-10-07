@@ -237,7 +237,7 @@
     },
     "trending": {
         "heading": "Trending now — what we're tracking",
-        "intro": "Viral clips our engine caught on the platforms we monitor, ranked by reach. These are items we're tracking — not verdicts. \"Under review\" means a human editor is still assessing it.",
+        "intro": "Viral clips our engine caught on the platforms we monitor, ranked by reach. We're tracking the spread — these are not verdicts. A verdict is published only once an item clears review.",
         "statusNote": "Tracking status — not a fact-check verdict.",
         "status": {
             "monitoring": "Monitoring",
@@ -273,10 +273,25 @@
       "empty": "No drafts awaiting review.",
       "heading": "Pending drafts"
     },
+    "queue": {
+      "tokenLabel": "Editor session token",
+      "tokenHint": "Paste the bearer token from your editor sign-in. It is sent only to the fact-check API, which authorises every action.",
+      "load": "Load queue",
+      "loading": "Loading…",
+      "reach": "Reach",
+      "riskTier": "Risk tier",
+      "approved": "Approved & published.",
+      "dismissed": "Dismissed.",
+      "authError": "Not authorised. Check your editor session token and role.",
+      "loadError": "Could not load the review queue.",
+      "actionError": "That action did not complete. Try again."
+    },
     "action": {
       "approve": "Approve & publish",
       "correct": "Correct & publish",
-      "publishing": "Publishing…"
+      "dismiss": "Dismiss",
+      "publishing": "Publishing…",
+      "dismissing": "Dismissing…"
     },
     "noRatingToSubmitter": "Rating withheld from the submitter until published (AT-0004-B)."
   },
