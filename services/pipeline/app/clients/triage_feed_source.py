@@ -19,8 +19,10 @@ subset used here (item/title/link/pubDate/guid) needs nothing heavier.
 
 from __future__ import annotations
 
+import html
 import logging
 import os
+import re
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from xml.etree import ElementTree
@@ -93,22 +95,64 @@ class TriageFeedSource:
         return candidates[:limit]
 
 
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_html(raw: str) -> str:
+    """De-HTML an RSS <description>. Google News ships the description as an
+    anchor tag echoing the headline (`<a ...>Headline</a>&nbsp;<font>Publisher`),
+    so strip tags + unescape entities before it reaches claim-text; PesaCheck's
+    plain-prose descriptions pass through unchanged (no tags, nothing to strip)."""
+    text = _HTML_TAG_RE.sub(" ", raw)
+    text = html.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _strip_publisher_suffix(title: str, source: str) -> str:
+    """Google News appends ` - <publisher>` to every <title>, where <publisher>
+    is exactly the <source> element text. Strip only that exact suffix (never a
+    bare ` - ` split, which would maul headlines that legitimately contain one);
+    PesaCheck/Africa Check items have no <source>, so `source` is empty and the
+    title is returned untouched."""
+    if source:
+        suffix = f" - {source}"
+        if title.endswith(suffix):
+            return title[: -len(suffix)].strip()
+    return title
+
+
 def _parse_rss(xml_text: str) -> list[FetchCandidate]:
     root = ElementTree.fromstring(xml_text)
     items: list[FetchCandidate] = []
     for item in root.iter("item"):
-        title = (item.findtext("title") or "").strip()
+        raw_title = (item.findtext("title") or "").strip()
         link = (item.findtext("link") or "").strip()
-        description = (item.findtext("description") or "").strip()
-        guid = (item.findtext("guid") or link or title).strip()
+        source = (item.findtext("source") or "").strip()
+        description = _strip_html((item.findtext("description") or "").strip())
+        guid = (item.findtext("guid") or link or raw_title).strip()
         if not guid:
             continue
+
+        title = _strip_publisher_suffix(raw_title, source)
+        # Google News' de-HTML'd description just re-states the headline (+
+        # publisher), so folding it in would duplicate the title. Only append a
+        # description that adds genuinely new prose (PesaCheck's summary blurb).
+        if description and description != title and title not in description:
+            text = f"{title}\n{description}".strip()
+        else:
+            text = title
         items.append(
             FetchCandidate(
                 platform="triage_feed",
                 native_id=guid,
                 title=title,
-                text=f"{title}\n{description}".strip(),
+                text=text,
+                # Google News links are opaque news.google.com/rss/articles/<b64>
+                # redirects; stored as-is (resolving each would cost one HTTP
+                # round-trip per item). poll()'s follow_redirects=True only
+                # affects feed fetches, not these per-item links — verify-hop
+                # resolves the real article URL downstream. For PesaCheck this is
+                # already the canonical article URL.
                 url=link,
                 observed_at=_parse_pub_date(item.findtext("pubDate")),
             )
