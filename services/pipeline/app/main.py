@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.clients.corroboration_factory import make_corroboration_client
 from app.clients.embedder_factory import make_embedder
 from app.clients.factcheck_api import make_factcheck_client
 from app.clients.fetch_source_factory import make_fetch_sources
@@ -93,6 +94,12 @@ _hop_idempotency_store = InMemoryIdempotencyStore()
 # the "why" and the future real-vendor swap point.
 _provenance_checker = make_provenance_checker()
 _reverse_image_search = make_reverse_image_search()
+# ADR-0036: the grounded second gate. No GEMINI_API_KEY -> FakeCorroboration ->
+# the verify hop fails closed to no_second_opinion (zero effect). Activates the
+# moment the owner adds the key to Secret Manager (activate-on-keys), and even
+# then contributes zero confidence lift until CORROBORATION_SHADOW_MODE=false
+# with a fitted per-stratum artifact present.
+_corroboration_client = make_corroboration_client()
 _synthetic_media_detector = FakeSyntheticMediaDetector()
 _abuse_scan = FakeAbuseScan()
 # ADR-0032: the autonomous fetch engine's sources + dedup store. Sources
@@ -230,6 +237,7 @@ async def hop_verify(payload: VerifyHopRequest) -> VerifyResult:
         factcheck_client=_factcheck_client,
         store=_hop_idempotency_store,
         reverse_image_search=_reverse_image_search,
+        corroboration_client=_corroboration_client,
     )
 
 
