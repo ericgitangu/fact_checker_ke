@@ -29,6 +29,7 @@ from app.models.enums import CredibilityTier
 from app.models.hop_requests import VerifyHopRequest
 from app.models.pipeline_io import (
     Citation,
+    CorroborationPayload,
     DraftVerdictOutput,
     PublishDecisionPayload,
     UsageRecord,
@@ -37,12 +38,14 @@ from app.models.pipeline_io import (
 )
 from app.prompts.templates import build_draft_verdict_prompt
 from app.protocols.check_store import CheckStore
+from app.protocols.corroboration import Corroboration
 from app.protocols.embedder import Embedder
 from app.protocols.factcheck_client import FactCheckClient
 from app.protocols.llm_client import LlmClient, LlmCompletionError
 from app.protocols.reverse_image import ReverseImageSearch, ReverseImageSearchError
 from app.registry.credibility import render_registry_as_prompt_context, tier_for_url
 from app.stages.citation_guard import CitationIntegrityError, RetrievedDoc, verify_citations
+from app.stages.corroboration import run_corroboration
 from app.stages.dedup_guard import may_reuse
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
 from app.stages.json_extract import strip_code_fences
@@ -147,8 +150,18 @@ async def run_verify_hop(
     factcheck_client: FactCheckClient,
     store: InMemoryIdempotencyStore | None = None,
     reverse_image_search: ReverseImageSearch | None = None,
+    corroboration_client: Corroboration | None = None,
 ) -> VerifyResult:
     store = store or InMemoryIdempotencyStore()
+    if corroboration_client is None:
+        # Fakes-first default, same convention as `reverse_image_search`: a
+        # caller that doesn't wire the ADR-0036 second gate gets the
+        # deterministic fake (which fails closed to no_second_opinion), so
+        # existing verify-hop callers are a pure no-op. app/main.py passes the
+        # env-selected instance (app/clients/corroboration_factory.py).
+        from app.fakes.fake_corroboration import FakeCorroboration
+
+        corroboration_client = FakeCorroboration()
     if reverse_image_search is None:
         # Fakes-first default, same convention as `store` above: a
         # caller that doesn't wire a ReverseImageSearch (most existing
@@ -301,13 +314,33 @@ async def run_verify_hop(
             # finalize_publish), for every completed draft on either
             # engine (submission today; the ADR-0032 fetch engine once
             # it converges on this same hop).
+            # ADR-0036: the independent grounded second gate, run ONLY on the
+            # decision-boundary slice (see run_corroboration's sampling). Its
+            # agreement feeds finalize_publish via the calibration map (zero
+            # lift in shadow mode); any failure fails closed to no_second_opinion.
+            corroboration = await run_corroboration(
+                draft=draft,
+                claim_text=request.claim_text,
+                language=request.language,
+                named_person_involved=request.named_person_involved,
+                attribution=request.attribution.value,
+                client=corroboration_client,
+            )
             outcome = finalize_publish(
                 result,
                 named_person_involved=request.named_person_involved,
                 attribution=request.attribution.value,
+                corroboration=corroboration,
             )
             result = result.model_copy(
                 update={
+                    "corroboration": CorroborationPayload(
+                        agreement_state=corroboration.agreement_state,
+                        second_opinion_stance=corroboration.second_opinion_stance,
+                        model=corroboration.model,
+                        grounding_citations=list(corroboration.grounding_citations),
+                        usd=corroboration.usd,
+                    ),
                     "publish": PublishDecisionPayload(
                         risk_tier=outcome.risk_tier.value,
                         auto_publish=outcome.decision.auto_publish,
@@ -315,7 +348,8 @@ async def run_verify_hop(
                         publish_mode=outcome.decision.publish_mode,
                         queued_for_async_audit=outcome.decision.queued_for_async_audit,
                         requires_human_tap=outcome.decision.requires_human_tap,
-                    )
+                        corroboration_state=outcome.corroboration_state,
+                    ),
                 }
             )
             store.set(cache_key, result)

@@ -114,6 +114,11 @@ class PublishDecisionPayload(BaseModel):
     publish_mode: str | None = None
     queued_for_async_audit: bool = False
     requires_human_tap: bool = False
+    # ADR-0036: the second-opinion agreement feature behind this decision
+    # ("agree" | "disagree" | "no_second_opinion"), for the flywheel +
+    # a UI transparency chip. In shadow mode it is recorded but did not move
+    # the decision. Nullable/defaulted so every existing caller is unaffected.
+    corroboration_state: str | None = None
 
 
 class VerifyEvidence(BaseModel):
@@ -138,12 +143,31 @@ class VerifyEvidence(BaseModel):
     published_at: str | None = None
 
 
+class CorroborationPayload(BaseModel):
+    """ADR-0036: the grounded second-opinion result, carried so services/api can
+    persist the agreement feature onto the flywheel (training_eval_labels) and
+    render a transparency chip. `grounding_citations` are an AGREEMENT SIGNAL
+    ONLY — never auto-ingested as citable evidence without the ADR-0023 §2
+    citation-integrity check."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    agreement_state: str
+    second_opinion_stance: str | None = None
+    model: str | None = None
+    grounding_citations: list[str] = Field(default_factory=list)
+    usd: float = Field(default=0.0, ge=0)
+
+
 class VerifyResult(BaseModel):
     """Final /hops/verify response: the citation-checked, gated verdict."""
 
     model_config = ConfigDict(extra="forbid")
 
     verdict: DraftVerdictOutput | None
+    # ADR-0036: the independent second-gate result (None when no second opinion
+    # was sought/available). Additive + nullable — existing callers unaffected.
+    corroboration: CorroborationPayload | None = None
     # The citation-checked sources behind `verdict`, for services/api to
     # persist as the published Check's `evidence[]` (ADR-0031 AT-0031-1).
     # Empty for the reused-existing-check short-circuit and for a draft the
