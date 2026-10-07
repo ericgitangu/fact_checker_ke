@@ -123,6 +123,13 @@ module "pipeline_service" {
     PIPELINE_CALLBACK_SECRET = {
       secret = module.secret_pipeline_callback_secret.secret_id
     }
+    # ADR-0036: the grounded second-opinion gate's Gemini key. Absent -> the
+    # corroboration client is the Fake (activate-on-keys) and the verify hop
+    # fails closed to no_second_opinion. Reconciled from the live pilot
+    # (2026-10-07, rev 00018-7vq).
+    GEMINI_API_KEY = {
+      secret = module.secret_gemini_api_key.secret_id
+    }
   }
   # Go-live safety (docs/runbooks/go-live.md §2.2, "belt-and-suspenders"):
   # app/main.py reads FETCH_ENGINE_ENABLED and defaults to "true" when
@@ -143,6 +150,13 @@ module "pipeline_service" {
     YOUTUBE_PUBLISHED_AFTER_DAYS = "3"
     YOUTUBE_FETCH_QUERY          = "Kenya Ruto maandamano"
     API_BASE_URL                 = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
+    # ADR-0036 corroboration gate, near-0 MVP posture (reconciled 2026-10-07):
+    # SHADOW on (zero confidence lift until a per-stratum artifact is fitted),
+    # grounding OFF (billable/429s on free tier — ungrounded is free-tier
+    # eligible), and the dedicated daily spend lane capped tiny (~100 calls/day).
+    CORROBORATION_SHADOW_MODE             = "true"
+    GEMINI_CORROBORATION_GROUNDED         = "false"
+    CORROBORATION_ENGINE_DAILY_BUDGET_USD = "0.30"
   }
 }
 
