@@ -125,6 +125,41 @@ against production labels, and the UI transparency chip. These do not weaken the
 zero-lift safety guarantee (no key ⇒ no agreement data to persist; shadow +
 artifact-absence ⇒ no lift regardless).
 
+## Phase-2 calibration run (2026-10-07) — signal proven, flip correctly withheld
+
+Ran the golden-set harness (`app/eval/corroboration_calibration.py`, 55 curated
+claims with independent verdicts, real draft + Vertex-grounded corroboration):
+
+- **The agreement signal is strong and real.** Measured across runs: when the
+  grounded gate AGREES the draft was correct ~82–89%; when it DISAGREES, ~3–9%;
+  baseline ~26–33%. Agree-minus-baseline correctness lift **+0.50 to +0.63**.
+  Disagree@high-confidence correctness was 0/N — agreement/disagreement is a
+  far better correctness predictor than the draft's own confidence.
+- **The flip was correctly WITHHELD** by the release gate. Two blockers, both
+  real (not fixable by a looser bar):
+  1. **The draft's raw confidence is bimodal** (~0.30 for inconclusive, ~0.80–
+     0.99 when confident, almost nothing between), so an isotonic curve fit per
+     stratum **saturates** — it maps everything ≥0.80 to ~1.0. A saturated curve
+     would auto-publish any mid-confidence agreed draft, so the gate's
+     non-saturation check rejects it. More data does NOT fix saturation.
+  2. **The flip-relevant slice is tiny.** `agree AND raw_conf ≥ 0.95` was 100%
+     correct but only **N=3** — statistically meaningless for an auto-publish
+     decision.
+- **Gate hardened** to catch this: agree stratum fitted (≥ min_per_stratum),
+  positive lift, agree ECE ≤ 0.15, AND the agree curve not saturated at the
+  boundary-band floor. The harness refuses to write an artifact unless all hold.
+
+**Consequence for the lift model (ADR-0036 amendment needed before a flip):**
+isotonic-on-the-draft's-raw-confidence is the wrong shape for a bimodal signal.
+The measured data instead supports an **agreement-gated rule with a high
+raw-confidence floor** (auto-publish a held Tier-A/B draft only when `agree` AND
+`raw_conf ≥ ~0.97` AND a hard verdict, still 100%-audited), once that slice
+reaches a defensible N (≈ ≥30, incl. Swahili/Sheng) via a larger golden set
+and/or accumulated live flywheel labels. Until then: **shadow stays ON, lift = 0.**
+The harness re-gates saved samples for free (`--samples-in`) and re-runs as the
+golden set grows or on exported live labels, so the flip becomes one command
+when the data clears the hardened bar.
+
 ## Activation log (2026-10-07)
 
 - **Ungrounded, free (Developer API key):** verified `gemini-3.8-flash` works on

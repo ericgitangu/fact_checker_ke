@@ -1,0 +1,55 @@
+{"claim_text": "COVID-19 vaccines contain microchips that are used to track people.", "language": "en", "golden_rating": "False"}
+{"claim_text": "5G mobile networks cause or spread COVID-19.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Drinking water frequently flushes the coronavirus out of your body and prevents infection.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Nairobi is the capital city of Kenya.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Kenya's 2010 Constitution created a devolved system of 47 county governments.", "language": "en", "golden_rating": "True"}
+{"claim_text": "The Kenyan shilling is the official currency of Kenya.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Mount Kenya is the highest mountain in Africa.", "language": "en", "golden_rating": "False"}
+{"claim_text": "The Maasai Mara National Reserve is located in Kenya.", "language": "en", "golden_rating": "True"}
+{"claim_text": "William Ruto was declared the winner of Kenya's 2022 presidential election.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Kenya gained independence from British colonial rule in 1963.", "language": "en", "golden_rating": "True"}
+{"claim_text": "The Great Rift Valley passes through Kenya.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Garlic cures HIV/AIDS.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Vaccines cause autism in children.", "language": "en", "golden_rating": "False"}
+{"claim_text": "The Earth is flat.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Human activity is the main driver of current global climate change.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Lake Victoria borders Kenya, Uganda and Tanzania.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Kenya is a landlocked country with no access to the ocean.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Eating raw onions overnight cures the common cold completely.", "language": "en", "golden_rating": "False"}
+{"claim_text": "The M-Pesa mobile money service originated in Kenya.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Nairobi National Park is a wildlife park located within a capital city.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Serikali ya Kenya ina kaunti arobaini na saba.", "language": "sw", "golden_rating": "True"}
+{"claim_text": "Chanjo za COVID-19 zina vidude vya kielektroniki vya kufuatilia watu.", "language": "sw", "golden_rating": "False"}
+{"claim_text": "Nairobi ndio mji mkuu wa Kenya.", "language": "sw", "golden_rating": "True"}
+{"claim_text": "Lugha rasmi za Kenya ni Kiswahili na Kiingereza.", "language": "sw", "golden_rating": "True"}
+{"claim_text": "Kunywa maji ya moto pekee huua virusi vya corona mwilini.", "language": "sw", "golden_rating": "False"}
+{"claim_text": "Mlima Kilimanjaro uko nchini Kenya.", "language": "sw", "golden_rating": "False"}
+{"claim_text": "Bananas contain radioactive potassium and a single banana will give you radiation poisoning.", "language": "en", "golden_rating": "False"}
+{"claim_text": "The Kenyan athlete Eliud Kipchoge was the first person to run a marathon distance in under two hours.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Antibiotics are effective at killing viruses such as the common cold.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Coffee is one of Kenya's major agricultural export crops.", "language": "en", "golden_rating": "True"}
+{"claim_text": "Bill Gates created COVID-19 to profit from vaccines.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Drinking bleach or chlorine dioxide cures COVID-19.", "language": "en", "golden_rating": "False"}
+{"claim_text": "The COVID-19 pandemic was a hoax and the virus does not exist.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Masks do nothing at all to reduce the spread of respiratory viruses.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Ivermectin is a proven cure for COVID-19 in humans.", "language": "en", "golden_rating": "False"}
+{"claim_text": "The 2020 United States presidential election was stolen through massive voter fraud.", "language": "en", "golden_rating": "False"}
+{"claim_text": "The Moon landings in 1969 were faked by NASA in a studio.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Chemtrails from aeroplanes are chemicals sprayed to control the population.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Microwaving food destroys all of its nutrients and makes it radioactive.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Humans only use 10 percent of their brains.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Vaccines contain aborted fetal cells injected into every dose.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Drinking celery juice every morning cures cancer.", "language": "en", "golden_rating": "False"}
+{"claim_text": "The HPV vaccine causes infertility in girls.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Lemon and baking soda is a scientifically proven cure for cancer.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Deworming tablets can be used as a reliable contraceptive.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Standing near a microwave oven while it runs gives you cancer.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Genetically modified (GMO) foods have been proven to cause cancer in humans.", "language": "en", "golden_rating": "False"}
+{"claim_text": "A full moon causes a measurable spike in crime and hospital admissions.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Sugar causes hyperactivity in children.", "language": "en", "golden_rating": "False"}
+{"claim_text": "You must drink exactly eight glasses of water a day or you will become dehydrated.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Cracking your knuckles causes arthritis.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Reading in dim light permanently damages your eyesight.", "language": "en", "golden_rating": "False"}
+{"claim_text": "5G towers were installed secretly to activate the microchips in COVID vaccines.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Hydroxychloroquine is a safe and effective cure for COVID-19.", "language": "en", "golden_rating": "False"}
+{"claim_text": "Climate change is a hoax invented to raise taxes.", "language": "en", "golden_rating": "False"}
