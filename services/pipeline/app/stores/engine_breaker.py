@@ -145,20 +145,27 @@ class PostgresEngineCostBreaker:
     def record_spend(self, engine: Engine, usd_cost: float) -> BreakerState:
         today = self._today()
         budget = configured_daily_budget_usd(engine)
-        with self._conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO engine_spend_daily (engine, day, usd_spent, daily_budget_usd)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (engine, day) DO UPDATE SET
-                    usd_spent = engine_spend_daily.usd_spent + EXCLUDED.usd_spent,
-                    updated_at = now()
-                RETURNING usd_spent, daily_budget_usd
-                """,
-                (engine, today, usd_cost, budget),
-            )
-            row = cur.fetchone()
-        self._conn.commit()
+        try:
+            with self._conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO engine_spend_daily (engine, day, usd_spent, daily_budget_usd)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (engine, day) DO UPDATE SET
+                        usd_spent = engine_spend_daily.usd_spent + EXCLUDED.usd_spent,
+                        updated_at = now()
+                    RETURNING usd_spent, daily_budget_usd
+                    """,
+                    (engine, today, usd_cost, budget),
+                )
+                row = cur.fetchone()
+            self._conn.commit()
+        except Exception:
+            # Roll the aborted transaction back so the SHARED connection is not
+            # left poisoned (InFailedSqlTransaction) for the next caller, then
+            # re-raise for the caller's own fail-closed handling.
+            self._conn.rollback()
+            raise
         assert row is not None
         usd_spent, daily_budget_usd = row
         return _state_from_totals(engine, float(usd_spent), float(daily_budget_usd))

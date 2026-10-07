@@ -1,0 +1,1 @@
+ALTER TYPE "public"."spend_engine" ADD VALUE 'corroboration';

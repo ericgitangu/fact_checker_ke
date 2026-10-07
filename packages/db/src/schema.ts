@@ -139,7 +139,9 @@ export const fetchCandidateStatusEnum = pgEnum("fetch_candidate_status", ["pendi
  * real enum, not a bare string, so a future submission-engine breaker
  * can reuse this exact table without a migration.
  */
-export const spendEngineEnum = pgEnum("spend_engine", ["fetch", "submission"]);
+// ADR-0036: "corroboration" is the grounded second-opinion / rescue daily-spend
+// lane (app/stores/engine_breaker.py), isolated from the fetch/submission engines.
+export const spendEngineEnum = pgEnum("spend_engine", ["fetch", "submission", "corroboration"]);
 
 /**
  * ADR-0031: the source of a flywheel-captured labeled row — an editor's
