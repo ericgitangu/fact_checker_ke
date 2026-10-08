@@ -65,6 +65,7 @@ import {
   PostgresSubmissionService,
   type SubmissionService,
 } from "./lib/submission-service.js";
+import { PostgresClaimSourceStore, type ClaimSourceStore } from "./lib/claim-source.js";
 import type { Database } from "@fact-checker-ke/db";
 
 export interface BuildAppOptions {
@@ -83,6 +84,10 @@ export interface BuildAppOptions {
   deviceConcurrencyGuard?: ConcurrencyGuard;
   ipConcurrencyGuard?: ConcurrencyGuard;
   deviceQuotaGuard?: DeviceQuotaGuard;
+  /** ADR-0038 Wave 2: claim-source store double for route tests (no DATABASE_URL). */
+  claimSourceStore?: ClaimSourceStore;
+  /** ADR-0038 Wave 2: injectable fetch for crowdsource URL resolution (tests avoid real network). */
+  claimSourceFetchImpl?: typeof fetch;
   /** SSE tuning knobs (tests override these to avoid 15s/90s real waits). */
   sseHeartbeatMs?: number;
   sseMaxDurationMs?: number;
@@ -236,7 +241,28 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register((instance) =>
     submissionRoutes(instance, { submissions: submissions!, submissionService, deviceQuotaGuard, checks: checks! }),
   );
-  await app.register((instance) => checkRoutes(instance, { checks: checks!, db }));
+  // ADR-0038 Wave 2 "Submit the truth": the crowdsource endpoint needs the
+  // claim_source_submissions table (Postgres), the shared device throttle, the
+  // QStash publisher, and the pipeline verify-hop URL for the re-verify enqueue.
+  // In-memory mode (no DATABASE_URL) wires a null store, so the route 501s
+  // rather than pretending to persist (routes/checks.ts).
+  const claimSourceStore: ClaimSourceStore | null =
+    options.claimSourceStore ?? (db ? new PostgresClaimSourceStore(db) : null);
+  await app.register((instance) =>
+    checkRoutes(instance, {
+      checks: checks!,
+      db,
+      crowdsource: {
+        claimSourceStore,
+        deviceQuotaGuard,
+        publisher,
+        reverifyHopUrl: `${pipelineBaseUrl}/hops/verify`,
+        reverifyThreshold: config.crowdsourceReverifyThreshold ?? 2,
+        featureCrowdsourceSources: config.featureCrowdsourceSources ?? true,
+        fetchImpl: options.claimSourceFetchImpl,
+      },
+    }),
+  );
   await app.register((instance) => feedRoutes(instance, { checks: checks! }));
   await app.register((instance) => trendingRoutes(instance, { trending: trending! }));
   await app.register((instance) => waitlistRoutes(instance, { waitlist: waitlist!, rateLimiter }));

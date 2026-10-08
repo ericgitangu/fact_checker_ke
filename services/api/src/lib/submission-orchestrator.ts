@@ -98,7 +98,7 @@ interface VerifyHopResponseBody {
     //     thread; null for an ordinary verdict.
     //   - `authoritative`: false for an AI-grounded preliminary / a named-person
     //     item whose rating is withheld from the public.
-    lifecycle?: "published" | "preliminary" | "awaiting_sources" | "dismissed" | null;
+    lifecycle?: "published" | "preliminary" | "awaiting_sources" | "editor_review" | "dismissed" | null;
     source_kind?: string | null;
     authoritative?: boolean | null;
   } | null;
@@ -316,7 +316,13 @@ export async function runSubmissionOrchestration(
   const lifecycleOn = args.featurePreliminaryThreads === true;
   const hopLifecycle = lifecycleOn ? (verify.publish.lifecycle ?? null) : null;
   const initialLifecycleState: NonNullable<(typeof schema.checks.$inferSelect)["lifecycleState"]> | null =
-    hopLifecycle === "preliminary" || hopLifecycle === "awaiting_sources" || hopLifecycle === "dismissed"
+    hopLifecycle === "preliminary" ||
+    hopLifecycle === "awaiting_sources" ||
+    hopLifecycle === "dismissed" ||
+    // editor_review: the pipeline routes a named-person/escalated item here. It
+    // is a NON-publish state — persisted so the item enters the bounded editor
+    // queue, and the publish gate below is suppressed so it is NEVER auto-published.
+    hopLifecycle === "editor_review"
       ? hopLifecycle
       : null;
   const hopSourceKind = lifecycleOn ? (verify.publish.source_kind ?? null) : null;
@@ -432,12 +438,22 @@ export async function runSubmissionOrchestration(
     summary,
     riskTier: verify.publish.risk_tier,
     decision: {
-      autoPublish: verify.publish.auto_publish && publishable,
-      reason: publishable
-        ? verify.publish.reason
-        : !hasEvidence
-          ? "held for editor review: no citable evidence to satisfy the published-check requirement (ADR-0031 AT-0031-1)"
-          : "held for editor review: no context to lead the published assessment (ADR-0034)",
+      // HARD INVARIANT (never auto-publish a named person): when the pipeline
+      // routes an item to editor_review (named-person/escalated), suppress
+      // auto-publish here regardless of the pipeline's confidence-based
+      // auto_publish flag — a named-person claim that clears the band is held
+      // for a human editor, never published by an autonomous edge. This is the
+      // API-side half of the pipeline's editor_review guard; enactPublishDecision
+      // itself trusts `autoPublish`, so the gate must be applied here.
+      autoPublish: verify.publish.auto_publish && publishable && hopLifecycle !== "editor_review",
+      reason:
+        hopLifecycle === "editor_review"
+          ? "held for editor review: named-person / escalated item routed to the editor queue (never auto-published)"
+          : publishable
+            ? verify.publish.reason
+            : !hasEvidence
+              ? "held for editor review: no citable evidence to satisfy the published-check requirement (ADR-0031 AT-0031-1)"
+              : "held for editor review: no context to lead the published assessment (ADR-0034)",
       publishMode: verify.publish.publish_mode,
       queuedForAsyncAudit: verify.publish.queued_for_async_audit,
       requiresHumanTap: verify.publish.requires_human_tap,
