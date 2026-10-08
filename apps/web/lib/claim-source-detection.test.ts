@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectSource, formatMmSs } from "./claim-source-detection";
+import { detectSource, formatMmSs, isShortenerUrl } from "./claim-source-detection";
 
 describe("detectSource", () => {
   it("returns empty for blank input", () => {
@@ -59,5 +59,23 @@ describe("formatMmSs", () => {
 
   it("clamps negative values to 0:00", () => {
     expect(formatMmSs(-10)).toBe("0:00");
+  });
+});
+
+describe("isShortenerUrl", () => {
+  it("recognises known shorteners (with or without www.)", () => {
+    expect(isShortenerUrl("https://share.google/NHHtEozjG6LQwKgmp")).toBe(true);
+    expect(isShortenerUrl("https://bit.ly/abc")).toBe(true);
+    expect(isShortenerUrl("http://www.tinyurl.com/x")).toBe(true);
+    expect(isShortenerUrl("  https://t.co/abc  ")).toBe(true);
+  });
+
+  it("does not treat real platforms (incl. youtu.be), articles, text or lookalikes as shorteners", () => {
+    expect(isShortenerUrl("https://youtu.be/dQw4w9WgXcQ")).toBe(false);
+    expect(isShortenerUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe(false);
+    expect(isShortenerUrl("https://example.com/bit.ly")).toBe(false);
+    expect(isShortenerUrl("https://bit.ly.evil.com/x")).toBe(false);
+    expect(isShortenerUrl("not a url")).toBe(false);
+    expect(isShortenerUrl("ftp://bit.ly/x")).toBe(false);
   });
 });
