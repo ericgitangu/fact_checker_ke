@@ -39,7 +39,10 @@ export function normalizeClaim(text: string): string {
  * ORCHESTRATE call itself.
  */
 
-interface AnalyzeHopResponseBody {
+// Exported for reuse by the crowdsource re-verify orchestrator
+// (lib/reverify-orchestrator.ts), which consumes the SAME /hops/verify
+// response shape and persists it onto an EXISTING check (ADR-0038 Wave 2).
+export interface AnalyzeHopResponseBody {
   language: string;
   translation_en: string;
   claims: Array<{ text: string; claim_type: string; sampled_for_editor_review: boolean }>;
@@ -47,7 +50,7 @@ interface AnalyzeHopResponseBody {
   needs_quote: boolean;
 }
 
-interface VerifyHopResponseBody {
+export interface VerifyHopResponseBody {
   verdict: {
     rating: Rating | null;
     rationale: string;
@@ -142,7 +145,7 @@ export interface RunSubmissionOrchestrationArgs {
   featurePreliminaryThreads?: boolean;
 }
 
-async function postJson<T>(fetchImpl: typeof fetch, url: string, body: unknown): Promise<T> {
+export async function postJson<T>(fetchImpl: typeof fetch, url: string, body: unknown): Promise<T> {
   const res = await fetchImpl(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -165,14 +168,14 @@ type CredibilityTier = (typeof CREDIBILITY_TIERS)[number];
 
 /** Coerce the pipeline's credibility_tier string to the DB enum, defaulting
  * an unexpected value to tier3_general rather than failing the whole hop. */
-function normalizeCredibilityTier(tier: string): CredibilityTier {
+export function normalizeCredibilityTier(tier: string): CredibilityTier {
   return (CREDIBILITY_TIERS as readonly string[]).includes(tier) ? (tier as CredibilityTier) : "tier3_general";
 }
 
 /** Parse a wire date (e.g. a fact-check reviewDate, which may be date-only or
  * absent) to a Date, or null — never an Invalid Date that would break the
  * timestamp insert. */
-function parseDateOrNull(value: string | null | undefined): Date | null {
+export function parseDateOrNull(value: string | null | undefined): Date | null {
   if (!value) return null;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
