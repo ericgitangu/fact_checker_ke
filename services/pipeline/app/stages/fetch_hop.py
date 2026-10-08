@@ -51,10 +51,11 @@ from app.models.pipeline_io import AnalyzeResult
 from app.protocols.fetch_dedup_store import FetchDedupStore, FetchObservationHistory
 from app.protocols.fetch_source import FetchCandidate, FetchSource, FetchSourceError
 from app.protocols.llm_client import LlmClient
-from app.protocols.transcriber import Transcriber, TranscriptionError
+from app.protocols.transcriber import Transcriber
 from app.stages.analyze import run_analyze_hop
 from app.stages.fetch_scoring import FetchScoringConfig, FetchScoringInput, score_candidate
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
+from app.stages.stt_gate import resolve_claim_text
 from app.stores.engine_breaker import EngineCostBreaker
 
 _log = logging.getLogger(__name__)
@@ -245,42 +246,16 @@ async def run_fetch_hop(
 async def _resolve_claim_text(candidate: FetchCandidate, *, transcriber: Transcriber | None) -> str | None:
     """ADR-0032/0005 AT-0032-4 / AT-0005-5 STT compliance boundary.
 
-    Returns the claim-bearing text to process, or None when this
-    candidate must be blocked (no checkable text, and transcription is
-    not lawfully available) — the caller must then stop WITHOUT calling
-    the transcriber or the LLM, never fabricate a transcript.
-
-    `candidate.text` already present -> used as-is, no STT call, no
-    change to any existing fetch source's behaviour.
-
-    `candidate.text` empty AND `candidate.audio_url` set:
-      - `candidate.stt_eligible=True` (owner-authorized / partner /
-        open-licensed / live-capture subset) -> transcribe for real
-        (fake in dev/test, no vendor key configured).
-      - otherwise -> blocked; returns None.
+    Delegates to the shared, source-agnostic gate in app/stages/stt_gate.py so
+    the fence (third-party audio is NEVER transcribed) lives in ONE place that
+    the submission analyze path (ADR-0038) can reuse. Behaviour unchanged.
     """
-    if candidate.text.strip():
-        return candidate.text
-
-    if not candidate.audio_url:
-        return None
-
-    if not candidate.stt_eligible:
-        # Fail-closed: audio exists but this item is NOT in the lawful
-        # subset -- never download/transcribe third-party audio here.
-        return None
-
-    if transcriber is None:
-        # No transcriber wired (e.g. local dev with STT disabled) -- the
-        # compliant-subset ALLOWANCE never implies a transcriber must be
-        # called if one wasn't configured; fail closed the same way.
-        return None
-
-    try:
-        transcription = await transcriber.transcribe(candidate.audio_url)
-    except TranscriptionError:
-        return None
-    return transcription.text
+    return await resolve_claim_text(
+        text=candidate.text,
+        audio_url=candidate.audio_url,
+        stt_eligible=candidate.stt_eligible,
+        transcriber=transcriber,
+    )
 
 
 async def _process_candidate(
