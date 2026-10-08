@@ -166,7 +166,12 @@ module "pipeline_service" {
     # dropped forever without re-scoring, so the feed could never accrue velocity
     # and froze once the trending set was seen. ON = trend/velocity accumulates.
     FETCH_VELOCITY_REOBSERVE = "true"
-    API_BASE_URL             = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
+    # ADR-0038 enrichment (2026-10-09): a bare video URL with no quote is made
+    # checkable from LAWFUL publisher metadata (title+description — NOT a
+    # transcript) instead of dead-ending at needs_quote. Verified live
+    # end-to-end. Flip to "false" to fall back to needs_quote.
+    ENRICH_VIDEO_METADATA = "true"
+    API_BASE_URL          = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
     # ADR-0036 corroboration gate (reconciled 2026-10-07, rev w/ Vertex grounding):
     # SHADOW on (zero confidence lift until a per-stratum artifact is fitted).
     # GROUNDING ON via Vertex AI — authed by the pipeline SA's ADC
@@ -190,7 +195,11 @@ module "pipeline_service" {
     # must be a region, never "global". Spend is capped on the dedicated "stt" breaker
     # lane (~$0.50/day ≈ 31 audio-min at ~$0.016/min) — isolated from fetch/submission/
     # corroboration. STT_LANGUAGES defaults to "sw-KE,en-US" in code.
-    SUBMISSION_STT_ENABLED      = "false"
+    # ENABLED live 2026-10-09 (gcloud): speech.googleapis.com on + roles/speech.client
+    # granted to the pipeline SA. Still fires ONLY for the stt_eligible compliant
+    # subset (owner/partner/open-licensed) — no third-party audio, so with no
+    # compliant source populating audio_url today the real spend is $0.
+    SUBMISSION_STT_ENABLED      = "true"
     STT_LOCATION                = "us-central1"
     STT_MODEL                   = "chirp_2"
     STT_ENGINE_DAILY_BUDGET_USD = "0.50"
