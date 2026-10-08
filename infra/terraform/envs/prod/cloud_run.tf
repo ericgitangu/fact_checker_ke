@@ -180,6 +180,20 @@ module "pipeline_service" {
     GOOGLE_CLOUD_LOCATION                 = "global"
     GEMINI_CORROBORATION_GROUNDED         = "true"
     CORROBORATION_ENGINE_DAILY_BUDGET_USD = "0.30"
+    # ADR-0005 real STT backend (services/pipeline/app/clients/transcriber_chirp2.py).
+    # Ships DARK: SUBMISSION_STT_ENABLED="false" means make_transcriber() returns the
+    # FakeTranscriber and NO real Speech-to-Text call is ever made, even though the
+    # SA role + API are provisioned. Flipping it to "true" (with speech.googleapis.com
+    # enabled + roles/speech.client granted — see service_accounts.tf) activates the
+    # real Chirp_2 backend; GOOGLE_CLOUD_PROJECT (set above for Vertex) doubles as its
+    # ADC project. Chirp_2 requires the regional endpoint (ADR-0005), so STT_LOCATION
+    # must be a region, never "global". Spend is capped on the dedicated "stt" breaker
+    # lane (~$0.50/day ≈ 31 audio-min at ~$0.016/min) — isolated from fetch/submission/
+    # corroboration. STT_LANGUAGES defaults to "sw-KE,en-US" in code.
+    SUBMISSION_STT_ENABLED      = "false"
+    STT_LOCATION                = "us-central1"
+    STT_MODEL                   = "chirp_2"
+    STT_ENGINE_DAILY_BUDGET_USD = "0.50"
   }
 }
 
