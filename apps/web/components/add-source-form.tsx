@@ -54,11 +54,25 @@ export function AddSourceForm({
         body: JSON.stringify({ url, ...(note.trim() ? { note: note.trim() } : {}) }),
       });
       if (res.status === 200 || res.status === 201) {
-        const body = (await res.json().catch(() => ({}))) as { status?: string };
-        setState({
-          status: "done",
-          ack: body.status === "duplicate" ? copy.ackDuplicate : copy.ackSubmitted,
-        });
+        const body = (await res.json().catch(() => ({}))) as {
+          status?: "accepted" | "rejected" | "duplicate";
+          reVerifyQueued?: boolean;
+        };
+        // Mirror services/api submitClaimSource's ClaimSourceOutcome exactly —
+        // `status` + `reVerifyQueued` is all the client gets, and it's enough to
+        // be honest about what actually happens next: a re-check only fires when
+        // this accepted source crossed the threshold (`reVerifyQueued: true`).
+        // Never promise "we'll re-check" for an accepted-but-below-threshold or
+        // a rejected (non-credible domain) source.
+        const ack =
+          body.status === "duplicate"
+            ? copy.ackDuplicate
+            : body.status === "rejected"
+              ? copy.ackRejected
+              : body.reVerifyQueued
+                ? copy.ackQueued
+                : copy.ackAcceptedPending;
+        setState({ status: "done", ack });
         return;
       }
       setState({ status: "error", message: copy.error });
