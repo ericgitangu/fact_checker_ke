@@ -1781,6 +1781,18 @@ a:hover {
 .lifecycle-affordance-cta {
   font-weight: 600;
 }
+/* ADR-0038 Wave 3: a non-named preliminary's AI DRAFT STANCE sits beside its
+   affordance chip. Reuses the neutral caveat-note token (no verdict colour) so
+   it reads as a caveated stance, never the authoritative verdict stamp. */
+.feedcard-affordance-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.feedcard-ai-stance {
+  font-weight: 600;
+}
 /* A button rendered as the CTA (interactive add-source, ADR-0038 Wave 2) must
    not inherit the <button> chrome — it reads as the same text link the hint
    span did, reusing the existing CTA token (no new palette). */
