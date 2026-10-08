@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { getDeviceToken } from "../lib/device-token";
 import type { AddSourceFormCopy } from "../lib/lifecycle-copy";
 
@@ -36,6 +37,7 @@ export function AddSourceForm({
   copy: AddSourceFormCopy;
   resource?: "checks" | "submissions";
 }): React.JSX.Element {
+  const router = useRouter();
   const [state, setState] = useState<FormState>({ status: "idle" });
   const [url, setUrl] = useState("");
   const [note, setNote] = useState("");
@@ -53,6 +55,15 @@ export function AddSourceForm({
         },
         body: JSON.stringify({ url, ...(note.trim() ? { note: note.trim() } : {}) }),
       });
+      if (res.status === 401) {
+        // Gated action, not signed in: route to the sign-in flow with a
+        // return-to so they land back on this exact check/trending card after
+        // Google (which does a full redirect to callbackUrl, so the session
+        // cookie is fresh on return regardless).
+        const returnTo = `${window.location.pathname}${window.location.search}`;
+        router.push(`/signin?callbackUrl=${encodeURIComponent(returnTo)}`);
+        return;
+      }
       if (res.status === 200 || res.status === 201) {
         const body = (await res.json().catch(() => ({}))) as {
           status?: "accepted" | "rejected" | "duplicate";

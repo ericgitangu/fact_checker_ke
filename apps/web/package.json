@@ -13,9 +13,11 @@
   "dependencies": {
     "@fact-checker-ke/brand": "workspace:*",
     "@fact-checker-ke/core": "workspace:*",
+    "@fact-checker-ke/db": "workspace:*",
     "@fact-checker-ke/i18n": "workspace:*",
     "@serwist/turbopack": "^9.5.12",
     "next": "16.3.8",
+    "next-auth": "beta",
     "next-intl": "^4.14.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",

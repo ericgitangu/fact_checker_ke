@@ -1349,3 +1349,41 @@ export const pendingCheckoutSubjects = pgTable(
   },
   (table) => [primaryKey({ columns: [table.provider, table.reference] })],
 );
+
+/**
+ * Public Google-OAuth sign-ins ("early adopters"), the public-site identity
+ * store. DELIBERATELY SEPARATE from `users` (above): `users` is the
+ * admin/editor system — `password_hash NOT NULL`, a `role` enum, MFA/TOTP,
+ * and a cross-table "no role grant without verified MFA" invariant. A public
+ * Google login has none of those: no password (OAuth), no role, no MFA. Writing
+ * anonymous public logins into `users` would (a) violate `password_hash NOT
+ * NULL` and (b) mix role-bearing admins with unprivileged readers in one table
+ * whose every consumer assumes "a row here can be granted editorial power".
+ * Keeping them apart is a security boundary, not a modelling nicety.
+ *
+ * Auth itself is STATELESS (Auth.js v5 JWT session strategy, no DB adapter —
+ * see apps/web/auth.ts): this table is NOT a session store and holds no
+ * tokens. It is an append-/update-only roster of who has signed in, upserted
+ * on each login (ON CONFLICT (email) DO UPDATE name/image/last_seen_at). The
+ * JWT is the source of truth for the live session; a write failure here is
+ * fail-open (login proceeds) precisely because nothing in the auth path reads
+ * this table back.
+ *
+ * `email` is the natural key (unique). `provider` defaults to 'google' and is
+ * carried as plain text (not an enum) so a second public IdP later is an
+ * additive insert value, not a migration of an enum type. No PII beyond what
+ * the OAuth profile already returns (email/name/avatar URL).
+ */
+export const earlyAdopters = pgTable(
+  "early_adopters",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    name: text("name"),
+    image: text("image"),
+    provider: text("provider").notNull().default("google"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("early_adopters_email_idx").on(table.email)],
+);

@@ -3296,3 +3296,55 @@ button.lifecycle-affordance-cta {
     bottom: 8px;
   }
 }
+
+/* ---------- public Google auth (header control + sign-in button) ---------- */
+/* Logged-in header cluster: avatar + sign-out, sitting in the nav row next to
+   the theme toggle. Inline-flex so it aligns with the other nav affordances on
+   desktop and stacks cleanly inside the mobile disclosure panel. */
+.nav-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Sign-out reads as a quiet nav action, not a loud button — same muted ink and
+   hover as the nav links (.nav-links a:hover), so it never competes with the
+   primary CTAs. It's a real <button> (server-action form), styled to match. */
+.nav-signout {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.nav-signout:hover {
+  color: var(--ink);
+  background: var(--paper-2);
+}
+
+/* "Sign in with Google": the base .btn geometry on a neutral, theme-stable
+   ground (Google brand guidance wants the four-colour G on a light, high-
+   contrast surface, NOT the site's brand green). White ground + hairline rule
+   in both themes keeps the mark legible; the label uses the normal ink token. */
+.google-signin-btn {
+  gap: 10px;
+  background: #ffffff;
+  color: #1f1f1f;
+  border-color: var(--rule-strong, rgba(0, 0, 0, 0.18));
+}
+.google-signin-btn:hover:not(:disabled) {
+  background: #f6f7f8;
+  transform: translateY(-1px);
+}
+.google-signin-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}

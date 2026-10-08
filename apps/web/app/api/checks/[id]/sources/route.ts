@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { auth } from "../../../../../auth";
 
 /**
  * BFF proxy for ADR-0038 Wave 2 `POST /v1/checks/:id/sources` ("Submit the
@@ -22,6 +23,13 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  // Auth gate (server-side): add-source is one of the two gated actions.
+  // 401 → the client routes the reader to /signin?callbackUrl=<current>.
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "auth_required" }, { status: 401 });
+  }
+
   const { id } = await params;
   const body: unknown = await request.json().catch(() => null);
   const parsed = SourceBodySchema.safeParse(body);

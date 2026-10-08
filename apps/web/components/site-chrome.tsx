@@ -6,10 +6,27 @@ import { NavLink } from "./nav-link";
 import { PrimaryNav } from "./primary-nav";
 import { ThemeToggle } from "./theme-toggle";
 import { PremiumUpsell } from "./premium/premium-upsell";
+import { UserAvatar } from "./user/user-avatar";
 import { BUY_ME_A_COFFEE_URL, GITHUB_REPO_URL, PATREON_URL } from "../lib/site";
+import { auth, signOut } from "../auth";
+
+/**
+ * Server action for the header sign-out control. Defined server-side (no
+ * client bundle) and calls Auth.js's server `signOut`, which clears the JWT
+ * cookie and redirects home. CSRF is handled by Auth.js + the framework's
+ * server-action protocol.
+ */
+async function signOutAction(): Promise<void> {
+  "use server";
+  await signOut({ redirectTo: "/" });
+}
 
 export async function AppHeader(): Promise<React.JSX.Element> {
   const t = await getTranslations("common");
+  // Stateless JWT session (auth.ts) — no DB round-trip. Reading it here opts
+  // the header (and thus every page) into dynamic rendering, which is already
+  // the case: the root layout reads headers() for the consent region.
+  const session = await auth();
   return (
     <header className="shell app-nav">
       {/* Shared identity from @fact-checker-ke/brand: the FC·KE gradient
@@ -46,6 +63,26 @@ export async function AppHeader(): Promise<React.JSX.Element> {
             sole frontend keeps it — on every page via this shared header
             (ADR-0010/0015 amendments). */}
         <ThemeToggle />
+        {/* Public Google auth (Auth.js v5, JWT sessions). Logged in → the
+            user's avatar + a sign-out server action; logged out → a link into
+            the sign-in flow. Rendered inside PrimaryNav so it collapses behind
+            the mobile hamburger with the rest of the nav. */}
+        {session?.user ? (
+          <div className="nav-user">
+            <UserAvatar
+              name={session.user.name ?? session.user.email ?? ""}
+              image={session.user.image}
+              size="sm"
+            />
+            <form action={signOutAction}>
+              <button type="submit" className="nav-signout">
+                {t("auth.signOut")}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <NavLink href="/signin">{t("auth.signIn")}</NavLink>
+        )}
       </PrimaryNav>
     </header>
   );
