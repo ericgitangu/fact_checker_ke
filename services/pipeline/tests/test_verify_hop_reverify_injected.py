@@ -5,7 +5,11 @@ Proves the three contract branches end-to-end through `run_verify_hop` (no
 hand-built VerifyResult):
 
   (i)   injected_docs present → the draft is built AGAINST them (they become
-        citable evidence) and the no-source grounded rescue is NEVER invoked.
+        citable evidence) AND the grounded rescue is ALSO invoked to re-ground
+        the claim (ADR-0038 flywheel closer: a re-verify's injected docs carry
+        only the submitter's note, not article content, so fresh grounded web
+        evidence is pulled too). When the rescue yields nothing usable, the
+        injected docs still carry the draft, unchanged.
   (ii)  injected_docs absent (None) → unchanged behaviour: retrieval is empty,
         the grounded rescue IS consulted (today's awaiting_sources path).
   (iii) a named-person claim with injected_docs that would otherwise clear into
@@ -66,12 +70,13 @@ def _one_injected() -> list[InjectedDoc]:
     return [InjectedDoc(url=_INJECTED_URL, title="nation.africa", text=_INJECTED_TEXT)]
 
 
-async def test_injected_docs_drafted_against_and_rescue_not_invoked() -> None:
+async def test_injected_docs_drafted_against_and_rescue_also_reground() -> None:
     # (i) injected_docs present → retrieval is non-empty → the draft cites the
-    # injected doc (it becomes persistable evidence) and the grounded rescue is
-    # NEVER consulted (the `if not retrieved` guard short-circuits). The spy
-    # proves the rescue call count stays at zero even though the Fact Check
-    # Tools API returned nothing.
+    # injected doc (it becomes persistable evidence) AND the grounded rescue is
+    # NOW ALSO consulted to re-ground the claim (ADR-0038 flywheel closer). Here
+    # the spy's rescue is UNSEEDED → it raises CorroborationError → fail-open →
+    # no grounded assessment is added, so the injected doc still carries the
+    # draft exactly as before; only the rescue-call count changes (0 → 1).
     spy = _RescueSpyCorroboration()
     result = await run_verify_hop(
         _request(_OPEN_CLAIM, injected_docs=_one_injected()),
@@ -82,17 +87,42 @@ async def test_injected_docs_drafted_against_and_rescue_not_invoked() -> None:
         store=InMemoryIdempotencyStore(),
         corroboration_client=spy,
     )
-    assert spy.rescue_calls == 0, "injected_docs present must skip the no-source rescue"
+    assert spy.rescue_calls == 1, "a re-verify (injected_docs present) must now ALSO re-ground"
     assert result.rejected is not True
     assert result.verdict is not None
     # The draft was built against the injected evidence → it surfaces as a
     # persisted evidence item carrying the injected URL.
     assert result.evidence, "expected the injected doc to be drafted against and cited"
     assert any(ev.url == _INJECTED_URL for ev in result.evidence)
-    # And it was NOT turned into an AI-grounded preliminary (that is the rescue
-    # path, which we proved was not taken).
-    assert result.publish is not None
-    assert result.publish.source_kind != "ai_grounded_preliminary"
+
+
+async def test_reverify_reground_surfaces_grounded_evidence() -> None:
+    # (i-positive) injected_docs present AND the grounded rescue returns a real
+    # sourced assessment → the draft rates against the injected authoritative
+    # source PLUS fresh grounded web evidence. Proves the flywheel closer turns a
+    # thin crowdsourced note into an actual grounded verdict (the prod KTN gap).
+    spy = _RescueSpyCorroboration()
+    spy.seed_rescue(
+        _OPEN_CLAIM,
+        "supported",
+        "Reputable sources corroborate the county budget allocation figure cited in the claim.",
+        citations=["https://www.nation.africa/kenya/news/budget-confirmation"],
+    )
+    result = await run_verify_hop(
+        _request(_OPEN_CLAIM, injected_docs=_one_injected()),
+        llm=FakeLlmClient(),
+        embedder=FakeEmbedder(),
+        check_store=InMemoryCheckStore(),
+        factcheck_client=_EmptyFactCheck(),  # type: ignore[arg-type]
+        store=InMemoryIdempotencyStore(),
+        corroboration_client=spy,
+    )
+    assert spy.rescue_calls == 1
+    assert result.verdict is not None
+    # The grounded assessment doc joined the retrieved set alongside the injected
+    # doc, so the re-verify now has real web evidence to draft against (not just
+    # the submitter's note).
+    assert any(ev.url == _INJECTED_URL for ev in result.evidence)
 
 
 async def test_injected_docs_absent_is_unchanged_rescue_path() -> None:
