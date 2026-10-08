@@ -25,6 +25,7 @@ import os
 import re
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from urllib.parse import quote
 from xml.etree import ElementTree
 
 import httpx
@@ -32,6 +33,12 @@ import httpx
 from app.protocols.fetch_source import FetchCandidate, FetchSourceError
 
 TRIAGE_FEED_URLS_ENV = "TRIAGE_FEED_URLS"
+# When set, fetch each feed THROUGH this proxy (a Vercel BFF route) instead of
+# directly — so the request leaves Vercel's (non-blocked) egress rather than the
+# Cloud Run egress IP that Cloudflare 403s on pesacheck.org (the egress-IP block;
+# see reference-cloudrun-egress-ip-block). Called as `{proxy}?url=<encoded feed>`,
+# the proxy returns the raw RSS. Unset -> direct fetch (dev/test, unchanged).
+TRIAGE_FEED_PROXY_URL_ENV = "TRIAGE_FEED_PROXY_URL"
 
 _log = logging.getLogger(__name__)
 
@@ -76,10 +83,16 @@ class TriageFeedSource:
         # follow_redirects: PesaCheck's tag feeds 301 (e.g. /tagged/kenya/feed ->
         # /tag/kenya/feed); httpx does NOT follow by default, so without this the
         # redirect stub parses as invalid XML and the feed looks "failed".
+        proxy = os.environ.get(TRIAGE_FEED_PROXY_URL_ENV)
         async with httpx.AsyncClient(timeout=self._timeout, follow_redirects=True) as client:
             for url in urls:
+                # Route through the Vercel BFF proxy when configured (Cloud Run's
+                # egress IP is 403'd by Cloudflare on pesacheck.org); direct fetch
+                # otherwise. The feed TEXT is returned either way, so parsing is
+                # unchanged.
+                fetch_url = f"{proxy.rstrip('/')}?url={quote(url, safe='')}" if proxy else url
                 try:
-                    response = await client.get(url)
+                    response = await client.get(fetch_url)
                     response.raise_for_status()
                     candidates.extend(_parse_rss(response.text))
                 except (httpx.HTTPError, ElementTree.ParseError) as exc:

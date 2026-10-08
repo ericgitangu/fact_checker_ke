@@ -249,3 +249,57 @@ async def test_failing_source_is_isolated_not_fatal() -> None:
     assert result.candidates_observed == 1  # the good source still ran end-to-end
     assert len(result.emitted) == 1
     assert good.poll_count == 1
+
+
+async def test_editorial_platform_floor_lets_a_curated_triage_item_emit() -> None:
+    """Root-cause regression (verified 2026-10-08, real-scorer run): an RSS
+    triage item carries NO engagement, so it scores ~0.3 on the velocity-
+    weighted scorer and was dropped below tau — triage_feed had NEVER emitted.
+
+    A low-virality, non-salient claim from `triage_feed` (no engagement, plain
+    headline) must now EMIT on the editorial floor, while the SAME low-virality
+    claim from `youtube` (not an editorial platform) still drops below tau.
+    Proves the floor is real AND scoped — not a blanket tau drop.
+    """
+    plain = "Kenyatta University did not urge couples to live together, officials clarify."
+    triage = FakeFetchSource(
+        platform="triage_feed",
+        fixtures=[_candidate("triage_feed", "pc-1", text=plain, engagement={})],
+    )
+    yt = FakeFetchSource(
+        platform="youtube",
+        fixtures=[_candidate("youtube", "yt-low", text=plain, engagement={})],
+    )
+
+    result = await run_fetch_hop(
+        sources=[triage, yt],
+        dedup_store=InMemoryFetchDedupStore(),
+        llm=FakeLlmClient(),
+        org_id="org-1",
+    )
+
+    assert result.candidates_observed == 2
+    emitted_platforms = {e.platform for e in result.emitted}
+    assert emitted_platforms == {"triage_feed"}  # curated item emitted...
+    assert result.dropped_below_tau == 1  # ...the identical youtube item did not
+
+
+async def test_editorial_floor_disabled_below_tau_restores_drop(monkeypatch) -> None:
+    """The floor is config-driven: setting FETCH_EDITORIAL_FLOOR below tau
+    disables it, and the curated item drops exactly as before — proving the
+    floor, not some other change, is what makes it emit (AT-0032-2: retuning is
+    an env change, never a code change)."""
+    monkeypatch.setenv("FETCH_EDITORIAL_FLOOR", "0.0")
+    plain = "Kenyatta University did not urge couples to live together, officials clarify."
+    triage = FakeFetchSource(
+        platform="triage_feed",
+        fixtures=[_candidate("triage_feed", "pc-1", text=plain, engagement={})],
+    )
+    result = await run_fetch_hop(
+        sources=[triage],
+        dedup_store=InMemoryFetchDedupStore(),
+        llm=FakeLlmClient(),
+        org_id="org-1",
+    )
+    assert result.emitted == []
+    assert result.dropped_below_tau == 1

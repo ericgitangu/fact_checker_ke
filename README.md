@@ -35,7 +35,7 @@ Autonomy-first does not mean human-free: a claim can be escalated to `editor_rev
 
 ## Architecture
 
-Two ingest engines feed one event-driven pipeline. The **fetch engine** pulls candidate claims autonomously (YouTube trending `mostPopular` for Kenya, plus PesaCheck and Google News RSS triage); the **submission engine** takes a URL or raw text from a user. Both land on the same path: `submission.received` → **analyze** → **verify** → **publish-policy** → an editorial **lifecycle** that ends in a terminal state. State changes and the events announcing them commit together through a transactional outbox, drained by QStash with idempotency so at-least-once delivery is safe to retry. Status streams to the client over SSE in near-real-time.
+Two ingest engines feed one event-driven pipeline. The **fetch engine** pulls candidate claims autonomously (YouTube trending `mostPopular` for Kenya, plus a Google News fact-check RSS query for Kenya, which surfaces debunks from outlets like PesaCheck, Africa Check and AFP); the **submission engine** takes a URL or raw text from a user. Both land on the same path: `submission.received` → **analyze** → **verify** → **publish-policy** → an editorial **lifecycle** that ends in a terminal state. State changes and the events announcing them commit together through a transactional outbox, drained by QStash with idempotency so at-least-once delivery is safe to retry. Status streams to the client over SSE in near-real-time.
 
 ```mermaid
 flowchart TD
@@ -69,8 +69,8 @@ flowchart TD
 
 Stage detail:
 
-- **analyze** — language identification (English / Swahili / Sheng), translation to a working language, and extraction of checkable claims (as opposed to opinion, prediction, or rhetoric). Model: Claude Haiku.
-- **verify** — evidence retrieval (Google Fact Check Tools API), independent corroboration and grounded rescue via Google Vertex AI Gemini grounding, and a citation-integrity check that every cited source actually supports the drafted assessment. Draft model: Claude Sonnet.
+- **analyze** — language identification (English / Swahili / Sheng), translation to a working language, and extraction of checkable claims (as opposed to opinion, prediction, or rhetoric). Model: Claude Haiku. A bare video URL with no quote is made checkable from the publisher's *lawful* metadata (title + description — never a scraped transcript); a submission with nothing checkable returns an honest `needs_quote` / `no_checkable_claims` rather than a fabricated analysis. Audio is transcribed (Google Chirp_2) only for the compliant subset — owner/partner/open-licensed — never third-party media.
+- **verify** — evidence retrieval (Google Fact Check Tools API), independent corroboration and grounded rescue via Google Vertex AI Gemini grounding, and a citation-integrity check that every cited source actually supports the drafted assessment. A relevance-and-recency guard weighs each source by registry tier and date, so an off-topic or stale article can't be borrowed to manufacture a verdict. Draft model: Claude Sonnet. Readers can strengthen a verdict by submitting a source: it *re-grounds* the claim and can only move the assessment forward, never silently downgrade it (the crowdsource flywheel).
 - **publish-policy** — a risk-tiered gate. Higher-risk claims (named person, legal exposure) demand higher confidence and more corroboration before auto-publish; below threshold they route to `awaiting_sources` or `editor_review`.
 - **lifecycle** — `verifying` → one of `preliminary`, `awaiting_sources`, `published`, `dismissed`; escalation to `editor_review` and back; `archived_expired` for stale items. A rescue can re-enter a dismissed claim as a thread starter rather than dead-ending it.
 
@@ -153,7 +153,8 @@ There is no GitHub Actions CI badge: Actions billing is currently locked on this
 | Shared contracts | zod schemas + inferred TypeScript types (`packages/core`) |
 | Database | Neon serverless Postgres with pgvector, Drizzle ORM |
 | Queue / cache / cron | Upstash Redis + QStash |
-| AI models | Anthropic Claude (Haiku for analyze, Sonnet for verify draft); Google Vertex AI Gemini grounding (corroboration + rescue); Google Fact Check Tools API (retrieval) |
+| AI models | Anthropic Claude (Haiku for analyze, Sonnet for verify draft); Google Vertex AI Gemini grounding (corroboration + rescue); Google Fact Check Tools API (retrieval); Google Chirp_2 speech-to-text (compliant-subset audio only) |
+| Discovery | YouTube Data API (trending KE) + Google News fact-check RSS triage |
 | Infrastructure | Terraform IaC; GCP Cloud Run in `africa-south1`, scale-to-zero |
 | Monorepo / build | pnpm workspaces + moonrepo |
 | Testing | Vitest (TypeScript), Pytest (Python) |
@@ -164,7 +165,8 @@ There is no GitHub Actions CI badge: Actions billing is currently locked on this
 - **Test-driven.** Features land with their tests — vitest for TypeScript, pytest for Python. The contract (inputs → outputs) is what gets tested, not internals.
 - **One contract source.** Request/response shapes are defined once as zod schemas in `packages/core` and generated into Pydantic for the Python side; a drift check fails the build if the two diverge.
 - **Transactional outbox + idempotency.** A state change and the event announcing it commit in one transaction; client idempotency keys, a QStash inbox, and a content-hash result cache make at-least-once delivery safe to retry.
-- **Scale-to-zero cost discipline.** A Terraform plan-guard fails any plan that provisions an always-on resource — no NAT gateway, no `min_instance_count > 0`, no unattached static IP.
+- **Scale-to-zero cost discipline.** A Terraform plan-guard fails any plan that provisions an always-on resource — no NAT gateway, no `min_instance_count > 0`, no unattached static IP, no Cloud SQL or Memorystore — so those cost traps can't land through IaC.
+- **Metered abuse guardrails.** Every AI engine spends against a per-lane daily USD breaker (analyze/verify, grounding, speech, fetch) that hard-stops at budget; intake is gated by a required device token, a per-device daily quota, and IP rate limits on token minting and the waitlist. An abuse spike or viral day is bounded to a known dollar figure, not a surprise bill.
 - **Decision records.** Material architecture decisions are written up under [docs/](docs/) before they are trusted, each with the options considered, the trade-off accepted, and a review trigger.
 
 ## Documentation

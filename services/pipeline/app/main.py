@@ -254,8 +254,35 @@ def _record_llm_call(org_id: str, usage: UsageRecord | None) -> None:
     _llm_call_store.record(LlmCall.from_usage(org_id, usage))
 
 
+def _submission_budget_guard() -> None:
+    """COST-CONTROL (security audit G1/G3/G4, 2026-10-09): the analyze + verify
+    hops are the single choke point every submission's LLM spend flows through —
+    user-submitted AND fetch-emitted, api-routed AND (because the pipeline is
+    public) any direct caller. Before spending on the LLM, hard-stop if the
+    "submission" lane has hit 100% of its daily USD budget
+    (SUBMISSION_ENGINE_DAILY_BUDGET_USD). This is the daily ceiling that bounds a
+    scripted-abuse or viral-spike day to a known dollar figure instead of an
+    unbounded Anthropic/Gemini bill — the Gemini grounding lane is already capped
+    separately ($0.30/day), so this covers the Haiku(analyze)+Sonnet(verify)
+    spend that was previously uncapped. 429 so the caller/relay backs off without
+    incurring the call."""
+    if _fetch_cost_breaker.current_state("submission").hard_stopped:
+        raise HTTPException(status_code=429, detail="submission_budget_exhausted")
+
+
+def _meter_submission_spend(usage: UsageRecord | None) -> None:
+    """Accumulate the ACTUAL analyze/verify LLM spend against the "submission"
+    lane so the guard above trips once the daily budget is crossed. Skips the
+    no-op/reuse paths (same sentinel as _record_llm_call). record_spend is
+    fail-open, so metering never fails the hop."""
+    if usage is None or usage.model == "none":
+        return
+    _fetch_cost_breaker.record_spend("submission", usage.usd)
+
+
 @app.post("/hops/analyze")
 async def hop_analyze(event: AnalyzeHopEnvelope) -> AnalyzeResult:
+    _submission_budget_guard()  # cost ceiling (audit G1) — before any LLM spend
     try:
         result = await run_analyze_hop(
             event.to_hop_request(),
@@ -267,11 +294,13 @@ async def hop_analyze(event: AnalyzeHopEnvelope) -> AnalyzeResult:
         logger.warning("analyze hop failed: %s", exc)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     _record_llm_call(event.org_id, result.usage)
+    _meter_submission_spend(result.usage)
     return result
 
 
 @app.post("/hops/verify")
 async def hop_verify(payload: VerifyHopRequest) -> VerifyResult:
+    _submission_budget_guard()  # cost ceiling (audit G1) — before any LLM spend
     result = await run_verify_hop(
         payload,
         llm=_sonnet_llm,
@@ -293,6 +322,7 @@ async def hop_verify(payload: VerifyHopRequest) -> VerifyResult:
     # Draft-verdict LLM call (stage "verify"): real token counts + usd. None on
     # the dedup-reuse / rejected paths (no fresh draft call) — skipped there.
     _record_llm_call(payload.org_id, result.usage)
+    _meter_submission_spend(result.usage)  # cost ceiling (audit G1): accrue actual spend
     # Grounded second-opinion (assess) call, when one actually ran (a real stance
     # came back — not the fail-closed/not-sampled no_second_opinion). The gemini
     # SDK reports only a usd estimate for this call (no token breakdown), so token
