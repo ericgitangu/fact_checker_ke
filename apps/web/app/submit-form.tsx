@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { getDeviceToken } from "../lib/device-token";
-import { detectSource } from "../lib/claim-source-detection";
+import { detectSource, isShortenerUrl } from "../lib/claim-source-detection";
 import { detectLanguages } from "../lib/language-detect";
 import { SourcePreview } from "../components/submit/source-preview";
 import { VideoMomentMarker } from "../components/submit/video-moment-marker";
@@ -35,12 +35,12 @@ function randomIdempotencyKey(): string {
  * lib/language-detect.ts for the (heuristic, no-backend-call) detection
  * logic itself.
  */
-export function SubmitForm(): React.JSX.Element {
+export function SubmitForm({ initialUrl = "" }: { initialUrl?: string } = {}): React.JSX.Element {
   const t = useTranslations("submit");
   const tCommon = useTranslations("common");
   const router = useRouter();
 
-  const [rawInput, setRawInput] = useState("");
+  const [rawInput, setRawInput] = useState(initialUrl);
   const [quote, setQuote] = useState("");
   const [timestampSec, setTimestampSec] = useState(0);
   // Captured for the upload UI's own lifecycle, but NOT yet sent with the
@@ -64,7 +64,47 @@ export function SubmitForm(): React.JSX.Element {
     };
   }, []);
 
-  const detection = useMemo(() => detectSource(rawInput), [rawInput]);
+  // Shortener resolution (share.google, bit.ly, …): the platform behind a
+  // short link is unknowable client-side, so /api/resolve-url follows it and
+  // detection runs on the RESOLVED url. `resolution.for` pins the result to the
+  // exact input it was computed for, so stale results never apply after typing.
+  const trimmedInput = rawInput.trim();
+  const [resolution, setResolution] = useState<{ for: string; url: string } | null>(null);
+  const needsResolve = isShortenerUrl(trimmedInput);
+  const resolvedUrl = resolution?.for === trimmedInput ? resolution.url : null;
+  const resolving = needsResolve && resolvedUrl === null;
+
+  useEffect(() => {
+    if (!isShortenerUrl(trimmedInput)) return;
+    const controller = new AbortController();
+    const debounce = setTimeout(() => {
+      void fetch("/api/resolve-url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: trimmedInput }),
+        signal: controller.signal,
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((body: unknown) => {
+          const url =
+            typeof body === "object" && body !== null && "resolvedUrl" in body
+              ? (body as { resolvedUrl: unknown }).resolvedUrl
+              : null;
+          setResolution({ for: trimmedInput, url: typeof url === "string" ? url : trimmedInput });
+        })
+        .catch(() => {
+          // Aborted (further typing) is expected; a real failure falls back to
+          // the original link so submit is never stuck behind a dead resolver.
+          if (!controller.signal.aborted) setResolution({ for: trimmedInput, url: trimmedInput });
+        });
+    }, 300);
+    return () => {
+      clearTimeout(debounce);
+      controller.abort();
+    };
+  }, [trimmedInput]);
+
+  const detection = useMemo(() => detectSource(resolvedUrl ?? rawInput), [resolvedUrl, rawInput]);
   const languageSampleText = detection.kind === "text" ? detection.text : quote;
   const languages = useMemo(
     () => (languageSampleText.trim() ? detectLanguages(languageSampleText) : []),
@@ -77,6 +117,7 @@ export function SubmitForm(): React.JSX.Element {
       setState({ status: "error", message: t("error.empty") });
       return;
     }
+    if (resolving) return;
     setState({ status: "submitting" });
     try {
       const deviceToken = await getDeviceToken();
@@ -140,7 +181,13 @@ export function SubmitForm(): React.JSX.Element {
         />
       </div>
 
-      {detection.kind === "url" && (
+      {resolving && (
+        <p className="form-note form-note-muted" role="status">
+          {t("resolving")}
+        </p>
+      )}
+
+      {detection.kind === "url" && !resolving && (
         <>
           <SourcePreview detection={detection} />
           {detection.isVideoPlatform && (
@@ -185,7 +232,7 @@ export function SubmitForm(): React.JSX.Element {
 
       <div className="submit-cta-row" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <AwaitingReviewStamp />
-        <button type="submit" className="btn btn-primary" disabled={state.status === "submitting" || isOffline}>
+        <button type="submit" className="btn btn-primary" disabled={state.status === "submitting" || isOffline || resolving}>
           {state.status === "submitting" ? tCommon("action.submitting") : tCommon("action.submit")}
         </button>
       </div>
