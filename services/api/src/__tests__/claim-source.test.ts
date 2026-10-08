@@ -29,6 +29,7 @@ function openCheck(store: InMemoryClaimSourceStore, claimText = "The budget was 
     claimText,
     submissionId: randomUUID(),
     orgId: randomUUID(),
+      language: "en",
   });
   return id;
 }
@@ -118,6 +119,7 @@ describe("submitClaimSource (ADR-0038 Wave 2)", () => {
       claimText: "x",
       submissionId: randomUUID(),
       orgId: randomUUID(),
+      language: "en",
     });
 
     const res = await submitClaimSource(store, deps(new FakePublisher()), {
@@ -136,7 +138,7 @@ describe("submitClaimSource (ADR-0038 Wave 2)", () => {
     const checkId = randomUUID();
     const submissionId = randomUUID();
     const orgId = randomUUID();
-    store.seedCheck(checkId, { lifecycleState: "awaiting_sources", claimText: "GDP grew 5%.", submissionId, orgId });
+    store.seedCheck(checkId, { lifecycleState: "awaiting_sources", claimText: "GDP grew 5%.", submissionId, orgId, language: "en" });
 
     const first = await submitClaimSource(store, deps(publisher, 2), {
       checkId,

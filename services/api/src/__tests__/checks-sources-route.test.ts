@@ -27,6 +27,7 @@ function seededStore(lifecycleState: "awaiting_sources" | "published" = "awaitin
     claimText: "A claim.",
     submissionId: randomUUID(),
     orgId: randomUUID(),
+      language: "en",
   });
   return { store, checkId };
 }
@@ -176,6 +177,7 @@ describe("POST /v1/submissions/:id/sources (ADR-0038 Wave 2 trending)", () => {
       claimText: "A claim.",
       submissionId,
       orgId: randomUUID(),
+      language: "en",
     });
     const app = await buildApp({ logger: false, claimSourceStore: store, claimSourceFetchImpl: fakeFetch });
     const res = await app.inject({

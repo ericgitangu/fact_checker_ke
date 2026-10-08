@@ -277,11 +277,14 @@ export async function runSubmissionOrchestration(
   await advance("analyzing", "analyzed");
   await advance("analyzed", "verifying");
 
+  // The analyze hop's detected language (ISO, e.g. "sw"); persisted on the check so
+  // a later crowdsourced re-verify grounds in the ORIGINAL language, not "en".
+  const detectedLanguage = analyze.language && analyze.language !== "unknown" ? analyze.language : "en";
   const verify = await postJson<VerifyHopResponseBody>(fetchImpl, `${args.pipelineBaseUrl}/hops/verify`, {
     submission_id: event.submission_id,
     org_id: event.org_id,
     claim_text: claimText,
-    language: analyze.language && analyze.language !== "unknown" ? analyze.language : "en",
+    language: detectedLanguage,
     named_person_involved: false,
   });
 
@@ -353,6 +356,7 @@ export async function runSubmissionOrchestration(
       lifecycleState: initialLifecycleState,
       sourceKind: hopSourceKind,
       authoritative: hopAuthoritative,
+      language: detectedLanguage,
       lastActivityAt: new Date(),
       submissionId: event.submission_id,
       orgId: event.org_id,

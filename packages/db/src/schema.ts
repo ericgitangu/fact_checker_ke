@@ -406,6 +406,12 @@ export const checks = pgTable(
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
     sourceKind: text("source_kind"),
     authoritative: boolean("authoritative").notNull().default(true),
+    // ADR-0038: the analyze hop's detected language (ISO code, e.g. "sw"), carried
+    // so a crowdsourced re-verify grounds in the ORIGINAL language (translate-then-
+    // ground) instead of assuming "en" — a Swahili claim must not be re-grounded as
+    // English. Nullable: legacy rows + rows drafted before this carry null (the
+    // re-verify falls back to "en" as before).
+    language: text("language"),
   },
   (table) => [
     index("checks_org_id_idx").on(table.orgId),

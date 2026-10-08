@@ -31,6 +31,9 @@ export interface ClaimSourceCheckInfo {
   submissionId: string;
   /** The owning org id — required by VerifyHopRequest. */
   orgId: string;
+  /** The detected language (ISO, e.g. "sw"); re-verify grounds in it, not "en".
+   * Null for legacy rows → falls back to "en". */
+  language: string | null;
 }
 
 /** An accepted (tier≤2) source, as needed to build a re-verify injected_doc. */
@@ -81,6 +84,7 @@ export class PostgresClaimSourceStore implements ClaimSourceStore {
         submissionId: schema.checks.submissionId,
         orgId: schema.checks.orgId,
         normalizedClaim: schema.checks.normalizedClaim,
+        language: schema.checks.language,
       })
       .from(schema.checks)
       .where(eq(schema.checks.id, checkId))
@@ -100,6 +104,7 @@ export class PostgresClaimSourceStore implements ClaimSourceStore {
       claimText,
       submissionId: check.submissionId,
       orgId: check.orgId,
+      language: check.language,
     };
   }
 
@@ -360,7 +365,7 @@ export async function submitClaimSource(
         submission_id: info.submissionId,
         org_id: info.orgId,
         claim_text: claimText,
-        language: "en",
+        language: info.language ?? "en",
         injected_docs: docs.map((d) => {
           const docUrl = (d.resolvedUrl ?? d.url).slice(0, 2048);
           const title = hostOf(docUrl).slice(0, MAX_DOC_TITLE);
