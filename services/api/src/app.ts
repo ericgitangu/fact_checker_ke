@@ -276,6 +276,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       // /internal/outbox/drain + the dedicated /internal/entitlements/sweep)
       // transitions lapsed active rows to `expired`.
       entitlements: entitlements!,
+      // ADR-0038 Wave 1 (status-progression lifecycle), all flag-gated:
+      featurePreliminaryThreads: config.featurePreliminaryThreads,
+      featureLifecycleExpiry: config.featureLifecycleExpiry,
+      lifecycleExpiryDays: config.lifecycleExpiryDays,
+      editorReviewExpiryDays: config.editorReviewExpiryDays,
     }),
   );
   await app.register((instance) =>

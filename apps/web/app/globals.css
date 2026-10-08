@@ -1769,6 +1769,19 @@ a:hover {
   background: var(--paper-2);
 }
 
+/* ADR-0038 per-card next-step affordance (lifecycle-affordance.tsx). Reuses
+   the status-chip + ts-* tokens above — no new palette. The wrapper just lays
+   the chip and its (Wave-3, non-interactive) next-step hint together. */
+.lifecycle-affordance {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.lifecycle-affordance-cta {
+  font-weight: 600;
+}
+
 .advisory-list {
   display: flex;
   flex-direction: column;

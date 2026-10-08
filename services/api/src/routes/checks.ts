@@ -94,4 +94,6 @@ export async function checkRoutes(
     }
     return reply.status(201).send(result.value);
   });
+
+  // ADR-0038 Wave 2: `POST /v1/checks/:id/sources` (public, throttled, URL-validated, deduped → `claim_source_submissions`) attaches here — deferred until that table exists.
 }

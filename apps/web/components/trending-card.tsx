@@ -1,7 +1,9 @@
-import type { TrendingItem } from "@fact-checker-ke/core";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { RadarIcon, EyeIcon, ExternalLinkIcon } from "@fact-checker-ke/brand";
 import { TrendingStatusChip } from "./trending-status-chip";
+import { LifecycleAffordance } from "./lifecycle-affordance";
+import { lifecycleAffordanceFor } from "../lib/lifecycle-copy";
+import type { TrendingItemView } from "../lib/lifecycle-read-model";
 
 /**
  * One row in the "Trending / under review" stream: a fetch-DISCOVERED viral
@@ -21,13 +23,21 @@ function formatReach(n: number): string {
   return String(n);
 }
 
-export async function TrendingCard({ item }: { item: TrendingItem }): Promise<React.JSX.Element> {
+export async function TrendingCard({ item }: { item: TrendingItemView }): Promise<React.JSX.Element> {
   const t = await getTranslations("feed");
+  const locale = await getLocale();
   const observedDate = new Intl.DateTimeFormat("en-KE", {
     year: "numeric",
     month: "short",
     day: "numeric",
   }).format(new Date(item.observedAt));
+
+  // ADR-0038: the honest next-step affordance for this discovery, keyed off the
+  // check's lifecycle (preliminary → "Help verify", awaiting_sources → "Submit
+  // the truth", editor_review → "Under editorial review", archived_expired →
+  // "Reopen with a source"). Null for a plain monitoring/published item, which
+  // keeps its status chip + (published) check link below.
+  const affordance = lifecycleAffordanceFor(item.lifecycleState, locale);
 
   return (
     <article className="trendingcard" aria-label={item.title}>
@@ -43,6 +53,8 @@ export async function TrendingCard({ item }: { item: TrendingItem }): Promise<Re
       </div>
 
       <p className="trendingcard-title">{item.title}</p>
+
+      {affordance && <LifecycleAffordance affordance={affordance} />}
 
       {item.engagement && (
         <p className="trendingcard-reach">

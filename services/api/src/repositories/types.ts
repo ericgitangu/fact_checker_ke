@@ -1,14 +1,21 @@
 import type {
   BillingProvider,
-  Check,
   EntitlementStatus,
   EntitlementTier,
-  FeedItem,
   Submission,
-  TrendingItem,
   WaitlistSignupInput,
   WaitlistSignupResult,
 } from "@fact-checker-ke/core";
+// ADR-0038 contract B: the read models carry three additive editorial-
+// lifecycle fields that live in services/api (not packages/core). These
+// augmented aliases are structural supersets of the core Check/FeedItem/
+// TrendingItem, so every existing consumer typed against the core type keeps
+// working unchanged.
+import type {
+  CheckWithLifecycle,
+  FeedItemWithLifecycle,
+  TrendingItemWithLifecycle,
+} from "../lib/read-model-lifecycle.js";
 
 /**
  * Result type for repository operations that can fail in an expected way.
@@ -27,7 +34,7 @@ export interface SubmissionRepository {
 }
 
 export interface CheckRepository {
-  getById(id: string): Promise<RepoResult<Check>>;
+  getById(id: string): Promise<RepoResult<CheckWithLifecycle>>;
   /**
    * The latest check for a submission (newest by `createdAt`), as a thin
    * pointer for `GET /v1/submissions/:id` — just the real check id and
@@ -44,7 +51,7 @@ export interface CheckRepository {
    * (a keyset cursor, not an offset, so it stays correct under
    * concurrent inserts); omit it for the first page.
    */
-  listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItem[]>;
+  listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItemWithLifecycle[]>;
   /**
    * Feed-quality (virality): the top-N PUBLISHED checks by `viralityScore`
    * DESC — the "most viral right now" section. Rows with a null virality score
@@ -53,7 +60,7 @@ export interface CheckRepository {
    * is computed over ALL published rows, not a keyset page, and is additive to
    * `listPublished` — the descending feed is unchanged.
    */
-  listTopViral(opts: { limit: number }): Promise<FeedItem[]>;
+  listTopViral(opts: { limit: number }): Promise<FeedItemWithLifecycle[]>;
 }
 
 export interface TrendingRepository {
@@ -68,7 +75,7 @@ export interface TrendingRepository {
    * when a published check exists). Served by the partial index
    * `submissions_fetch_trending_idx`.
    */
-  listTrending(opts: { limit: number }): Promise<TrendingItem[]>;
+  listTrending(opts: { limit: number }): Promise<TrendingItemWithLifecycle[]>;
 }
 
 export interface WaitlistRepository {

@@ -86,6 +86,21 @@ interface VerifyHopResponseBody {
     // check for the calibration flywheel. Optional — absent on a pre-ADR-0036
     // pipeline response (the API tolerates extra/missing fields, see postJson).
     corroboration_state?: string | null;
+    // ADR-0038 contract A (pipeline → api): the editorial lifecycle the verify
+    // hop assigns to a NON-auto-published outcome, plus its provenance. All
+    // three are OPTIONAL — a pre-0038 pipeline, or one with
+    // FEATURE_PRELIMINARY_THREADS off, simply omits them and the orchestrator
+    // falls back to today's held-draft behaviour (see `featurePreliminaryThreads`).
+    //   - `lifecycle`:  "published" (the auto-publish path, enacted by
+    //     publish-enactment, NOT persisted from here) | "preliminary" |
+    //     "awaiting_sources" | "dismissed".
+    //   - `source_kind`: e.g. "ai_grounded_preliminary" for a grounded rescue
+    //     thread; null for an ordinary verdict.
+    //   - `authoritative`: false for an AI-grounded preliminary / a named-person
+    //     item whose rating is withheld from the public.
+    lifecycle?: "published" | "preliminary" | "awaiting_sources" | "dismissed" | null;
+    source_kind?: string | null;
+    authoritative?: boolean | null;
   } | null;
 }
 
@@ -117,6 +132,14 @@ export interface RunSubmissionOrchestrationArgs {
   event: SubmissionReceivedEvent;
   /** Injectable for tests; defaults to the global `fetch`. */
   fetchImpl?: typeof fetch;
+  /**
+   * ADR-0038 (FEATURE_PRELIMINARY_THREADS): when true, the verify hop's
+   * `lifecycle`/`source_kind`/`authoritative` fields (contract A) are trusted
+   * and persisted onto the check. When false/omitted (default — shipped dark),
+   * they are ignored and the item falls back to today's held-draft behaviour,
+   * so the whole lifecycle track is inert until the flag is flipped on.
+   */
+  featurePreliminaryThreads?: boolean;
 }
 
 async function postJson<T>(fetchImpl: typeof fetch, url: string, body: unknown): Promise<T> {
@@ -277,9 +300,37 @@ export async function runSubmissionOrchestration(
     return { kind: "verify_rejected_no_check_created", reason: verify.rejection_reason ?? verify.publish?.reason ?? null };
   }
 
+  // ADR-0038 contract A: read the verify hop's editorial-lifecycle fields —
+  // but ONLY when FEATURE_PRELIMINARY_THREADS is on (otherwise ship dark: the
+  // fields are ignored and the item falls back to today's held-draft path).
+  //
+  // What we persist on INSERT:
+  //   - `source_kind` + `authoritative` are orthogonal to the publish gate and
+  //     carried straight through.
+  //   - `lifecycle_state` is set to a NON-publish state (preliminary /
+  //     awaiting_sources / dismissed) here; the `published` terminal state is
+  //     enacted atomically by `enactPublishDecision` (publish-enactment.ts), so
+  //     this never pre-sets `published` and never double-sets it.
+  //   - `last_activity_at = now()` — ingest is activity, and it is the clock the
+  //     expiry sweep reads.
+  const lifecycleOn = args.featurePreliminaryThreads === true;
+  const hopLifecycle = lifecycleOn ? (verify.publish.lifecycle ?? null) : null;
+  const initialLifecycleState: NonNullable<(typeof schema.checks.$inferSelect)["lifecycleState"]> | null =
+    hopLifecycle === "preliminary" || hopLifecycle === "awaiting_sources" || hopLifecycle === "dismissed"
+      ? hopLifecycle
+      : null;
+  const hopSourceKind = lifecycleOn ? (verify.publish.source_kind ?? null) : null;
+  // `authoritative` is NOT NULL (default true): a null/absent hop value keeps
+  // the row authoritative; only an explicit `false` marks it non-authoritative.
+  const hopAuthoritative = lifecycleOn ? (verify.publish.authoritative ?? true) : true;
+
   const [check] = await args.db
     .insert(schema.checks)
     .values({
+      lifecycleState: initialLifecycleState,
+      sourceKind: hopSourceKind,
+      authoritative: hopAuthoritative,
+      lastActivityAt: new Date(),
       submissionId: event.submission_id,
       orgId: event.org_id,
       summary,

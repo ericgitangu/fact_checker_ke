@@ -1,10 +1,7 @@
 import type {
   BillingProvider,
-  Check,
   EntitlementTier,
-  FeedItem,
   Submission,
-  TrendingItem,
   WaitlistSignupInput,
   WaitlistSignupResult,
 } from "@fact-checker-ke/core";
@@ -13,6 +10,12 @@ import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import { deriveTrendingStatus } from "../lib/trending-status.js";
 import { cleanTrendingTitle } from "../lib/trending-title.js";
+import {
+  lifecycleFieldsOf,
+  type CheckWithLifecycle,
+  type FeedItemWithLifecycle,
+  type TrendingItemWithLifecycle,
+} from "../lib/read-model-lifecycle.js";
 import type {
   CheckRepository,
   DeviceTokenRepository,
@@ -131,7 +134,7 @@ export class PostgresCheckRepository implements CheckRepository {
     return { id: row.id, published: !row.isDraft && row.publishedAt !== null };
   }
 
-  async getById(id: string): Promise<RepoResult<Check>> {
+  async getById(id: string): Promise<RepoResult<CheckWithLifecycle>> {
     const [checkRow] = await this.db
       .select()
       .from(schema.checks)
@@ -164,6 +167,9 @@ export class PostgresCheckRepository implements CheckRepository {
     return {
       ok: true,
       value: {
+        // ADR-0038 contract B: additive lifecycle fields (lifecycleState,
+        // authoritative, sourceKind) on the full check read model.
+        ...lifecycleFieldsOf(checkRow),
         id: checkRow.id,
         submissionId: checkRow.submissionId,
         summary: checkRow.summary,
@@ -220,7 +226,7 @@ export class PostgresCheckRepository implements CheckRepository {
    * // out of scope for this change per the task brief ("NO new migration
    * // unless truly required").
    */
-  async listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItem[]> {
+  async listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItemWithLifecycle[]> {
     const whereClauses = [eq(schema.checks.isDraft, false), isNotNull(schema.checks.publishedAt)];
     if (opts.cursor) {
       whereClauses.push(lt(schema.checks.publishedAt, new Date(opts.cursor)));
@@ -236,7 +242,7 @@ export class PostgresCheckRepository implements CheckRepository {
     return this.hydrateFeedItems(checkRows);
   }
 
-  async listTopViral(opts: { limit: number }): Promise<FeedItem[]> {
+  async listTopViral(opts: { limit: number }): Promise<FeedItemWithLifecycle[]> {
     // Feed-quality (virality): top published checks by virality score, nulls
     // EXCLUDED (not ranked as zero), ties broken by recency — served by the
     // partial index `checks_published_virality_idx`.
@@ -260,7 +266,7 @@ export class PostgresCheckRepository implements CheckRepository {
    * and project each to a `FeedItem`, preserving the input order. Shared by
    * `listPublished` (descending feed) and `listTopViral` (most-viral section)
    * so the two read paths can never drift in their projection. */
-  private async hydrateFeedItems(checkRows: (typeof schema.checks.$inferSelect)[]): Promise<FeedItem[]> {
+  private async hydrateFeedItems(checkRows: (typeof schema.checks.$inferSelect)[]): Promise<FeedItemWithLifecycle[]> {
     if (checkRows.length === 0) return [];
 
     const checkIds = checkRows.map((c) => c.id);
@@ -278,7 +284,7 @@ export class PostgresCheckRepository implements CheckRepository {
       .innerJoin(schema.sources, eq(schema.checkEvidence.sourceId, schema.sources.id))
       .where(inArray(schema.checkEvidence.checkId, checkIds));
 
-    const sourcesByCheckId = new Map<string, FeedItem["sources"]>();
+    const sourcesByCheckId = new Map<string, FeedItemWithLifecycle["sources"]>();
     for (const row of evidenceRows) {
       const list = sourcesByCheckId.get(row.checkId) ?? [];
       list.push({
@@ -293,11 +299,13 @@ export class PostgresCheckRepository implements CheckRepository {
     }
 
     return checkRows.map((row) => ({
+      // ADR-0038 contract B: additive lifecycle fields on each feed row.
+      ...lifecycleFieldsOf(row),
       id: row.id,
       claim: row.summary,
       // Published checks always carry a rating (`checks_published_requires_rating`
       // DB constraint) — the cast is backed by that invariant, not an assumption.
-      rating: row.rating as FeedItem["rating"],
+      rating: row.rating as FeedItemWithLifecycle["rating"],
       calibratedConfidence: row.calibratedConfidence === null ? null : Number(row.calibratedConfidence),
       ingestSource: row.ingestSource,
       riskTier: row.riskTier,
@@ -322,7 +330,7 @@ export class PostgresCheckRepository implements CheckRepository {
 export class PostgresTrendingRepository implements TrendingRepository {
   constructor(private readonly db: Database) {}
 
-  async listTrending(opts: { limit: number }): Promise<TrendingItem[]> {
+  async listTrending(opts: { limit: number }): Promise<TrendingItemWithLifecycle[]> {
     // Fetch-sourced discoveries ranked by virality DESC NULLS LAST, ties by
     // observation recency — served by the partial index
     // `submissions_fetch_trending_idx`. `desc()` alone would be NULLS FIRST in
@@ -353,6 +361,12 @@ export class PostgresTrendingRepository implements TrendingRepository {
         isDraft: schema.checks.isDraft,
         publishedAt: schema.checks.publishedAt,
         createdAt: schema.checks.createdAt,
+        // ADR-0038: the editorial lifecycle + its read-model fields, so the
+        // derived status (editor_review → under_review only) and the per-card
+        // affordance both key off the same row.
+        lifecycleState: schema.checks.lifecycleState,
+        authoritative: schema.checks.authoritative,
+        sourceKind: schema.checks.sourceKind,
       })
       .from(schema.checks)
       .where(inArray(schema.checks.submissionId, submissionIds));
@@ -380,10 +394,21 @@ export class PostgresTrendingRepository implements TrendingRepository {
     return subRows.map((row) => {
       const best = bestCheckBySubmission.get(row.id) ?? null;
       const pointer = best
-        ? { checkId: best.id, isDraft: best.isDraft, publishedAt: best.publishedAt ? toIsoString(best.publishedAt) : null }
+        ? {
+            checkId: best.id,
+            isDraft: best.isDraft,
+            publishedAt: best.publishedAt ? toIsoString(best.publishedAt) : null,
+            lifecycleState: best.lifecycleState ?? null,
+          }
         : null;
       const { status, checkId } = deriveTrendingStatus(row.status, pointer);
+      // ADR-0038 contract B: the chosen check's lifecycle fields ride along on
+      // the trending item (or the defaults when the discovery has no check).
+      const lifecycle = best
+        ? lifecycleFieldsOf(best)
+        : { lifecycleState: null, authoritative: true, sourceKind: null };
       return {
+        ...lifecycle,
         submissionId: row.id,
         // The fetch submission's `text` is the discovered claim/video title
         // (youtube_fetch_source.py sets it to "title\ndescription"). It is

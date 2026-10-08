@@ -1,9 +1,11 @@
-import type { FeedItem } from "@fact-checker-ke/core";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { ConfidenceGauge, RadarIcon, PenLineIcon } from "@fact-checker-ke/brand";
 import { VerdictChip } from "./verdict";
 import { FeedItemCaveatNote } from "./legal-caveat";
 import { MarkdownText } from "./markdown-text";
+import { LifecycleAffordance } from "./lifecycle-affordance";
+import { lifecycleAffordanceFor } from "../lib/lifecycle-copy";
+import type { FeedItemView } from "../lib/lifecycle-read-model";
 
 /**
  * ADR-0032's visible payoff, rendered: one row in the "what we're
@@ -26,14 +28,23 @@ import { MarkdownText } from "./markdown-text";
  * `feed-section.tsx`, which renders the full standing disclosure once,
  * for the whole list, rather than once per item.
  */
-export async function FeedItemCard({ item }: { item: FeedItem }): Promise<React.JSX.Element> {
+export async function FeedItemCard({ item }: { item: FeedItemView }): Promise<React.JSX.Element> {
   const t = await getTranslations("feed");
   const tCheck = await getTranslations("check");
+  const locale = await getLocale();
   const publishedDate = new Intl.DateTimeFormat("en-KE", {
     year: "numeric",
     month: "short",
     day: "numeric",
   }).format(new Date(item.publishedAt));
+
+  // ADR-0038 per-card affordance. The feed is published-only, so for an
+  // ordinary published row this resolves to null and the card renders the
+  // verdict + confidence exactly as before. For any non-published lifecycle
+  // (defensive — e.g. a preliminary surfaced through this card), it renders the
+  // next-step affordance INSTEAD of a verdict, so a non-authoritative /
+  // not-yet-verified item (incl. named-person) never shows a rating chip.
+  const affordance = lifecycleAffordanceFor(item.lifecycleState, locale);
 
   return (
     <article className="feedcard" aria-label={item.claim}>
@@ -44,14 +55,20 @@ export async function FeedItemCard({ item }: { item: FeedItem }): Promise<React.
           </span>
           {t(`source.${item.ingestSource}`)}
         </span>
-        {await VerdictChip({ rating: item.rating })}
-        {item.calibratedConfidence !== null && (
-          <ConfidenceGauge
-            value={item.calibratedConfidence}
-            label={tCheck("guidance.confidenceLabel")}
-            size="sm"
-            className="feedcard-gauge"
-          />
+        {affordance ? (
+          <LifecycleAffordance affordance={affordance} />
+        ) : (
+          <>
+            {await VerdictChip({ rating: item.rating })}
+            {item.calibratedConfidence !== null && (
+              <ConfidenceGauge
+                value={item.calibratedConfidence}
+                label={tCheck("guidance.confidenceLabel")}
+                size="sm"
+                className="feedcard-gauge"
+              />
+            )}
+          </>
         )}
       </div>
 

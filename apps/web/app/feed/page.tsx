@@ -51,6 +51,7 @@ export default async function FeedPage({
       {/* "Most viral right now" (top-3 PUBLISHED by reach) sits below it —
           additive, and self-hiding (renders null) when nothing qualifies, so
           an all-submission feed is unaffected. */}
+      {/* ADR-0038 Wave 3: a second "Most followed" rail (new claim_follows counter) attaches here alongside Most-viral — deferred until the follows counter exists. */}
       <ViralSection items={feed.topViral} />
 
       <FeedSection

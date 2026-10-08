@@ -35,6 +35,25 @@ describe("GET /v1/feed", () => {
     await app.close();
   });
 
+  it("ADR-0038 contract B: exposes lifecycleState/authoritative/sourceKind on each feed item (not stripped)", async () => {
+    const checks = new InMemoryCheckRepository();
+    const c = publishedCheck({ summary: "contract-b" });
+    // Seed with explicit lifecycle read-fields (the 3rd seed arg).
+    checks.seed(c, "submission", { lifecycleState: "published", authoritative: true, sourceKind: null });
+
+    const app = await buildApp({ logger: false, checks });
+    const res = await app.inject({ method: "GET", url: "/v1/feed" });
+    const body = res.json() as {
+      items: Array<{ claim: string; lifecycleState: string | null; authoritative: boolean; sourceKind: string | null }>;
+    };
+    const item = body.items.find((i) => i.claim === "contract-b");
+    // The fields survive Fastify serialization (no response schema strips them).
+    expect(item?.lifecycleState).toBe("published");
+    expect(item?.authoritative).toBe(true);
+    expect(item?.sourceKind).toBeNull();
+    await app.close();
+  });
+
   it("surfaces a top-3 'most viral' section by viralityScore desc, excluding nulls, ties by recency", async () => {
     const checks = new InMemoryCheckRepository();
     // Four viral (fetch) items with distinct scores + one tie, and one
