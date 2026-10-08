@@ -12,6 +12,7 @@ import { advanceWithInbox } from "../lib/advance.js";
 import { runRetentionSweep } from "../lib/retention.js";
 import { runEntitlementSweep } from "../lib/entitlement-sweep.js";
 import { runSubmissionOrchestration } from "../lib/submission-orchestrator.js";
+import { sweepExpiredLifecycle } from "../lib/editorial.js";
 import type { EntitlementRepository } from "../repositories/types.js";
 
 const SubmissionAdvancedBodySchema = z.object({
@@ -46,6 +47,19 @@ export interface InternalRoutesDeps {
    * fail-safe spirit as the `db`-gated branches below.
    */
   entitlements?: EntitlementRepository;
+  /**
+   * ADR-0038 (FEATURE_PRELIMINARY_THREADS): forwarded to the submission
+   * orchestrator so it only trusts/persists the verify-hop lifecycle fields
+   * when on. Optional + defaulted off so existing `InternalRoutesDeps` literals
+   * keep compiling and the lifecycle work stays dark until flipped on.
+   */
+  featurePreliminaryThreads?: boolean;
+  /** ADR-0038 (FEATURE_LIFECYCLE_EXPIRY): gates POST /internal/lifecycle/expire.
+   * Off/omitted ⇒ the sweep is a no-op. */
+  featureLifecycleExpiry?: boolean;
+  /** ADR-0038: TTLs (days) for the expiry sweep; defaulted to 7 / 30. */
+  lifecycleExpiryDays?: number;
+  editorReviewExpiryDays?: number;
 }
 
 async function verifyOrReject(
@@ -119,6 +133,29 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
       return reply.status(200).send({ expired: 0, note: "entitlement repository not wired; no-op" });
     }
     const result = await runEntitlementSweep(deps.entitlements);
+    return reply.status(200).send(result);
+  });
+
+  // ADR-0038 auto-expire sweep ([T]): Cloud-Scheduler-driven (scale-to-zero,
+  // no always-on worker — the schedule is created out-of-band, same policy as
+  // the outbox/retention sweeps), transitioning stale non-terminal checks to
+  // `archived_expired`. Same QStash signature verification as every other
+  // /internal route (fail-closed when no signing keys are set) and the same
+  // db-gated 503 as the drain route (it writes checks + audit_log, which the
+  // in-memory mode has no store for). FLAG-GATED on FEATURE_LIFECYCLE_EXPIRY:
+  // off ⇒ an authenticated no-op (the ADR-0038 rollback path).
+  app.post("/internal/lifecycle/expire", async (request, reply) => {
+    if (!(await verifyOrReject(request, reply, deps.verifier))) return;
+    if (!deps.featureLifecycleExpiry) {
+      return reply.status(200).send({ archived: 0, note: "FEATURE_LIFECYCLE_EXPIRY off; no-op" });
+    }
+    if (!deps.db) {
+      return reply.status(503).send({ error: "db_unavailable" });
+    }
+    const result = await sweepExpiredLifecycle(deps.db, {
+      lifecycleExpiryDays: deps.lifecycleExpiryDays ?? 7,
+      editorReviewExpiryDays: deps.editorReviewExpiryDays ?? 30,
+    });
     return reply.status(200).send(result);
   });
 
@@ -232,6 +269,9 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
         db: deps.db,
         pipelineBaseUrl: deps.pipelineBaseUrl ?? "http://localhost:8000",
         event,
+        // ADR-0038 contract A: only persist the verify-hop lifecycle fields
+        // when the flag is on (otherwise ship dark).
+        featurePreliminaryThreads: deps.featurePreliminaryThreads ?? false,
       });
       return reply.status(200).send({ outcome: outcome.kind, ...outcome });
     } catch (err) {

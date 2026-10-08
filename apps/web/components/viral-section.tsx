@@ -1,4 +1,4 @@
-import type { FeedItem } from "@fact-checker-ke/core";
+import type { FeedItemView } from "../lib/lifecycle-read-model";
 import { getTranslations } from "next-intl/server";
 import { Reveal, RadarIcon } from "@fact-checker-ke/brand";
 import { FeedItemCard } from "./feed-item-card";
@@ -19,7 +19,7 @@ import { FeedItemCard } from "./feed-item-card";
  * once for the whole page, and these same items also appear in the descending
  * feed below, which that disclosure already covers.
  */
-export async function ViralSection({ items }: { items: FeedItem[] }): Promise<React.JSX.Element | null> {
+export async function ViralSection({ items }: { items: FeedItemView[] }): Promise<React.JSX.Element | null> {
   if (items.length === 0) return null;
   const t = await getTranslations("feed");
 
@@ -35,7 +35,7 @@ export async function ViralSection({ items }: { items: FeedItem[] }): Promise<Re
 
       <ol className="feed-list viral-list">
         {await Promise.all(
-          items.map(async (item: FeedItem, i: number) => (
+          items.map(async (item: FeedItemView, i: number) => (
             <li key={item.id}>
               <Reveal motion="rise" delay={Math.min(i, 4) * 0.06}>
                 {await FeedItemCard({ item })}

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresRepositories } from "../repositories/postgres.js";
 import type { TrendingRepository } from "../repositories/types.js";
-import { createDb, schema, type Database } from "@fact-checker-ke/db";
+import { schema, type Database } from "@fact-checker-ke/db";
 import { requireIntegrationDatabaseUrl } from "./integration-env.js";
 
 /**
@@ -36,7 +36,11 @@ describe.skipIf(!connectionString)("GET /v1/trending — TrendingRepository.list
     marker: string;
     status: "received" | "analyzing" | "analyzed" | "verifying" | "ready" | "failed";
     viralityScore: number | null;
-    check?: { isDraft: boolean; publishedAt: Date | null };
+    check?: {
+      isDraft: boolean;
+      publishedAt: Date | null;
+      lifecycleState?: "preliminary" | "awaiting_sources" | "editor_review" | "published";
+    };
   }): Promise<string> {
     const [submission] = await db
       .insert(schema.submissions)
@@ -63,6 +67,9 @@ describe.skipIf(!connectionString)("GET /v1/trending — TrendingRepository.list
         whatWouldChangeThis: opts.check.isDraft ? null : "A material correction.",
         riskTier: opts.check.isDraft ? null : "A",
         ingestSource: "fetch",
+        // ADR-0038: deriveTrendingStatus now reads lifecycle_state; under_review
+        // is emitted ONLY for editor_review (not any held draft).
+        lifecycleState: opts.check.lifecycleState ?? null,
       });
     }
 
@@ -77,7 +84,9 @@ describe.skipIf(!connectionString)("GET /v1/trending — TrendingRepository.list
       marker: `${marker}-rev`,
       status: "ready",
       viralityScore: 400.4,
-      check: { isDraft: true, publishedAt: null },
+      // ADR-0038: only an editor_review item surfaces as under_review (a held draft
+      // alone is now 'monitoring' — the old "a human editor is assessing it" lie).
+      check: { isDraft: true, publishedAt: null, lifecycleState: "editor_review" },
     });
     const published = await seedFetchSubmission({
       marker: `${marker}-pub`,

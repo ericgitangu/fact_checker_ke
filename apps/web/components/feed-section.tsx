@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import type { FeedItem } from "@fact-checker-ke/core";
+import type { FeedItemView } from "../lib/lifecycle-read-model";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { Reveal, RadarIcon } from "@fact-checker-ke/brand";
@@ -32,7 +32,7 @@ export async function FeedSection({
   showViewAllLink = false,
   emptyAction,
 }: {
-  items: FeedItem[];
+  items: FeedItemView[];
   isMock: boolean;
   showViewAllLink?: boolean;
   /** Only the full `/feed` route passes this — the home-page preview
@@ -62,7 +62,7 @@ export async function FeedSection({
       ) : (
         <ul className="feed-list">
           {await Promise.all(
-            items.map(async (item: FeedItem, i: number) => {
+            items.map(async (item: FeedItemView, i: number) => {
               // ADR-0012 §4: in-feed ad unit AFTER item N — between whole
               // cards (never above the fold, never between a claim and its
               // evidence). Its own <li> so the list stays valid. Renders
