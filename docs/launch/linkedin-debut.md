@@ -14,7 +14,7 @@
 >
 > So I built something that doesn't wait.
 >
-> **fact_checker_ke** is an autonomous AI fact-checker for Kenyan claims. It surfaces what's going viral on its own, weighs each claim against grounded evidence, and publishes an assessment — in English, Swahili and Sheng.
+> **fact_checker_ke** is an autonomous AI fact-checker for Kenyan claims. It surfaces what's going viral on its own, weighs each claim against grounded evidence, and publishes an assessment — working across English, Swahili and Sheng.
 >
 > Two rules it won't break:
 >

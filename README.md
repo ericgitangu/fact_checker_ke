@@ -35,7 +35,7 @@ Autonomy-first does not mean human-free: a claim can be escalated to `editor_rev
 
 ## Architecture
 
-Two ingest engines feed one event-driven pipeline. The **fetch engine** pulls candidate claims autonomously (YouTube trending `mostPopular` for Kenya, plus a fact-check news RSS triage served via Google News, which surfaces PesaCheck / Africa Check / AFP items); the **submission engine** takes a URL or raw text from a user. Both land on the same path: `submission.received` → **analyze** → **verify** → **publish-policy** → an editorial **lifecycle** that ends in a terminal state. State changes and the events announcing them commit together through a transactional outbox, drained by QStash with idempotency so at-least-once delivery is safe to retry. Status streams to the client over SSE in near-real-time.
+Two ingest engines feed one event-driven pipeline. The **fetch engine** pulls candidate claims autonomously (YouTube trending `mostPopular` for Kenya, plus a Google News fact-check RSS query for Kenya, which surfaces debunks from outlets like PesaCheck, Africa Check and AFP); the **submission engine** takes a URL or raw text from a user. Both land on the same path: `submission.received` → **analyze** → **verify** → **publish-policy** → an editorial **lifecycle** that ends in a terminal state. State changes and the events announcing them commit together through a transactional outbox, drained by QStash with idempotency so at-least-once delivery is safe to retry. Status streams to the client over SSE in near-real-time.
 
 ```mermaid
 flowchart TD
@@ -165,7 +165,7 @@ There is no GitHub Actions CI badge: Actions billing is currently locked on this
 - **Test-driven.** Features land with their tests — vitest for TypeScript, pytest for Python. The contract (inputs → outputs) is what gets tested, not internals.
 - **One contract source.** Request/response shapes are defined once as zod schemas in `packages/core` and generated into Pydantic for the Python side; a drift check fails the build if the two diverge.
 - **Transactional outbox + idempotency.** A state change and the event announcing it commit in one transaction; client idempotency keys, a QStash inbox, and a content-hash result cache make at-least-once delivery safe to retry.
-- **Scale-to-zero cost discipline.** A Terraform plan-guard fails any plan that provisions an always-on resource — no NAT gateway, no `min_instance_count > 0`, no unattached static IP. (The Compute Engine, Cloud SQL and Memorystore APIs are left disabled entirely, so those cost traps can't be created at all.)
+- **Scale-to-zero cost discipline.** A Terraform plan-guard fails any plan that provisions an always-on resource — no NAT gateway, no `min_instance_count > 0`, no unattached static IP, no Cloud SQL or Memorystore — so those cost traps can't land through IaC.
 - **Metered abuse guardrails.** Every AI engine spends against a per-lane daily USD breaker (analyze/verify, grounding, speech, fetch) that hard-stops at budget; intake is gated by a required device token, a per-device daily quota, and IP rate limits on token minting and the waitlist. An abuse spike or viral day is bounded to a known dollar figure, not a surprise bill.
 - **Decision records.** Material architecture decisions are written up under [docs/](docs/) before they are trusted, each with the options considered, the trade-off accepted, and a review trigger.
 
