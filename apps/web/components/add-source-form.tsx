@@ -27,10 +27,14 @@ export function AddSourceForm({
   checkId,
   triggerLabel,
   copy,
+  resource = "checks",
 }: {
+  /** The id to attach the source to — a check id ("checks") or, for a trending
+   * card where the draft id is never exposed, a submission id ("submissions"). */
   checkId: string;
   triggerLabel: string;
   copy: AddSourceFormCopy;
+  resource?: "checks" | "submissions";
 }): React.JSX.Element {
   const [state, setState] = useState<FormState>({ status: "idle" });
   const [url, setUrl] = useState("");
@@ -41,7 +45,7 @@ export function AddSourceForm({
     setState({ status: "submitting" });
     try {
       const deviceToken = await getDeviceToken();
-      const res = await fetch(`/api/checks/${checkId}/sources`, {
+      const res = await fetch(`/api/${resource}/${checkId}/sources`, {
         method: "POST",
         headers: {
           "content-type": "application/json",

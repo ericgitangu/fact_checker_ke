@@ -55,16 +55,16 @@ export async function TrendingCard({ item }: { item: TrendingItemView }): Promis
       <p className="trendingcard-title">{item.title}</p>
 
       {affordance && (
-        // BLOCKER (by design, not a bug): a trending item's `checkId` is exposed
-        // ONLY when published (TrendingItem.checkId is null for a draft still
-        // under review — a draft id is never leaked). So for an under-review /
-        // monitoring preliminary item the add-source CTA stays NON-interactive
-        // here; the interactive "Submit the truth" form is wired on the feed /
-        // published surfaces where a real check id IS available (feed-item-card).
+        // A trending draft's `checkId` is never exposed (null until published),
+        // but `submissionId` IS public — so the add-source form targets the
+        // submission id and the API resolves it to the owning check server-side.
+        // This makes "Submit the truth" interactive on a trending preliminary /
+        // awaiting item without leaking a draft id.
         <LifecycleAffordance
           affordance={affordance}
           checkId={item.checkId}
-          formCopy={item.checkId ? addSourceFormCopyFor(locale) : undefined}
+          submissionId={item.submissionId}
+          formCopy={addSourceFormCopyFor(locale)}
         />
       )}
 

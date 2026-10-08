@@ -194,4 +194,58 @@ export async function checkRoutes(
     }
     return reply.status(result.httpStatus).send(result.value);
   });
+
+  /**
+   * ADR-0038 Wave 2: the SAME crowdsource flow, keyed by SUBMISSION id. The
+   * public trending stream exposes `submissionId` but deliberately never the
+   * draft check id, so a reader on a trending (preliminary / awaiting_sources /
+   * editor_review) item submits a source by submission id; we resolve it to the
+   * owning check server-side and reuse submitClaimSource unchanged. Same flag,
+   * throttle, validation, and lifecycle gating as /v1/checks/:id/sources.
+   */
+  app.post<{ Params: { id: string } }>("/v1/submissions/:id/sources", async (request, reply) => {
+    const cs = deps.crowdsource;
+    if (!cs || !cs.featureCrowdsourceSources) {
+      return reply.status(404).send({ error: "not_found", message: "Not found." });
+    }
+    if (!cs.claimSourceStore) {
+      return reply.status(501).send({ error: "crowdsource_unavailable", message: "No database configured." });
+    }
+    const token = deviceToken(request);
+    if (!token) {
+      return reply.status(400).send({
+        error: "device_token_required",
+        message: "The X-Device-Token header is required (see POST /v1/device).",
+      });
+    }
+    const withinQuota = await cs.deviceQuotaGuard.checkAndConsume(token);
+    if (!withinQuota) {
+      return reply.status(429).send({ error: "device_quota_exceeded" });
+    }
+    const parsed = SourceSubmissionSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "validation_error", issues: parsed.error.issues });
+    }
+    // Resolve the submission to its check; a fetch submission with no check yet
+    // (or an unknown id) has no open thread to attach a source to.
+    const checkId = await cs.claimSourceStore.resolveCheckIdBySubmission(request.params.id);
+    if (!checkId) {
+      return reply.status(404).send({ error: "not_found", message: "No check for this submission." });
+    }
+    const result = await submitClaimSource(
+      cs.claimSourceStore,
+      {
+        resolveUrl: (url) => resolveUrlServerSide(url, cs.fetchImpl ?? fetch),
+        publisher: cs.publisher,
+        reverifyHopUrl: cs.reverifyHopUrl,
+        reverifyThreshold: cs.reverifyThreshold,
+      },
+      { checkId, url: parsed.data.url, note: parsed.data.note ?? null, deviceHash: hashDeviceToken(token) },
+    );
+    reply.header("Cache-Control", NO_STORE_CACHE_CONTROL);
+    if (!result.ok) {
+      return reply.status(result.httpStatus).send({ error: result.error.code, message: result.error.message });
+    }
+    return reply.status(result.httpStatus).send(result.value);
+  });
 }
