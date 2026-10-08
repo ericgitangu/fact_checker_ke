@@ -587,7 +587,9 @@
         "analyzed",
         "verifying",
         "ready",
-        "failed"
+        "failed",
+        "needs_quote",
+        "no_checkable_claims"
       ]
     },
     "WaitlistSignupInput": {

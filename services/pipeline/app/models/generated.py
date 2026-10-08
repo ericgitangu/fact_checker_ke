@@ -217,6 +217,8 @@ class SubmissionStatus(StrEnum):
     verifying = 'verifying'
     ready = 'ready'
     failed = 'failed'
+    needs_quote = 'needs_quote'
+    no_checkable_claims = 'no_checkable_claims'
 
 
 class Interest(StrEnum):
