@@ -203,6 +203,16 @@ module "pipeline_service" {
     STT_LOCATION                = "us-central1"
     STT_MODEL                   = "chirp_2"
     STT_ENGINE_DAILY_BUDGET_USD = "0.50"
+    # COST CEILING (security audit G1, 2026-10-09): the analyze+verify hops now
+    # meter their ACTUAL Haiku+Sonnet spend against the "submission" breaker lane
+    # and hard-stop at 100% (app/main.py:_submission_budget_guard). This is the
+    # daily dollar ceiling for the whole analyze/verify path — user AND
+    # fetch-emitted, api-routed AND any direct caller of the public pipeline — so
+    # a scripted-abuse or viral-spike day is bounded to this figure instead of an
+    # unbounded Anthropic bill. Gemini grounding is capped separately
+    # (CORROBORATION_ENGINE_DAILY_BUDGET_USD=0.30). Debut-week showcase value;
+    # drop it toward bare-minimum after the launch week per the cost plan.
+    SUBMISSION_ENGINE_DAILY_BUDGET_USD = "8.00"
     # Triage feed (ADR-0032/0037). Was never in TF — only ever set by gcloud, so
     # a future apply would have wiped it. Now persisted. Verified 2026-10-08:
     # PesaCheck/Africa Check's own RSS is Cloudflare-403'd from EVERY datacenter
@@ -213,7 +223,15 @@ module "pipeline_service" {
     # query — the reachable, parseable triage source. The parser strips Google
     # News' " - <publisher>" title suffix + anchor-tag description
     # (triage_feed_source.py).
-    TRIAGE_FEED_URLS = "https://news.google.com/rss/search?q=Kenya (fact check OR false OR misleading OR debunked OR hoax) when:7d&hl=en-KE&gl=KE&ceid=KE:en"
+    # Percent-encoded so the q= value (spaces, quotes, parens) is a valid URL for
+    # httpx; the decoded query is:
+    #   Kenya ("fact check" OR false OR misleading OR debunked OR hoax OR
+    #          "no evidence" OR fake OR fabricated OR "did not") when:7d
+    # Phrase-quoting "fact check" stops it matching the org token "FactCheckAfrica"
+    # (dropped the award/sports noise that a bare `fact check` term pulled in);
+    # the debunk-signal terms raise precision for actual viral-misinformation
+    # fact-checks ("No evidence ...", "FALSE: ...", "... did not ...").
+    TRIAGE_FEED_URLS = "https://news.google.com/rss/search?q=Kenya%20%28%22fact%20check%22%20OR%20false%20OR%20misleading%20OR%20debunked%20OR%20hoax%20OR%20%22no%20evidence%22%20OR%20fake%20OR%20fabricated%20OR%20%22did%20not%22%29%20when%3A7d&hl=en-KE&gl=KE&ceid=KE:en"
     # Editorial-platform score floor (ADR-0032, fix verified live 2026-10-08):
     # an RSS triage item carries NO engagement, so it scores ~0.30-0.40 on the
     # velocity-weighted virality scorer and was ALWAYS dropped below tau=0.5 —

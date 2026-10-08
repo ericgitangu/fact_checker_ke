@@ -36,7 +36,7 @@ import type {
   TrendingRepository,
   WaitlistRepository,
 } from "./repositories/types.js";
-import { createWaitlistRateLimiter, type RateLimiter } from "./rate-limit.js";
+import { createDeviceMintRateLimiter, createWaitlistRateLimiter, type RateLimiter } from "./rate-limit.js";
 import { resolveConfig, type ResolvedConfig } from "./config.js";
 import { FakePublisher, QStashPublisher, type Publisher } from "./lib/publisher.js";
 import { createPubSub, type PubSub } from "./lib/pubsub.js";
@@ -77,6 +77,7 @@ export interface BuildAppOptions {
   entitlements?: EntitlementRepository;
   submissionService?: SubmissionService;
   rateLimiter?: RateLimiter;
+  deviceMintRateLimiter?: RateLimiter;
   publisher?: Publisher;
   pubsub?: PubSub;
   signatureVerifier?: SignatureVerifier;
@@ -179,6 +180,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   }
 
   const rateLimiter = options.rateLimiter ?? createWaitlistRateLimiter(config, warn);
+  // COST-CONTROL (security audit G2): throttle anonymous device-token minting.
+  const deviceMintRateLimiter = options.deviceMintRateLimiter ?? createDeviceMintRateLimiter(config, warn);
 
   const publisher: Publisher =
     options.publisher ?? (config.qstashToken ? new QStashPublisher(config.qstashToken) : new FakePublisher());
@@ -270,7 +273,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register((instance) => feedRoutes(instance, { checks: checks! }));
   await app.register((instance) => trendingRoutes(instance, { trending: trending! }));
   await app.register((instance) => waitlistRoutes(instance, { waitlist: waitlist!, rateLimiter }));
-  await app.register((instance) => deviceRoutes(instance, { deviceTokens: deviceTokens! }));
+  await app.register((instance) =>
+    deviceRoutes(instance, { deviceTokens: deviceTokens!, rateLimiter: deviceMintRateLimiter }),
+  );
 
   // ADR-0012 §3: entitlement read + billing (checkout/webhook). Registered
   // with either the Postgres or in-memory entitlement repo (same fallback
