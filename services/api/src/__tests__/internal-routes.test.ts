@@ -60,6 +60,56 @@ describe("internal routes — signature verification", () => {
   });
 });
 
+describe("ADR-0038 Wave 2 — POST /internal/hops/reverify auth + gating", () => {
+  const baseConfig = {
+    databaseUrl: null,
+    corsOrigins: ["http://localhost:3000"] as string[],
+    upstashRedisRestUrl: null,
+    upstashRedisRestToken: null,
+    isProduction: false,
+    qstashToken: null,
+    analyzeHopUrl: "unused",
+    qstashCurrentSigningKey: null,
+    qstashNextSigningKey: null,
+    capabilityTokenSecret: "test-capability-secret",
+    redisTcpUrl: null,
+  };
+
+  it("rejects with no/invalid signature (fail closed)", async () => {
+    const app = await buildApp({ logger: false, signatureVerifier: deny });
+    const res = await app.inject({ method: "POST", url: "/internal/hops/reverify", payload: {} });
+    expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("defaults to deny-all when no signing keys/verifier are configured", async () => {
+    const app = await buildApp({ logger: false });
+    const res = await app.inject({ method: "POST", url: "/internal/hops/reverify", payload: {} });
+    expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("no-ops past verification when FEATURE_CROWDSOURCE_SOURCES is off (rollback path)", async () => {
+    const app = await buildApp({
+      logger: false,
+      signatureVerifier: allow,
+      config: { ...baseConfig, featureCrowdsourceSources: false },
+    });
+    const res = await app.inject({ method: "POST", url: "/internal/hops/reverify", payload: {} });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ outcome: "noop" });
+    await app.close();
+  });
+
+  it("503s past verification when DB is unavailable (in-memory mode, flag on)", async () => {
+    // Default config has the crowdsource flag ON, so the db-gated 503 is reached.
+    const app = await buildApp({ logger: false, signatureVerifier: allow });
+    const res = await app.inject({ method: "POST", url: "/internal/hops/reverify", payload: {} });
+    expect(res.statusCode).toBe(503);
+    await app.close();
+  });
+});
+
 describe("dev-only simulator route", () => {
   it("is registered outside production (NODE_ENV!=='production')", async () => {
     const app = await buildApp({ logger: false });

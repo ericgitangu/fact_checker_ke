@@ -12,6 +12,7 @@ import { advanceWithInbox } from "../lib/advance.js";
 import { runRetentionSweep } from "../lib/retention.js";
 import { runEntitlementSweep } from "../lib/entitlement-sweep.js";
 import { runSubmissionOrchestration } from "../lib/submission-orchestrator.js";
+import { runReverifyOrchestration } from "../lib/reverify-orchestrator.js";
 import { sweepExpiredLifecycle } from "../lib/editorial.js";
 import type { EntitlementRepository } from "../repositories/types.js";
 
@@ -21,6 +22,27 @@ const SubmissionAdvancedBodySchema = z.object({
   from: SubmissionStatusSchema,
   to: SubmissionStatusSchema,
   event: OutboxEventSchema.nullable().optional(),
+});
+
+// ADR-0038 Wave 2 re-verify: the body QStash delivers to
+// POST /internal/hops/reverify is exactly the `ReverifyPayload` the crowdsource
+// endpoint builds (lib/claim-source.ts) — a valid pipeline VerifyHopRequest with
+// injected_docs. Bounds mirror the pipeline model so a malformed delivery 400s
+// here rather than being forwarded to the hop.
+const ReverifyBodySchema = z.object({
+  submission_id: z.string().uuid(),
+  org_id: z.string().uuid(),
+  claim_text: z.string().min(1).max(2000),
+  language: z.string().min(1).max(64),
+  injected_docs: z
+    .array(
+      z.object({
+        url: z.string().min(1).max(2048),
+        title: z.string().min(1).max(500),
+        text: z.string().min(1).max(20000),
+      }),
+    )
+    .max(50),
 });
 
 export interface InternalRoutesDeps {
@@ -54,6 +76,14 @@ export interface InternalRoutesDeps {
    * keep compiling and the lifecycle work stays dark until flipped on.
    */
   featurePreliminaryThreads?: boolean;
+  /**
+   * ADR-0038 Wave 2 (FEATURE_CROWDSOURCE_SOURCES): gates
+   * POST /internal/hops/reverify (the crowdsource re-verify persister). Off ⇒ an
+   * authenticated no-op (the rollback path — a QStash redelivery after the flag
+   * flips off moves nothing). Defaults ON (same posture as the crowdsource route
+   * itself). Optional + defaulted so existing `InternalRoutesDeps` literals keep
+   * compiling. */
+  featureCrowdsourceSources?: boolean;
   /** ADR-0038 (FEATURE_LIFECYCLE_EXPIRY): gates POST /internal/lifecycle/expire.
    * Off/omitted ⇒ the sweep is a no-op. */
   featureLifecycleExpiry?: boolean;
@@ -157,6 +187,40 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
       editorReviewExpiryDays: deps.editorReviewExpiryDays ?? 30,
     });
     return reply.status(200).send(result);
+  });
+
+  // ADR-0038 Wave 2 re-verify PERSISTENCE closer: the crowdsource endpoint
+  // (POST /v1/checks/:id/sources) now enqueues the re-verify HERE (not straight
+  // to the pipeline's stateless /hops/verify), so the fresh verdict is actually
+  // written back onto the EXISTING check. Same QStash signature verification as
+  // every other /internal route (fail-closed when no signing keys are set) and
+  // the same db-gated 503 as the drain route (it writes checks + sources +
+  // check_evidence, which in-memory mode has no store for). Flag-gated on
+  // FEATURE_CROWDSOURCE_SOURCES: off ⇒ an authenticated no-op (rollback path).
+  app.post("/internal/hops/reverify", async (request, reply) => {
+    if (!(await verifyOrReject(request, reply, deps.verifier))) return;
+    if (!(deps.featureCrowdsourceSources ?? true)) {
+      return reply.status(200).send({ outcome: "noop", note: "FEATURE_CROWDSOURCE_SOURCES off; no-op" });
+    }
+    if (!deps.db) {
+      return reply.status(503).send({ error: "db_unavailable" });
+    }
+
+    const parsed = ReverifyBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "validation_error", issues: parsed.error.issues });
+    }
+
+    const outcome = await runReverifyOrchestration({
+      db: deps.db,
+      pipelineBaseUrl: deps.pipelineBaseUrl ?? "http://localhost:8000",
+      payload: parsed.data,
+      // Mirror the submission orchestrator: only trust/persist the verify-hop
+      // lifecycle fields (and arm the editor_review suppression) when the flag
+      // is on. In practice a crowdsourced thread only exists when it is on.
+      featurePreliminaryThreads: deps.featurePreliminaryThreads ?? false,
+    });
+    return reply.status(200).send(outcome);
   });
 
   app.post("/internal/events/submission-advanced", async (request, reply) => {

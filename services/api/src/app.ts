@@ -256,7 +256,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
         claimSourceStore,
         deviceQuotaGuard,
         publisher,
-        reverifyHopUrl: `${pipelineBaseUrl}/hops/verify`,
+        // ADR-0038 Wave 2 re-verify PERSISTENCE: enqueue the re-verify at THIS
+        // service's own /internal/hops/reverify (which drives the pipeline hop
+        // AND writes the fresh verdict back onto the existing check) — NOT the
+        // pipeline's stateless /hops/verify, which moved nothing.
+        reverifyHopUrl: `${config.apiSelfBaseUrl ?? "http://localhost:8080"}/internal/hops/reverify`,
         reverifyThreshold: config.crowdsourceReverifyThreshold ?? 2,
         featureCrowdsourceSources: config.featureCrowdsourceSources ?? true,
         fetchImpl: options.claimSourceFetchImpl,
@@ -304,6 +308,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       entitlements: entitlements!,
       // ADR-0038 Wave 1 (status-progression lifecycle), all flag-gated:
       featurePreliminaryThreads: config.featurePreliminaryThreads,
+      // ADR-0038 Wave 2: gates POST /internal/hops/reverify (the re-verify
+      // persister); same flag the crowdsource route uses. Defaults ON.
+      featureCrowdsourceSources: config.featureCrowdsourceSources ?? true,
       featureLifecycleExpiry: config.featureLifecycleExpiry,
       lifecycleExpiryDays: config.lifecycleExpiryDays,
       editorReviewExpiryDays: config.editorReviewExpiryDays,
