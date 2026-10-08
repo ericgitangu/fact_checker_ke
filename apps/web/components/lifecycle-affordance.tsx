@@ -42,17 +42,25 @@ const TONE_ICON: Record<LifecycleAffordance["tone"], React.ComponentType<{ size?
 export function LifecycleAffordance({
   affordance,
   checkId,
+  submissionId,
   formCopy,
 }: {
   affordance: LifecycleAffordance;
-  /** The check id to attach a source to. Omitted when none is safely available
-   * (e.g. a trending draft, whose id is not exposed) → non-interactive hint. */
+  /** The check id to attach a source to (feed cards expose it). */
   checkId?: string | null;
+  /** The submission id — the public, non-leaked id a trending card exposes when
+   * the draft check id is deliberately hidden. Used when `checkId` is absent so a
+   * reader can still submit a source; the API resolves it to the owning check. */
+  submissionId?: string | null;
   /** Locale-resolved add-source form copy (resolved server-side by the card). */
   formCopy?: AddSourceFormCopy;
 }): React.JSX.Element {
   const Icon = TONE_ICON[affordance.tone];
-  const interactive = Boolean(affordance.label && checkId && formCopy);
+  // Prefer the check id (feed); fall back to the submission id (trending) so a
+  // trending preliminary/awaiting item is interactive without leaking a draft id.
+  const targetId = checkId ?? submissionId ?? null;
+  const resource = checkId ? ("checks" as const) : ("submissions" as const);
+  const interactive = Boolean(affordance.label && targetId && formCopy);
   return (
     <div className="lifecycle-affordance">
       <span className={`status-chip ${TONE_CLASS[affordance.tone]}`}>
@@ -60,7 +68,7 @@ export function LifecycleAffordance({
         {affordance.caption}
       </span>
       {interactive ? (
-        <AddSourceForm checkId={checkId!} triggerLabel={affordance.label!} copy={formCopy!} />
+        <AddSourceForm checkId={targetId!} resource={resource} triggerLabel={affordance.label!} copy={formCopy!} />
       ) : (
         affordance.label && (
           // No safe check id to target (e.g. a trending item still under review,

@@ -165,3 +165,42 @@ describe("POST /v1/checks/:id/sources (ADR-0038 Wave 2)", () => {
     await app.close();
   });
 });
+
+describe("POST /v1/submissions/:id/sources (ADR-0038 Wave 2 trending)", () => {
+  it("resolves the submission to its owning check and accepts an authoritative source", async () => {
+    const store = new InMemoryClaimSourceStore();
+    const checkId = randomUUID();
+    const submissionId = randomUUID();
+    store.seedCheck(checkId, {
+      lifecycleState: "awaiting_sources",
+      claimText: "A claim.",
+      submissionId,
+      orgId: randomUUID(),
+    });
+    const app = await buildApp({ logger: false, claimSourceStore: store, claimSourceFetchImpl: fakeFetch });
+    const res = await app.inject({
+      method: "POST",
+      url: `/v1/submissions/${submissionId}/sources`,
+      headers: { "x-device-token": "tok-1" },
+      payload: { url: "https://knbs.or.ke/x" },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(["accepted", "rejected"]).toContain(res.json().status);
+    // the source attached to the RESOLVED check, not leaking the draft id to the client
+    expect(store.inserted.some((r) => r.checkId === checkId)).toBe(true);
+    await app.close();
+  });
+
+  it("404s for a submission with no check", async () => {
+    const store = new InMemoryClaimSourceStore();
+    const app = await buildApp({ logger: false, claimSourceStore: store, claimSourceFetchImpl: fakeFetch });
+    const res = await app.inject({
+      method: "POST",
+      url: `/v1/submissions/${randomUUID()}/sources`,
+      headers: { "x-device-token": "tok-1" },
+      payload: { url: "https://knbs.or.ke/x" },
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+});

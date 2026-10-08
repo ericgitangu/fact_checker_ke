@@ -34,6 +34,18 @@ const REGISTRY: readonly RegistryEntry[] = [
   { source: "parliament.go.ke", tier: "tier1_primary" },
   { source: "pesacheck.org", tier: "tier2_established_media" },
   { source: "africacheck.org", tier: "tier2_established_media" },
+  // Global authorities (synced with the pipeline JSON): health/science primaries
+  // and international wire services — a fact-checker handling health misinfo and
+  // global claims must tier these authoritative, not tier3.
+  { source: "who.int", tier: "tier1_primary" },
+  { source: "cdc.gov", tier: "tier1_primary" },
+  { source: "nih.gov", tier: "tier1_primary" },
+  { source: "un.org", tier: "tier1_primary" },
+  { source: "reuters.com", tier: "tier2_established_media" },
+  { source: "apnews.com", tier: "tier2_established_media" },
+  { source: "afp.com", tier: "tier2_established_media" },
+  { source: "bbc.com", tier: "tier2_established_media" },
+  { source: "bbc.co.uk", tier: "tier2_established_media" },
   { source: "nation.africa", tier: "tier2_established_media" },
   { source: "standardmedia.co.ke", tier: "tier2_established_media" },
   { source: "citizen.digital", tier: "tier2_established_media" },
