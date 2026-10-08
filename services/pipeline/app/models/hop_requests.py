@@ -115,6 +115,27 @@ class AnalyzeHopEnvelope(BaseModel):
         )
 
 
+class InjectedDoc(BaseModel):
+    """ADR-0038 Wave 2 crowdsourced re-verify evidence: ONE accepted,
+    API-tier-gated (≤2, authoritative) community-submitted source the API
+    folds into a re-verify of an open `preliminary`/`awaiting_sources` check
+    (QStash → /hops/verify). `title` is the source's domain or page title;
+    `text` is a short excerpt/note the draft can quote. These become citable
+    `RetrievedDoc`s in run_verify_hop, drafted against BEFORE the no-source
+    grounded rescue — the re-verify's whole point is to progress an open
+    thread on real evidence rather than fall back to rescue.
+
+    The draft-verdict LLM still decides the rating from this evidence; it is
+    never a hardcoded verdict (ADR-0023 citation integrity holds — a submitted
+    URL is an agreement signal, not a verdict)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(min_length=1, max_length=2048)
+    title: str = Field(min_length=1, max_length=500)
+    text: str = Field(min_length=1, max_length=20000)
+
+
 class VerifyHopRequest(BaseModel):
     """POST /hops/verify request body. # TEMPORARY, see module docstring."""
 
@@ -138,6 +159,14 @@ class VerifyHopRequest(BaseModel):
     # reverse-image-search against. See app/stages/verify.py's
     # run_verify_hop for the consumer.
     media_hash: str | None = None
+    # ADR-0038 Wave 2 re-verify entry: the crowdsourced, API-accepted tier≤2
+    # sources to fold into this (re-)verify as citable evidence. Absent (None)
+    # by default — a first-pass verify sends nothing here, so the hop's
+    # behaviour is byte-for-byte unchanged; only the API's crowdsource
+    # re-verify (FEATURE_CROWDSOURCE_SOURCES, QStash → /hops/verify) populates
+    # it. See run_verify_hop for how these prepend to `retrieved` before the
+    # no-source rescue check.
+    injected_docs: list[InjectedDoc] | None = None
 
 
 class MediaProcessHopRequest(BaseModel):
