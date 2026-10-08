@@ -1,209 +1,191 @@
 # fact_checker_ke
 
-**Multilingual (EN / Swahili / Sheng) fact-checking for Kenya's creator boom — and a maandamano (protest) advisory tracker — built human-review-first.**
+**An autonomous AI fact-checker and maandamano (protest) advisory tracker for Kenya.** It surfaces viral Kenyan claims on its own, assesses them with grounded AI, and publishes confidence-weighted, cited assessments — never a bare verdict.
 
-[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](docs/adr/0026-open-source-boundary-licence.md)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ericgitangu/fact_checker_ke/pulls)
-[![Node](https://img.shields.io/badge/node-24.x-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org)
-[![pnpm](https://img.shields.io/badge/pnpm-9.x-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
-[![moonrepo](https://img.shields.io/badge/monorepo-moon-6F4FF2)](https://moonrepo.dev)
-[![Next.js](https://img.shields.io/badge/Next.js-App%20Router-000000?logo=next.js&logoColor=white)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org)
+[![Next.js](https://img.shields.io/badge/Next.js-App_Router-000000?logo=next.js&logoColor=white)](https://nextjs.org)
+[![Fastify](https://img.shields.io/badge/Fastify-API-FFFFFF?logo=fastify&logoColor=black)](https://fastify.dev)
 [![FastAPI](https://img.shields.io/badge/FastAPI-pipeline-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?logo=terraform&logoColor=white)](https://www.terraform.io)
-[![Cloud Run](https://img.shields.io/badge/compute-Cloud%20Run-4285F4?logo=googlecloud&logoColor=white)](https://cloud.google.com/run)
-[![Neon](https://img.shields.io/badge/postgres-Neon-00E599?logo=postgresql&logoColor=white)](https://neon.tech)
-[![Upstash](https://img.shields.io/badge/redis-Upstash-00C9A7)](https://upstash.com)
+[![Drizzle](https://img.shields.io/badge/Drizzle-ORM-C5F74F?logo=drizzle&logoColor=black)](https://orm.drizzle.team)
+[![Neon](https://img.shields.io/badge/Neon-Postgres-00E599?logo=postgresql&logoColor=white)](https://neon.tech)
+[![Google Cloud Run](https://img.shields.io/badge/Cloud_Run-scale--to--zero-4285F4?logo=googlecloud&logoColor=white)](https://cloud.google.com/run)
+[![Vercel](https://img.shields.io/badge/Vercel-web-000000?logo=vercel&logoColor=white)](https://vercel.com)
+[![Upstash](https://img.shields.io/badge/Upstash-Redis_+_QStash-00C9A7?logo=upstash&logoColor=white)](https://upstash.com)
+[![pnpm](https://img.shields.io/badge/pnpm-9.15-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
+[![moonrepo](https://img.shields.io/badge/moonrepo-task_runner-6F4FF2?logo=moonrepo&logoColor=white)](https://moonrepo.dev)
+[![Anthropic Claude](https://img.shields.io/badge/Anthropic-Claude-D97757?logo=anthropic&logoColor=white)](https://www.anthropic.com)
+[![Google Gemini](https://img.shields.io/badge/Google-Gemini-8E75B2?logo=googlegemini&logoColor=white)](https://ai.google.dev)
+[![zod](https://img.shields.io/badge/zod-schemas-3E67B1?logo=zod&logoColor=white)](https://zod.dev)
+[![Vitest](https://img.shields.io/badge/Vitest-TS_tests-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev)
+[![Pytest](https://img.shields.io/badge/Pytest-Python_tests-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org)
 
-> No GitHub Actions CI badge — Actions billing is currently locked on this account (see [ADR-0013](docs/adr/0013-git-workflow.md)). `moon ci` and the acceptance-test suites run locally and are the real gate until that's restored.
+## What it is
 
-## What this is
+Kenyan social and news feeds move faster than any human fact-checking desk can. fact_checker_ke closes that gap autonomously: it ingests claims from two sources, runs them through a grounded AI pipeline, and drives each one to a terminal state — published, dismissed, or waiting on sources — without a human editor in the common path. A separate maandamano page tracks protest advisories (area, status, sources).
 
-A user pastes a URL (news article, X/Threads post, a YouTube/TikTok video) or raw text. The pipeline normalizes it, detects checkable claims (as opposed to opinion, prediction or rhetoric), deduplicates against existing checks, retrieves evidence through credibility-aware RAG, and drafts a verdict with Claude models. **Every verdict is reviewed and approved by a human editor before it is published.** A separate, editor-curated maandamano page shows protest advisories (area, status, sources) at ward-level granularity, with no live crowd-sourced pins.
+Two things it refuses to do:
 
-**What it explicitly does not do:**
-- **No audio download from third-party platforms.** YouTube and TikTok's developer terms don't permit it (see [ADR-0002](docs/adr/0002-content-ingestion.md)). For third-party video, the *user* supplies the quoted text and timestamp; the UI says plainly *"We checked the quote you provided, not the video audio."*
-- **No unreviewed verdicts.** A draft shown to the submitter carries `rating: null` for any named-person claim until an editor confirms quote attribution against the source ([ADR-0004](docs/adr/0004-verification-pipeline.md)).
-- **No IFCN claims.** This project is not an IFCN signatory and makes no such representation.
-- **It rates claims, never people.** The product's output is "this statement is True / Misleading / False / Unproven" — never a verdict on a person's character.
+- **No bare verdicts.** Every published assessment carries a calibrated confidence score and its supporting citations. A claim the pipeline cannot corroborate is marked *awaiting sources* or *unproven*, not forced to true/false.
+- **It rates claims, not people.** The output is an assessment of a statement, with a right of reply for the subject of any named-person claim. It is not a judgment on anyone's character, and the project makes no IFCN-signatory representation.
 
-## N-tier architecture
+Autonomy-first does not mean human-free: a claim can be escalated to `editor_review` when the policy gate flags it (legal risk, low confidence on a named person, contested sources). That path exists; it is off the common path by design.
 
-```mermaid
-flowchart TB
-  subgraph CLIENT["Client tier"]
-    PWA["Next.js PWA + landing\napps/web"]
-    SITE["Redirect stub\napps/site → apps/web"]
-    MOBILE["Expo app\nplanned, Phase 1"]
-  end
+## Architecture
 
-  subgraph EDGE["Edge / BFF tier"]
-    VERCEL["Vercel\nSSR, ISR, BFF route handlers"]
-  end
-
-  subgraph APITIER["API tier"]
-    API["Fastify API\nservices/api on Cloud Run"]
-  end
-
-  subgraph ASYNC["Async / EDA tier"]
-    OUTBOX["Transactional outbox\n+ inline relay"]
-    QSTASH["QStash\nanalyze, verify hops"]
-    REDIS_PS["Upstash Redis\npub/sub + rate limits"]
-  end
-
-  subgraph INTEL["Intelligence tier"]
-    PIPE["FastAPI pipeline\nservices/pipeline"]
-    DETECT["Claim detection"]
-    DEDUP["Claim dedup"]
-    RAG["RAG retrieve"]
-    DRAFT["Draft verdict\nClaude models, ADR-0011"]
-  end
-
-  subgraph DATA["Data tier"]
-    NEON["Neon Postgres + pgvector\nsource of truth, outbox, idempotency"]
-    UPSTASH["Upstash Redis\nephemeral cache/limits"]
-    GCS["GCS\ntransient audio, 24h TTL"]
-  end
-
-  subgraph HUMAN["Human tier"]
-    EDITOR["Editor review gate\npublish / reject"]
-  end
-
-  PWA --> VERCEL
-  SITE --> VERCEL
-  MOBILE -. "direct, no BFF\nADR-0015" .-> API
-  VERCEL --> API
-  API --> OUTBOX
-  OUTBOX --> NEON
-  OUTBOX --> QSTASH
-  QSTASH --> PIPE
-  PIPE --> DETECT --> DEDUP --> RAG --> DRAFT
-  DRAFT --> NEON
-  API --> REDIS_PS
-  REDIS_PS --> UPSTASH
-  PIPE --> GCS
-  NEON --> EDITOR
-  EDITOR --> API
-```
-
-Terraform (`infra/`, see [ADR-0016](docs/adr/0016-deploy-rail-iac.md)) is the IaC home for every tier above — Cloud Run services/jobs, Neon and Upstash resources, Workload Identity Federation — gated by a scale-to-zero plan-guard. More on each tier: [docs/architecture/overview.md](docs/architecture/overview.md).
-
-## A submission's life
+Two ingest engines feed one event-driven pipeline. The **fetch engine** pulls candidate claims autonomously (YouTube trending `mostPopular` for Kenya, plus PesaCheck and Google News RSS triage); the **submission engine** takes a URL or raw text from a user. Both land on the same path: `submission.received` → **analyze** → **verify** → **publish-policy** → an editorial **lifecycle** that ends in a terminal state. State changes and the events announcing them commit together through a transactional outbox, drained by QStash with idempotency so at-least-once delivery is safe to retry. Status streams to the client over SSE in near-real-time.
 
 ```mermaid
-sequenceDiagram
-  participant U as User device
-  participant API as Fastify API
-  participant PG as Neon Postgres
-  participant QS as QStash
-  participant PIPE as FastAPI pipeline
-  participant ED as Editor (human gate)
-  participant CDN as Vercel CDN
+flowchart TD
+  subgraph INGEST["Ingest"]
+    FETCH["Fetch engine<br/>YouTube trending KE + news/RSS triage"]
+    SUBMIT["Submission engine<br/>user-pasted URL or text"]
+  end
 
-  U->>API: POST /v1/submissions (Idempotency-Key)
-  API->>PG: BEGIN tx: insert submission + outbox row
-  PG-->>API: commit
-  API->>QS: publish outbox row (inline relay, pre-response)
-  API-->>U: 202 Accepted + SSE stream URL
+  QUEUE["Transactional outbox<br/>+ QStash drain (idempotent)"]
 
-  QS->>PIPE: analyze hop (normalize + claim detection)
-  PIPE->>PG: write analyzed state + outbox event
-  PG-->>API: SSE: status=analyzing/analyzed
-  API-->>U: SSE event
+  subgraph PIPELINE["AI pipeline (FastAPI)"]
+    ANALYZE["analyze<br/>language ID, translation, claim extraction"]
+    VERIFY["verify<br/>retrieval, grounded corroboration/rescue, citation integrity"]
+    POLICY["publish-policy<br/>risk-tiered gate, calibrated confidence"]
+  end
 
-  QS->>PIPE: verify hop (retrieve + draft verdict)
-  PIPE->>PG: write draft verdict (rating hidden if named person)
-  PG-->>API: SSE: status=ready
-  API-->>U: SSE event (draft, AI-assisted, unpublished)
+  subgraph LIFECYCLE["Editorial lifecycle"]
+    STATE["verifying to preliminary / awaiting_sources / published / dismissed"]
+    REVIEW["editor_review (escalation, off the common path)"]
+  end
 
-  Note over ED,PG: Human gate - ADR-0004 / ADR-0008
-  ED->>PG: review draft, confirm quote attribution
-  ED->>PG: approve verdict -> status=published
-  PG->>CDN: check.published event -> revalidate ISR tag
-  CDN-->>U: published check page + ClaimReview JSON-LD
+  WEB["Next.js PWA<br/>public feed + maandamano tracker"]
+
+  FETCH --> QUEUE
+  SUBMIT --> QUEUE
+  QUEUE --> ANALYZE --> VERIFY --> POLICY --> STATE
+  STATE --> REVIEW
+  STATE --> WEB
+  REVIEW --> WEB
 ```
 
-The transactional outbox, idempotency keys and the two QStash hops are specified in [ADR-0017](docs/adr/0017-event-driven-core.md); SSE and caching in [ADR-0018](docs/adr/0018-realtime-and-caching.md).
+Stage detail:
 
-## Monorepo map
+- **analyze** — language identification (English / Swahili / Sheng), translation to a working language, and extraction of checkable claims (as opposed to opinion, prediction, or rhetoric). Model: Claude Haiku.
+- **verify** — evidence retrieval (Google Fact Check Tools API), independent corroboration and grounded rescue via Google Vertex AI Gemini grounding, and a citation-integrity check that every cited source actually supports the drafted assessment. Draft model: Claude Sonnet.
+- **publish-policy** — a risk-tiered gate. Higher-risk claims (named person, legal exposure) demand higher confidence and more corroboration before auto-publish; below threshold they route to `awaiting_sources` or `editor_review`.
+- **lifecycle** — `verifying` → one of `preliminary`, `awaiting_sources`, `published`, `dismissed`; escalation to `editor_review` and back; `archived_expired` for stale items. A rescue can re-enter a dismissed claim as a thread starter rather than dead-ending it.
 
-| Project | Tech | Purpose |
+Deeper diagrams (sequence flows, data model, infra topology) live in [docs/architecture.md](docs/architecture.md) and [docs/architecture/](docs/architecture/).
+
+## Monorepo layout
+
+pnpm workspaces (`apps/*`, `packages/*`, `services/api`) with [moonrepo](https://moonrepo.dev) as the task runner. The Python pipeline is managed separately by `uv` and is not a pnpm workspace.
+
+```
+fact_checker_ke/
+├── apps/
+│   ├── web/            Next.js PWA — public feed, submit flow, maandamano tracker, BFF route handlers (Vercel)
+│   └── site/           Retired marketing SPA, now a redirect-only stub to apps/web
+├── packages/
+│   ├── core/           Shared zod schemas and inferred TypeScript types — the single source of request/response shapes
+│   ├── db/             Drizzle ORM schema + SQL migrations against Neon Postgres
+│   ├── i18n/           en / sw copy
+│   └── brand/          Shared brand tokens (color, type) consumed by the web app
+├── services/
+│   ├── api/            Fastify + TypeScript BFF/API — submissions, checks, health, SSE (Cloud Run)
+│   └── pipeline/       FastAPI + Python (uv) — the analyze/verify/publish-policy AI pipeline (Cloud Run)
+├── infra/              Terraform IaC — Cloud Run, Neon, Upstash, Workload Identity Federation, scale-to-zero plan-guard
+└── docs/               Architecture notes, decision records, legal, research, runbooks
+```
+
+An Expo mobile client (native share-sheet intake, talking to the API directly without the BFF) is planned and not yet in the tree.
+
+## Quickstart
+
+### Prerequisites
+
+| Tool | Version | Notes |
 |---|---|---|
-| `apps/web` | Next.js (App Router) | **The single frontend** — marketing landing (`/`), submit (`/submit`), feed, `/checks/[id]`, `/maandamano`, `/methodology`, waitlist, BFF route handlers. Marketing + app unified ([ADR-0010](docs/adr/0010-client-strategy.md)) |
-| `apps/site` | Vite + React | **Retired to a redirect-only stub** — all paths 308-redirect to `apps/web` (its `vercel.json`). The marketing SPA (hero, methodology, waitlist) was folded into `apps/web`; the Vercel project and git history are intentionally kept ([ADR-0015](docs/adr/0015-deployment-topology.md)) |
-| `apps/mobile` | Expo (planned, Phase 1) | Native share-sheet intake; talks to the API directly, no BFF ([ADR-0010](docs/adr/0010-client-strategy.md), [ADR-0015](docs/adr/0015-deployment-topology.md)) |
-| `packages/core` | TypeScript, zod | Schemas, inferred types, ClaimReview builder, typed API client — the one source of request/response shapes for web and mobile |
-| `packages/db` | Drizzle ORM | Typed Postgres schema and query layer |
-| `db/migrations` | Plain SQL | Neon Postgres + pgvector migrations (expand-only, [ADR-0016](docs/adr/0016-deploy-rail-iac.md)) |
-| `services/api` | Fastify | Submissions, checks, health, SSE — Cloud Run |
-| `services/pipeline` | FastAPI (Python/uv) | normalize → claim detection → dedup → RAG retrieve → draft verdict — Cloud Run |
-| `infra/` | Terraform | IaC rail: Cloud Run, Neon, Upstash, WIF, plan-guard — see [ADR-0016](docs/adr/0016-deploy-rail-iac.md) |
-| `docs/adr` | Markdown | 30 architecture decision records — see [docs/adr/README.md](docs/adr/README.md) |
+| Node.js | 24.x | enforced via `engines` |
+| pnpm | 9.15.0 | pinned via `packageManager`; provisions moon and the Node toolchain |
+| Python | 3.12 | pipeline only, via `uv` |
+| uv | latest | Python dependency and venv manager |
+| Docker | any recent | optional — local Postgres (pgvector) + Redis for API persistence work |
 
-### moon task cheatsheet
+### Install and run
 
 ```bash
-pnpm install                       # provisions moon + the Node toolchain
-pnpm exec moon ci                  # affected-only: lint, typecheck, test, build (the real local CI gate)
-moon run <project>:<task>          # e.g. moon run api:test, moon run pipeline:typecheck
-moon run core:gen-contracts && git diff --exit-code   # contracts drift gate (zod -> JSON Schema -> Pydantic)
-docker compose up -d postgres redis   # local Neon-equivalent Postgres (pgvector) + Redis
-cd services/pipeline && uv sync && uv run pytest      # Python pipeline tests
+pnpm install                          # installs JS deps, provisions moon + the Node toolchain
 
-# Acceptance-test suites (RED->GREEN per ADR, see docs/adr/0019-test-strategy-redteam.md)
-scripts/at/at-0013.sh
-scripts/at/at-0014.sh
+# Full local gate: affected-only lint, typecheck, test, build
+pnpm exec moon ci
+
+# Run one project task
+moon run api:dev                      # Fastify API
+moon run web:dev                      # Next.js PWA
+moon run core:gen-contracts           # regenerate contracts (zod -> JSON Schema -> Pydantic)
+
+# Python pipeline
+cd services/pipeline && uv sync && uv run uvicorn app.main:app --reload
+
+# Local Postgres (pgvector) + Redis
+docker compose up -d postgres redis
 ```
+
+Copy each service's `.env.example` to `.env` and fill in local values before running anything that needs secrets. No secrets belong in the repo.
+
+### Tests
+
+```bash
+pnpm exec moon ci                     # TS: vitest across affected projects
+moon run api:test                     # a single project's vitest suite
+cd services/pipeline && uv run pytest  # Python pipeline tests
+```
+
+There is no GitHub Actions CI badge: Actions billing is currently locked on this account, so `moon ci` and the local suites are the real gate until it is restored.
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Web / PWA | Next.js (App Router), React, deployed on Vercel |
+| API / BFF | Fastify, TypeScript — on GCP Cloud Run |
+| AI pipeline | FastAPI, Python 3.12 (uv) — on GCP Cloud Run |
+| Shared contracts | zod schemas + inferred TypeScript types (`packages/core`) |
+| Database | Neon serverless Postgres with pgvector, Drizzle ORM |
+| Queue / cache / cron | Upstash Redis + QStash |
+| AI models | Anthropic Claude (Haiku for analyze, Sonnet for verify draft); Google Vertex AI Gemini grounding (corroboration + rescue); Google Fact Check Tools API (retrieval) |
+| Infrastructure | Terraform IaC; GCP Cloud Run in `africa-south1`, scale-to-zero |
+| Monorepo / build | pnpm workspaces + moonrepo |
+| Testing | Vitest (TypeScript), Pytest (Python) |
+| Quality gates | Conventional Commits (commitlint), gitleaks pre-commit, lefthook hooks |
 
 ## Engineering practices
 
-- **ADR-driven.** Every material decision is recorded as an ADR with options, trade-offs and a review trigger — [docs/adr/README.md](docs/adr/README.md) indexes all 30, plus the red-team process that re-attacks each one with edge cases before it's trusted.
-- **RED → GREEN acceptance tests.** Every ADR ends with an `AT-<n>` table. A PR implementing an ADR must show the test failing first, then passing — no "trust me, it works" ([ADR-0019](docs/adr/0019-test-strategy-redteam.md)).
-- **Transactional outbox + idempotency.** State changes and the event announcing them commit atomically; three idempotency layers (client key, QStash inbox, content-hash result cache) make at-least-once delivery safe to retry ([ADR-0017](docs/adr/0017-event-driven-core.md)).
-- **Scale-to-zero cost discipline.** A Terraform plan-guard mechanically fails any plan that provisions an always-on resource — no NAT gateway, no `min_instance_count > 0`, no unattached static IP ([ADR-0016](docs/adr/0016-deploy-rail-iac.md), [ADR-0029](docs/adr/0029-cost-model-runway.md)).
-- **Evidence-tagged research.** Every factual claim across the ADR set carries a tag: **[V]** verified against a primary/secondary source by adversarial vote, **[U]** unverified (re-check before depending on it), **[I]** inference with no direct source, **[GAP]** not researched — treat as unknown, not cleared. See the legend in [docs/adr/README.md](docs/adr/README.md).
+- **Test-driven.** Features land with their tests — vitest for TypeScript, pytest for Python. The contract (inputs → outputs) is what gets tested, not internals.
+- **One contract source.** Request/response shapes are defined once as zod schemas in `packages/core` and generated into Pydantic for the Python side; a drift check fails the build if the two diverge.
+- **Transactional outbox + idempotency.** A state change and the event announcing it commit in one transaction; client idempotency keys, a QStash inbox, and a content-hash result cache make at-least-once delivery safe to retry.
+- **Scale-to-zero cost discipline.** A Terraform plan-guard fails any plan that provisions an always-on resource — no NAT gateway, no `min_instance_count > 0`, no unattached static IP.
+- **Decision records.** Material architecture decisions are written up under [docs/](docs/) before they are trusted, each with the options considered, the trade-off accepted, and a review trigger.
 
-## Status
+## Documentation
 
-**Pre-launch.** Nothing is deployed to production yet. Honest phase breakdown ([ADR-0001](docs/adr/0001-scope-and-phasing.md)):
+- [docs/architecture.md](docs/architecture.md) and [docs/architecture/](docs/architecture/) — system diagrams and component notes
+- [docs/](docs/) — decision records, legal/compliance notes, research, and operational runbooks
 
-| Phase | Scope | Timeline |
-|---|---|---|
-| Phase 0 | Marketing SPA + PWA "check a link" + read-only maandamano page + infra skeleton | this weekend |
-| Phase 1 | Expo app builds, Play closed-test window, App Store submission, editor dashboard | 3-4 weeks (store review + D-U-N-S is the critical path) |
-| Phase 2 | Near-real-time live-stream checking, counter-truth bot, sponsorships/subscriptions | months 1-3 |
-| Phase 3 | Coordinated-inauthentic-behaviour (GNN) analysis, ads, IFCN application | month 3+ |
+Built for Kenya's Data Protection Act 2019: every published assessment carries an evidence file (cited sources, retrieved document IDs, archived snapshots) and a right of reply for the subject of a named-person claim.
 
-Tracking PRs: [#1 feat/foundation](https://github.com/ericgitangu/fact_checker_ke/pull/1) (monorepo scaffold, persistence, contracts, PWA, hardened images) and [#2 docs/adr-0013-0019-platform](https://github.com/ericgitangu/fact_checker_ke/pull/2) (platform ADRs, red-team review and grooming).
+## Contributing
 
-**Legal/compliance:** built for Kenya's Data Protection Act 2019. Every published verdict carries an evidence file (cited sources, retrieved document IDs, archived snapshots) and a right of reply for the subject of a named-person claim ([ADR-0008](docs/adr/0008-legal-compliance.md)).
+Issues and PRs are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow (Conventional Commits, the RED→GREEN test expectation, and the gitleaks pre-commit hook). By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Local dev
+## Security
 
-```bash
-# Node toolchain (apps/web, apps/site, packages/core, packages/db, services/api)
-pnpm install
-pnpm exec moon ci
+Found a vulnerability? Please follow the disclosure process in [SECURITY.md](SECURITY.md) — do not open a public issue for security reports. This is a defamation and abuse target by design, so the policy covers both software vulnerabilities and content-integrity concerns.
 
-# Python pipeline
-cd services/pipeline
-uv sync
-uv run pytest
+## License
 
-# Local Postgres + Redis (optional, for API persistence work)
-docker compose up -d postgres redis
+[Apache-2.0](LICENSE). The credibility-registry weights, abuse thresholds, and production system prompts are kept private; only their public type interfaces ship in this repo.
 
-# Run a single service
-pnpm --filter @fact-checker-ke/api dev
-cd services/pipeline && uv run uvicorn app.main:app --reload
-pnpm --filter web dev
-pnpm --filter site dev
-```
+## Author
 
-Copy each `.env.example` to `.env` and fill in local values before running a service that needs them.
-
-## Licence
-
-Licence: **Apache-2.0** (per [ADR-0026](docs/adr/0026-open-source-boundary-licence.md); the `LICENSE` file lands separately). The credibility-registry weights, abuse thresholds and production system prompts stay private — only their type interfaces are public.
-
-Author: [@ericgitangu](https://github.com/ericgitangu)
+Eric Gitangu — [@ericgitangu](https://github.com/ericgitangu)
