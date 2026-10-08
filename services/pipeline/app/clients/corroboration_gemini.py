@@ -161,6 +161,15 @@ def _model() -> str:
     return _VERTEX_MODEL if _use_vertex() else _DEVELOPER_MODEL
 
 
+def grounded_model_name() -> str:
+    """The model id a grounded corroboration/rescue call resolves to for the
+    current env (explicit override, else Vertex vs Developer-API default).
+    Exposed so the verify hop can label a grounded-rescue `llm_calls` cost row's
+    `model` without threading it through the Corroboration protocol's return
+    tuple (which carries no model for the rescue path)."""
+    return _model()
+
+
 class RealGeminiCorroboration:
     """Two auth modes (ADR-0036 activation):
     - Vertex AI (preferred on GCP, no raw key): GOOGLE_GENAI_USE_VERTEXAI=true,
@@ -351,4 +360,4 @@ def _estimate_usd(response: object) -> float:
     return 0.002
 
 
-__all__ = ["RealGeminiCorroboration"]
+__all__ = ["RealGeminiCorroboration", "grounded_model_name"]

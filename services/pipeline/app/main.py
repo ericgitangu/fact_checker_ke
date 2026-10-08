@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.clients.corroboration_factory import make_corroboration_client
+from app.clients.corroboration_gemini import grounded_model_name
 from app.clients.embedder_factory import make_embedder
 from app.clients.factcheck_api import make_factcheck_client
 from app.clients.fetch_source_factory import make_fetch_sources
@@ -29,6 +30,7 @@ from app.models.pipeline_io import (
     AnalyzeResult,
     MediaProcessResult,
     SyntheticMediaTriageResult,
+    UsageRecord,
     VerifyResult,
 )
 from app.stages.analyze import AnalyzeHopError, run_analyze_hop
@@ -51,6 +53,12 @@ from app.stores.engine_breaker import (
 )
 from app.stores.fetch_dedup_memory import InMemoryFetchDedupStore
 from app.stores.fetch_dedup_postgres import PostgresFetchDedupStore
+from app.stores.llm_call_store import (
+    InMemoryLlmCallStore,
+    LlmCall,
+    LlmCallStore,
+    PostgresLlmCallStore,
+)
 from app.stores.outbox_postgres import emit_fetch_submission_received
 
 logger = logging.getLogger("fact_checker_ke.pipeline")
@@ -150,6 +158,14 @@ _fetch_dedup_store = (
 _fetch_cost_breaker: EngineCostBreaker = (
     PostgresEngineCostBreaker(_fetch_db_conn) if _fetch_db_conn is not None else InMemoryEngineCostBreaker()
 )
+# Per-LLM-call cost audit (ADR-0011 §7 / llm_calls). Same shared connection and
+# real-vs-fake selection as the breaker above: when a DB is configured each
+# analyze/verify/corroboration/grounded_rescue LLM call writes one llm_calls row;
+# with no DB it is an in-memory no-op. Writes are fail-open (see the store's
+# Protocol) so this telemetry can never fail a hop.
+_llm_call_store: LlmCallStore = (
+    PostgresLlmCallStore(_fetch_db_conn) if _fetch_db_conn is not None else InMemoryLlmCallStore()
+)
 
 
 def _fetch_emit_submission(
@@ -187,7 +203,7 @@ def _ensure_fetch_conn() -> None:
     cheaply and reconnect + rebuild the stores that hold the reference. A
     no-op when the fetch engine is running on in-memory stores
     (_fetch_db_conn is None)."""
-    global _fetch_db_conn, _fetch_dedup_store, _fetch_cost_breaker
+    global _fetch_db_conn, _fetch_dedup_store, _fetch_cost_breaker, _llm_call_store
     if _fetch_db_conn is None:
         return
     try:
@@ -206,6 +222,7 @@ def _ensure_fetch_conn() -> None:
     _fetch_db_conn = _psycopg.connect(_fetch_database_url())  # type: ignore[arg-type]
     _fetch_dedup_store = PostgresFetchDedupStore(_fetch_db_conn)
     _fetch_cost_breaker = PostgresEngineCostBreaker(_fetch_db_conn)
+    _llm_call_store = PostgresLlmCallStore(_fetch_db_conn)
 
 
 # `/health` (NOT `/healthz`): Cloud Run's frontend intercepts any `*z` path on a
@@ -216,20 +233,32 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _record_llm_call(org_id: str, usage: UsageRecord | None) -> None:
+    """Persist one llm_calls row from an analyze/verify UsageRecord at the hop
+    boundary. Skips the no-op sentinel the analyze hop returns for a video-URL
+    short-circuit (model="none", no real call) and the reuse/rejected verify
+    paths (usage=None). `record` is fail-open, so this never fails the hop."""
+    if usage is None or usage.model == "none":
+        return
+    _llm_call_store.record(LlmCall.from_usage(org_id, usage))
+
+
 @app.post("/hops/analyze")
 async def hop_analyze(event: AnalyzeHopEnvelope) -> AnalyzeResult:
     try:
-        return await run_analyze_hop(
+        result = await run_analyze_hop(
             event.to_hop_request(), llm=_haiku_llm, store=_hop_idempotency_store
         )
     except AnalyzeHopError as exc:
         logger.warning("analyze hop failed: %s", exc)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    _record_llm_call(event.org_id, result.usage)
+    return result
 
 
 @app.post("/hops/verify")
 async def hop_verify(payload: VerifyHopRequest) -> VerifyResult:
-    return await run_verify_hop(
+    result = await run_verify_hop(
         payload,
         llm=_sonnet_llm,
         embedder=_embedder,
@@ -242,7 +271,33 @@ async def hop_verify(payload: VerifyHopRequest) -> VerifyResult:
         # daily "corroboration" budget lane (~$0.30/day ≈ 100 calls), isolated
         # from the fetch/submission engines — reuses the same Postgres breaker.
         corroboration_breaker=_fetch_cost_breaker,
+        # Per-call cost audit: the store writes the grounded-RESCUE row from
+        # inside the hop (its usd is not surfaced in VerifyResult); the draft and
+        # corroboration-assess rows are written at this boundary just below.
+        llm_call_store=_llm_call_store,
     )
+    # Draft-verdict LLM call (stage "verify"): real token counts + usd. None on
+    # the dedup-reuse / rejected paths (no fresh draft call) — skipped there.
+    _record_llm_call(payload.org_id, result.usage)
+    # Grounded second-opinion (assess) call, when one actually ran (a real stance
+    # came back — not the fail-closed/not-sampled no_second_opinion). The gemini
+    # SDK reports only a usd estimate for this call (no token breakdown), so token
+    # counts are 0; model falls back to the env-resolved grounded model id when the
+    # payload did not carry one. record is fail-open — never fails the hop.
+    corr = result.corroboration
+    if corr is not None and corr.second_opinion_stance is not None:
+        _llm_call_store.record(
+            LlmCall(
+                org_id=payload.org_id,
+                stage="corroboration",
+                model=corr.model or grounded_model_name(),
+                input_tokens=0,
+                cached_tokens=0,
+                output_tokens=0,
+                usd=corr.usd,
+            )
+        )
+    return result
 
 
 class FetchHopRequest(BaseModel):
