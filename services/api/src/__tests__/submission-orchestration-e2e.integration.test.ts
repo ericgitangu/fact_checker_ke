@@ -360,6 +360,71 @@ describe.skipIf(!connectionString)(
       expect(ev.length).toBe(0);
     }, 30_000);
 
+    it("NEVER auto-publishes a named-person item routed to editor_review, even when publishable + auto_publish=true (ADR-0038 hard invariant)", async () => {
+      // The legal invariant: a named-person claim that clears the band (evidence +
+      // context + auto_publish=true) must be HELD for a human editor, never
+      // published by an autonomous edge. The pipeline signals this with
+      // publish.lifecycle='editor_review'; the orchestrator must suppress the
+      // publish gate regardless of auto_publish.
+      const submissionId = randomUUID();
+      const orgId = "00000000-0000-0000-0000-000000000001";
+      await db.insert(schema.submissions).values({
+        id: submissionId,
+        orgId,
+        url: null,
+        text: "a named person did something specific",
+        submittedBy: null,
+        ingestSource: "submission",
+      });
+
+      const stubFetch = (async (url: string | URL | Request) => {
+        const u = String(url);
+        if (u.endsWith("/hops/analyze")) {
+          return Response.json({
+            language: "en",
+            translation_en: "a named person did something specific",
+            claims: [{ text: "a named person claim", claim_type: "checkable", sampled_for_editor_review: false }],
+            attribution: null,
+            needs_quote: false,
+          });
+        }
+        if (u.endsWith("/hops/verify")) {
+          return Response.json({
+            verdict: { rating: "False", rationale: "Sources refute this.", confidence: 0.99, what_would_change_this: "A retraction.", context: "Context leading the assessment." },
+            rejected: false,
+            rejection_reason: null,
+            reused_existing_check: false,
+            evidence: [{ url: "https://nation.africa/x", title: "Nation", publisher: "nation.africa", credibility_tier: "tier1_fact_checker", quote: "evidence quote", published_at: null }],
+            // auto_publish=true AND publishable, but routed to editor_review (named person).
+            publish: { risk_tier: "C", auto_publish: true, reason: "cleared band", publish_mode: "a", queued_for_async_audit: false, requires_human_tap: false, lifecycle: "editor_review", source_kind: null, authoritative: false },
+          });
+        }
+        throw new Error(`unexpected fetch ${u}`);
+      }) as unknown as typeof fetch;
+
+      const outcome = await runSubmissionOrchestration({
+        db,
+        pipelineBaseUrl: "http://pipeline.invalid",
+        featurePreliminaryThreads: true, // lifecycle track on
+        event: {
+          event_id: randomUUID(),
+          occurred_at: new Date().toISOString(),
+          submission_id: submissionId,
+          org_id: orgId,
+          event_type: "submission.received",
+          schema_version: "v1",
+          payload: { url: null, text: "a named person did something specific", submitted_by: null, quote: null, timestamp_sec: null, ingest_source: "submission", engagement: null, virality_score: null },
+        },
+        fetchImpl: stubFetch,
+      });
+
+      expect(outcome.kind).toBe("check_created");
+      const [check] = await db.select().from(schema.checks).where(eq(schema.checks.submissionId, submissionId));
+      expect(check!.isDraft).toBe(true); // HELD, never published
+      expect(check!.publishedAt).toBeNull();
+      expect(check!.lifecycleState).toBe("editor_review"); // routed to the bounded editor queue
+    }, 30_000);
+
     it("a non-checkable (rhetoric/injection) submission never reaches /hops/verify and never publishes, through the REAL relay", async () => {
       const { submissionId, res } = await seedAndRelay({
         // ADR-0023 AT-0023-1: the analyze hop's real injection-detection

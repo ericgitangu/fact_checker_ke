@@ -2,7 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { RadarIcon, EyeIcon, ExternalLinkIcon } from "@fact-checker-ke/brand";
 import { TrendingStatusChip } from "./trending-status-chip";
 import { LifecycleAffordance } from "./lifecycle-affordance";
-import { lifecycleAffordanceFor } from "../lib/lifecycle-copy";
+import { addSourceFormCopyFor, lifecycleAffordanceFor } from "../lib/lifecycle-copy";
 import type { TrendingItemView } from "../lib/lifecycle-read-model";
 
 /**
@@ -54,7 +54,19 @@ export async function TrendingCard({ item }: { item: TrendingItemView }): Promis
 
       <p className="trendingcard-title">{item.title}</p>
 
-      {affordance && <LifecycleAffordance affordance={affordance} />}
+      {affordance && (
+        // BLOCKER (by design, not a bug): a trending item's `checkId` is exposed
+        // ONLY when published (TrendingItem.checkId is null for a draft still
+        // under review — a draft id is never leaked). So for an under-review /
+        // monitoring preliminary item the add-source CTA stays NON-interactive
+        // here; the interactive "Submit the truth" form is wired on the feed /
+        // published surfaces where a real check id IS available (feed-item-card).
+        <LifecycleAffordance
+          affordance={affordance}
+          checkId={item.checkId}
+          formCopy={item.checkId ? addSourceFormCopyFor(locale) : undefined}
+        />
+      )}
 
       {item.engagement && (
         <p className="trendingcard-reach">
