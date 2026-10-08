@@ -30,7 +30,16 @@ import psycopg
 # opinion spike can never starve either real engine (and vice-versa). Its budget
 # defaults deliberately tiny (near-0 MVP cost cap) so the per-day CALL count is
 # bounded even on the free tier where each call's USD is ~0.
-Engine = Literal["fetch", "submission", "corroboration"]
+#
+# "stt" (ADR-0005) is a FOURTH, independent daily-spend lane for real GCP
+# Speech-to-Text v2 Chirp_2 transcription (app/clients/transcriber_chirp2.py),
+# isolated from the other three for the same reason: a transcription spike on the
+# compliant-subset audio path can never starve fetch/submission/corroboration
+# (and vice-versa). It meters metered-minute spend at ~$0.016/min (ADR-0005), so
+# its budget doubles as a hard daily audio-minute cap (ADR-0005: "Hard-cap audio
+# minutes per user per day"). Ships dark (SUBMISSION_STT_ENABLED default off), so
+# this lane sees zero spend until the real transcriber is both enabled and wired.
+Engine = Literal["fetch", "submission", "corroboration", "stt"]
 
 # ADR-0032 §4's two breaker thresholds, as fractions of the configured
 # daily budget. Not tier-specific, not tunable per call — a single
@@ -48,7 +57,16 @@ HARD_STOP_FRACTION = 1.00
 # app/stages/corroboration.py, that is a hard ~100-calls/day cap — a near-0 MVP
 # allocation (owner cost rule: stay at/near free-tier until monetization).
 # Override via CORROBORATION_ENGINE_DAILY_BUDGET_USD.
-DEFAULT_DAILY_BUDGET_USD: dict[Engine, float] = {"fetch": 5.00, "submission": 20.00, "corroboration": 0.30}
+# stt: ~$0.50/day. At Chirp_2's ~$0.016/min (ADR-0005), that is a hard ~31
+# audio-minutes/day cap — a near-0 MVP allocation on the same owner cost rule,
+# and the enforcement point for ADR-0005's "Hard-cap audio minutes per user per
+# day". Override via STT_ENGINE_DAILY_BUDGET_USD.
+DEFAULT_DAILY_BUDGET_USD: dict[Engine, float] = {
+    "fetch": 5.00,
+    "submission": 20.00,
+    "corroboration": 0.30,
+    "stt": 0.50,
+}
 
 
 def _budget_env_var(engine: Engine) -> str:

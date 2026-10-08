@@ -41,6 +41,25 @@ resource "google_project_iam_member" "pipeline_aiplatform_user" {
   member  = "serviceAccount:${google_service_account.pipeline_runtime.email}"
 }
 
+# ADR-0005: the REAL GCP Speech-to-Text v2 Chirp_2 transcriber
+# (services/pipeline/app/clients/transcriber_chirp2.py) reaches the regional
+# {STT_LOCATION}-speech.googleapis.com endpoint authenticated by this SA's ADC —
+# NOT a raw key — so transcription bills to the already-billed fact-checker-ke
+# project. roles/speech.client is the minimum for speech.recognizers.recognize
+# (the v2 implicit-recognizer `recognize` call this transcriber makes).
+#
+# ACTION REQUIRED before this grant has any effect (owner runs these — billing is
+# authorized; NOT run from here):
+#   1. gcloud services enable speech.googleapis.com --project=<project_id>
+#   2. terraform apply   (creates this binding)
+# The backend still ships DARK regardless: SUBMISSION_STT_ENABLED defaults off in
+# cloud_run.tf, so no transcription call is made until that flag is flipped true.
+resource "google_project_iam_member" "pipeline_speech_client" {
+  project = var.project_id
+  role    = "roles/speech.client"
+  member  = "serviceAccount:${google_service_account.pipeline_runtime.email}"
+}
+
 # --- Deploy SA least privilege (bootstrap created the SA; IAM bindings
 # that need concrete resources live here, once those resources exist) ---
 
