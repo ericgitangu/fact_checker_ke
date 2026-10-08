@@ -203,6 +203,28 @@ module "pipeline_service" {
     STT_LOCATION                = "us-central1"
     STT_MODEL                   = "chirp_2"
     STT_ENGINE_DAILY_BUDGET_USD = "0.50"
+    # Triage feed (ADR-0032/0037). Was never in TF — only ever set by gcloud, so
+    # a future apply would have wiped it. Now persisted. Verified 2026-10-08:
+    # PesaCheck/Africa Check's own RSS is Cloudflare-403'd from EVERY datacenter
+    # egress IP (Cloud Run AND a Vercel BFF proxy — the proxy was built and
+    # empirically fails with upstream 502; see reference-cloudrun-egress-ip-block).
+    # Google News' search RSS IS served to datacenter IPs and surfaces the same
+    # KE fact-check items (AFP/PesaCheck/Africa Check) via a fact-check-scoped
+    # query — the reachable, parseable triage source. The parser strips Google
+    # News' " - <publisher>" title suffix + anchor-tag description
+    # (triage_feed_source.py).
+    TRIAGE_FEED_URLS = "https://news.google.com/rss/search?q=Kenya (fact check OR false OR misleading OR debunked OR hoax) when:7d&hl=en-KE&gl=KE&ceid=KE:en"
+    # Editorial-platform score floor (ADR-0032, fix verified live 2026-10-08):
+    # an RSS triage item carries NO engagement, so it scores ~0.30-0.40 on the
+    # velocity-weighted virality scorer and was ALWAYS dropped below tau=0.5 —
+    # triage_feed had never emitted a candidate in the system's history. These
+    # items are editorially curated (a fact-check desk already surfaced them),
+    # which IS the check-worthiness signal; floor them to 0.6 so they emit.
+    # Bounded by max_emissions_per_run (10), the fetch cost breaker, once-ever
+    # dedup, and the analyze hop's real claim filter. Set FETCH_EDITORIAL_FLOOR
+    # below tau to disable without a code change.
+    FETCH_EDITORIAL_PLATFORMS = "triage_feed"
+    FETCH_EDITORIAL_FLOOR     = "0.6"
   }
 }
 
