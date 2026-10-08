@@ -108,3 +108,57 @@ export function lifecycleAffordanceFor(
   const table = COPY[locale === "sw" ? "sw" : "en"];
   return table[lifecycleState] ?? null;
 }
+
+/**
+ * ADR-0038 Wave 2: copy for the interactive add-source form (the `AddSourceForm`
+ * client island the affordance CTA opens). Kept local + locale-aware here for
+ * the SAME i18n-scope reason as the affordance copy above (packages/i18n is out
+ * of this wave's scope); en + sw are kept in parity by hand and SHOULD move to
+ * the shared `feed` catalog in a follow-up.
+ */
+export interface AddSourceFormCopy {
+  urlLabel: string;
+  urlPlaceholder: string;
+  noteLabel: string;
+  notePlaceholder: string;
+  submit: string;
+  submitting: string;
+  cancel: string;
+  /** Ack for an accepted/rejected submission — we logged it and will re-check. */
+  ackSubmitted: string;
+  /** Ack for a duplicate (already submitted for this check). */
+  ackDuplicate: string;
+  /** Generic failure. */
+  error: string;
+}
+
+const FORM_COPY: Record<Locale, AddSourceFormCopy> = {
+  en: {
+    urlLabel: "Source link",
+    urlPlaceholder: "https://…",
+    noteLabel: "Note (optional)",
+    notePlaceholder: "What does this source show?",
+    submit: "Submit source",
+    submitting: "Submitting…",
+    cancel: "Cancel",
+    ackSubmitted: "Thanks — source submitted; we'll re-check.",
+    ackDuplicate: "Already submitted — thanks.",
+    error: "Couldn't submit that source. Please try again.",
+  },
+  sw: {
+    urlLabel: "Kiungo cha chanzo",
+    urlPlaceholder: "https://…",
+    noteLabel: "Dokezo (hiari)",
+    notePlaceholder: "Chanzo hiki kinaonyesha nini?",
+    submit: "Wasilisha chanzo",
+    submitting: "Inawasilisha…",
+    cancel: "Ghairi",
+    ackSubmitted: "Asante — chanzo kimewasilishwa; tutakagua tena.",
+    ackDuplicate: "Tayari kimewasilishwa — asante.",
+    error: "Imeshindikana kuwasilisha chanzo. Tafadhali jaribu tena.",
+  },
+};
+
+export function addSourceFormCopyFor(locale: string): AddSourceFormCopy {
+  return FORM_COPY[locale === "sw" ? "sw" : "en"];
+}

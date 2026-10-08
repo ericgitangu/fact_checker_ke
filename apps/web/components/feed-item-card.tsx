@@ -4,7 +4,7 @@ import { VerdictChip } from "./verdict";
 import { FeedItemCaveatNote } from "./legal-caveat";
 import { MarkdownText } from "./markdown-text";
 import { LifecycleAffordance } from "./lifecycle-affordance";
-import { lifecycleAffordanceFor } from "../lib/lifecycle-copy";
+import { addSourceFormCopyFor, lifecycleAffordanceFor } from "../lib/lifecycle-copy";
 import type { FeedItemView } from "../lib/lifecycle-read-model";
 
 /**
@@ -56,7 +56,10 @@ export async function FeedItemCard({ item }: { item: FeedItemView }): Promise<Re
           {t(`source.${item.ingestSource}`)}
         </span>
         {affordance ? (
-          <LifecycleAffordance affordance={affordance} />
+          // `item.id` IS the check id (FeedItemSchema.id), so the add-source CTA
+          // is interactive here — unlike a trending draft, a feed item always
+          // carries a real, linkable check id.
+          <LifecycleAffordance affordance={affordance} checkId={item.id} formCopy={addSourceFormCopyFor(locale)} />
         ) : (
           <>
             {await VerdictChip({ rating: item.rating })}

@@ -1781,6 +1781,27 @@ a:hover {
 .lifecycle-affordance-cta {
   font-weight: 600;
 }
+/* A button rendered as the CTA (interactive add-source, ADR-0038 Wave 2) must
+   not inherit the <button> chrome — it reads as the same text link the hint
+   span did, reusing the existing CTA token (no new palette). */
+button.lifecycle-affordance-cta {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+/* ADR-0038 Wave 2 add-source form: stacks the URL + note inputs and the action
+   row. Inputs/buttons reuse .smart-input / .btn tokens — layout only here. */
+.add-source-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
 
 .advisory-list {
   display: flex;

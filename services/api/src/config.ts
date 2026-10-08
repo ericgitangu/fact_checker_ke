@@ -78,6 +78,26 @@ export interface ResolvedConfig {
    * `editor_review` — a human-owned item isn't yanked at 7d (ADR-0038). */
   editorReviewExpiryDays?: number;
   /**
+   * ADR-0038 Wave 2 (crowdsourced source-seeking, "Submit the truth").
+   *
+   * `featureCrowdsourceSources` (FEATURE_CROWDSOURCE_SOURCES): gates
+   * `POST /v1/checks/:id/sources`. UNLIKE the Wave-1 flags, this defaults
+   * ON (true) — the endpoint is the live fix for the dead "Submit the truth →"
+   * affordance (the web renders the CTA already). Set the env var to "false"/"0"
+   * to flip it OFF, and the route 404s (the ADR rollback path: "endpoint 404s").
+   * Optional for the same reason as the fields above (test config literals
+   * predate it); the wiring (app.ts) treats an omitted value as the default (on).
+   */
+  featureCrowdsourceSources?: boolean;
+  /**
+   * `CROWDSOURCE_REVERIFY_THRESHOLD` (default 2): the number of ACCEPTED
+   * tier≤2 (authoritative) community sources on a check that triggers a
+   * re-verify enqueue (ADR-0038 "Re-verification trigger"). A non-positive /
+   * non-numeric override falls back to 2 (never 0, which would re-verify on the
+   * very first accepted source and defeat the "weight of evidence" intent).
+   */
+  crowdsourceReverifyThreshold?: number;
+  /**
    * ADR-0007 kill-switch mechanism (AT-0007-A): the apps/web origin and
    * shared secret for the `/api/revalidate` webhook (see
    * apps/web/app/api/revalidate/route.ts) that the kill-switch route
@@ -223,6 +243,14 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
       env.LIFECYCLE_EXPIRY_DAYS && Number(env.LIFECYCLE_EXPIRY_DAYS) > 0 ? Number(env.LIFECYCLE_EXPIRY_DAYS) : 7,
     editorReviewExpiryDays:
       env.EDITOR_REVIEW_EXPIRY_DAYS && Number(env.EDITOR_REVIEW_EXPIRY_DAYS) > 0 ? Number(env.EDITOR_REVIEW_EXPIRY_DAYS) : 30,
+    // ADR-0038 Wave 2: default ON (ship the crowdsource endpoint live); only an
+    // explicit "false"/"0" disables it. Threshold defaults to 2, rejecting a
+    // non-positive/non-numeric override.
+    featureCrowdsourceSources: !(env.FEATURE_CROWDSOURCE_SOURCES === "false" || env.FEATURE_CROWDSOURCE_SOURCES === "0"),
+    crowdsourceReverifyThreshold:
+      env.CROWDSOURCE_REVERIFY_THRESHOLD && Number(env.CROWDSOURCE_REVERIFY_THRESHOLD) > 0
+        ? Number(env.CROWDSOURCE_REVERIFY_THRESHOLD)
+        : 2,
     webBaseUrl: env.WEB_BASE_URL ?? null,
     revalidateSecret: env.REVALIDATE_SECRET ?? null,
     pipelineCallbackSecret: env.PIPELINE_CALLBACK_SECRET ?? null,
