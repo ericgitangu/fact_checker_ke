@@ -61,6 +61,51 @@
       "source": "the-star.co.ke",
       "tier": "tier3_general",
       "notes": "The Star - general national outlet, mixed editorial track record."
+    },
+    {
+      "source": "who.int",
+      "tier": "tier1_primary",
+      "notes": "World Health Organization - primary global health authority."
+    },
+    {
+      "source": "cdc.gov",
+      "tier": "tier1_primary",
+      "notes": "US CDC - primary public-health authority."
+    },
+    {
+      "source": "nih.gov",
+      "tier": "tier1_primary",
+      "notes": "US NIH - primary biomedical research authority."
+    },
+    {
+      "source": "un.org",
+      "tier": "tier1_primary",
+      "notes": "United Nations - primary multilateral source."
+    },
+    {
+      "source": "reuters.com",
+      "tier": "tier2_established_media",
+      "notes": "Reuters - international wire service."
+    },
+    {
+      "source": "apnews.com",
+      "tier": "tier2_established_media",
+      "notes": "Associated Press - international wire service."
+    },
+    {
+      "source": "afp.com",
+      "tier": "tier2_established_media",
+      "notes": "Agence France-Presse - international wire service."
+    },
+    {
+      "source": "bbc.com",
+      "tier": "tier2_established_media",
+      "notes": "BBC News - established international broadcaster."
+    },
+    {
+      "source": "bbc.co.uk",
+      "tier": "tier2_established_media",
+      "notes": "BBC News - established international broadcaster."
     }
   ]
 }

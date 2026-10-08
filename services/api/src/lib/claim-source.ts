@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema, type Database } from "@fact-checker-ke/db";
 import type { CheckLifecycle, CredibilityTier } from "@fact-checker-ke/core";
 import type { Publisher } from "./publisher.js";
@@ -53,6 +53,9 @@ export interface InsertClaimSourceRow {
 export interface ClaimSourceStore {
   /** Check lifecycle + claim text, or null when the check does not exist. */
   getCheckInfo(checkId: string): Promise<ClaimSourceCheckInfo | null>;
+  /** Resolve a submission id to its most-recent check id (the public trending
+   * stream exposes submissionId but NEVER the draft check id). Null if none. */
+  resolveCheckIdBySubmission(submissionId: string): Promise<string | null>;
   /** Has this exact URL already been submitted for this check? (dedup probe) */
   hasExistingUrl(checkId: string, url: string): Promise<boolean>;
   /** Insert the submission row. */
@@ -98,6 +101,16 @@ export class PostgresClaimSourceStore implements ClaimSourceStore {
       submissionId: check.submissionId,
       orgId: check.orgId,
     };
+  }
+
+  async resolveCheckIdBySubmission(submissionId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ id: schema.checks.id })
+      .from(schema.checks)
+      .where(eq(schema.checks.submissionId, submissionId))
+      .orderBy(desc(schema.checks.createdAt))
+      .limit(1);
+    return row?.id ?? null;
   }
 
   async hasExistingUrl(checkId: string, url: string): Promise<boolean> {
@@ -184,6 +197,13 @@ export class InMemoryClaimSourceStore implements ClaimSourceStore {
 
   async getCheckInfo(checkId: string): Promise<ClaimSourceCheckInfo | null> {
     return this.checks.get(checkId) ?? null;
+  }
+
+  async resolveCheckIdBySubmission(submissionId: string): Promise<string | null> {
+    for (const [checkId, info] of this.checks) {
+      if (info.submissionId === submissionId) return checkId;
+    }
+    return null;
   }
 
   async hasExistingUrl(checkId: string, url: string): Promise<boolean> {
