@@ -333,6 +333,20 @@ export async function runSubmissionOrchestration(
   // the row authoritative; only an explicit `false` marks it non-authoritative.
   const hopAuthoritative = lifecycleOn ? (verify.publish.authoritative ?? true) : true;
 
+  // ADR-0038 Wave 3 stance persistence (the owner's explicit ask): for a
+  // NON-named (`risk_tier !== 'C'`) PRELIMINARY, persist the pipeline's draft
+  // rating so the public feed can show the AI's stance behind the "AI-grounded,
+  // not verified" caveat. HARD CONSTRAINTS preserved below: `isDraft` stays TRUE
+  // and `publishedAt` stays NULL — this is NOT a publish. The
+  // `checks_published_requires_rating` DB constraint only fires when
+  // `publishedAt` is set, so a preliminary with a rating + null publishedAt is
+  // valid. A NAMED person ('C') preliminary MUST keep rating null (withheld —
+  // legal); `awaiting_sources`/`dismissed`/`editor_review` never carry one.
+  const preliminaryDraftRating: Rating | null =
+    initialLifecycleState === "preliminary" && verify.publish.risk_tier !== "C"
+      ? (verify.verdict?.rating ?? null)
+      : null;
+
   const [check] = await args.db
     .insert(schema.checks)
     .values({
@@ -343,7 +357,10 @@ export async function runSubmissionOrchestration(
       submissionId: event.submission_id,
       orgId: event.org_id,
       summary,
-      rating: null, // not yet published — enactPublishDecision sets this atomically with isDraft/publishedAt
+      // A non-named preliminary carries the AI draft stance (above); every other
+      // non-published state stays null. enactPublishDecision sets the rating
+      // atomically with isDraft/publishedAt on the auto-publish path.
+      rating: preliminaryDraftRating,
       isDraft: true,
       publishedAt: null,
       riskTier: verify.publish.risk_tier,

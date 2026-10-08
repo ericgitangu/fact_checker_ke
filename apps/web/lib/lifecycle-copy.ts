@@ -162,3 +162,38 @@ const FORM_COPY: Record<Locale, AddSourceFormCopy> = {
 export function addSourceFormCopyFor(locale: string): AddSourceFormCopy {
   return FORM_COPY[locale === "sw" ? "sw" : "en"];
 }
+
+/**
+ * ADR-0038 Wave 3: the prefix for a non-named preliminary's AI DRAFT STANCE,
+ * composed with the rating label (from the shared `check.rating.*` catalog) as
+ * "AI-grounded: <stance>". Kept local + locale-aware for the SAME i18n-scope
+ * reason as the affordance copy above (packages/i18n is out of this wave's
+ * scope); en + sw are kept in parity by hand and SHOULD move to the shared
+ * `feed` catalog in a follow-up. This label is deliberately NOT the saturated
+ * verdict chip — it reads as a caveated stance, never the authoritative verdict.
+ */
+export function aiGroundedStancePrefixFor(locale: string): string {
+  return locale === "sw" ? "Mwelekeo wa AI: " : "AI-grounded: ";
+}
+
+/**
+ * ADR-0038 Wave 3 "Most followed" rail copy. The rail is FALLING BACK to
+ * "Most recent" ordering until a `claim_follows` counter exists (packages/db is
+ * fenced this wave — see the follows-upgrade marker in `most-recent-section.tsx`
+ * and the repo's `listHomeRailRecent`). Kept local + locale-aware for the same
+ * i18n-scope reason as the affordance copy above; SHOULD move to the shared
+ * `feed` catalog alongside a "Most followed" heading when follows ship.
+ */
+export interface HomeRailCopy {
+  heading: string;
+  intro: string;
+}
+
+export function homeRailRecentCopyFor(locale: string): HomeRailCopy {
+  return locale === "sw"
+    ? { heading: "Za hivi karibuni", intro: "Madai mapya zaidi tunayofanyia kazi — yaliyochapishwa na nyuzi zilizo wazi." }
+    : {
+        heading: "Most recent",
+        intro: "The freshest claims we're working on — published verdicts and open threads alike.",
+      };
+}

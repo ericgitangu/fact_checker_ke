@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { schema, type Database } from "@fact-checker-ke/db";
-import { TERMINAL_CHECK_LIFECYCLES, type CheckLifecycle } from "@fact-checker-ke/core";
+import { TERMINAL_CHECK_LIFECYCLES, type CheckLifecycle, type Rating } from "@fact-checker-ke/core";
 import {
   postJson,
   normalizeCredibilityTier,
@@ -226,9 +226,17 @@ export async function runReverifyOrchestration(
   // `nonPublishLifecycle` is null and the lifecycle column is left unchanged
   // (today's held-draft fallback), only the activity clock advances.
   if (nonPublishLifecycle !== null) {
+    // ADR-0038 Wave 3 stance persistence (mirrors runSubmissionOrchestration):
+    // a NON-named (`risk_tier !== 'C'`) PRELIMINARY carries the fresh AI draft
+    // stance so the public feed shows it behind the "AI-grounded" caveat; any
+    // other non-publish state (awaiting_sources / editor_review / a named 'C'
+    // item) has its rating withheld (set null) — defence-in-depth against a
+    // prior stance lingering on a row that re-verify moved to a protected state.
+    const preliminaryDraftRating: Rating | null =
+      nonPublishLifecycle === "preliminary" && verify.publish.risk_tier !== "C" ? rating : null;
     await args.db
       .update(schema.checks)
-      .set({ lifecycleState: nonPublishLifecycle, lastActivityAt: now })
+      .set({ lifecycleState: nonPublishLifecycle, rating: preliminaryDraftRating, lastActivityAt: now })
       .where(eq(schema.checks.id, check.id));
     return { outcome: "updated", checkId: check.id, lifecycle: nonPublishLifecycle };
   }

@@ -1,5 +1,9 @@
 import { mockFeedItems } from "../fixtures/feed-items";
-import { FeedResponseViewSchema, type FeedItemView } from "./lifecycle-read-model";
+import {
+  FeedResponseViewSchema,
+  HomeFeedResponseViewSchema,
+  type FeedItemView,
+} from "./lifecycle-read-model";
 
 export interface FeedPage {
   items: FeedItemView[];
@@ -26,7 +30,7 @@ function topViralFrom(items: FeedItemView[], limit = 3): FeedItemView[] {
     .filter((i) => i.viralityScore !== null && i.viralityScore !== undefined)
     .sort((a, b) => {
       const byViral = (b.viralityScore as number) - (a.viralityScore as number);
-      return byViral !== 0 ? byViral : b.publishedAt.localeCompare(a.publishedAt);
+      return byViral !== 0 ? byViral : (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "");
     })
     .slice(0, limit);
 }
@@ -66,5 +70,55 @@ export async function getFeedPage(options?: { limit?: number; cursor?: string | 
   } catch {
     const items = asView(mockFeedItems);
     return { items, nextCursor: null, topViral: topViralFrom(items), isMock: true };
+  }
+}
+
+/**
+ * ADR-0038 Wave 3: a page of the UNIFIED home feed (`GET /v1/feed/home`) —
+ * PUBLISHED verdicts interleaved with OPEN THREADS (`preliminary`/
+ * `awaiting_sources`), plus the two highlight rails (`mostViral`,
+ * `mostRecent`). Same fail-soft demo-fixture fallback as `getFeedPage`, and the
+ * same OWN extended fetch+parse (the rating/publishedAt are nullable and the
+ * lifecycle fields must survive — `ApiClient` would strip/reject them).
+ *
+ * `cursor` is the OPAQUE keyset token this returns as `nextCursor` (not a
+ * datetime). The rails are populated on the first page only (the API omits them
+ * on a cursor request), mirroring `topViral`.
+ */
+export interface HomeFeedPage {
+  items: FeedItemView[];
+  nextCursor: string | null;
+  /** "Most viral" rail (top by virality) — first page only. */
+  mostViral: FeedItemView[];
+  /** "Most followed" rail — Most-recent FALLBACK until a follows counter exists
+   * (packages/db is fenced this wave). First page only. */
+  mostRecent: FeedItemView[];
+  isMock: boolean;
+}
+
+export async function getHomeFeedPage(options?: { limit?: number; cursor?: string | null }): Promise<HomeFeedPage> {
+  const apiBaseUrl = (process.env.API_BASE_URL ?? "http://localhost:8080").replace(/\/$/, "");
+  const params = new URLSearchParams();
+  if (options?.limit) params.set("limit", String(options.limit));
+  if (options?.cursor) params.set("cursor", options.cursor);
+  const qs = params.toString();
+
+  try {
+    const res = await fetch(`${apiBaseUrl}/v1/feed/home${qs ? `?${qs}` : ""}`, { next: { revalidate: 30 } });
+    if (!res.ok) throw new Error(`home-feed ${res.status}`);
+    const response = HomeFeedResponseViewSchema.parse(await res.json());
+    return {
+      items: response.items,
+      nextCursor: response.nextCursor,
+      mostViral: response.mostViral,
+      mostRecent: response.mostRecent,
+      isMock: false,
+    };
+  } catch {
+    // Fallback: the demo fixture is all published verdicts. Derive the rails
+    // client-side so the sections still demonstrate without a backend.
+    const items = asView(mockFeedItems);
+    const mostRecent = [...items].sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "")).slice(0, 3);
+    return { items, nextCursor: null, mostViral: topViralFrom(items), mostRecent, isMock: true };
   }
 }

@@ -3,8 +3,9 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { FeedSection } from "../../components/feed-section";
 import { ViralSection } from "../../components/viral-section";
+import { MostRecentSection } from "../../components/most-recent-section";
 import { TrendingSection } from "../../components/trending-section";
-import { getFeedPage } from "../../lib/get-feed";
+import { getHomeFeedPage } from "../../lib/get-feed";
 import { getTrending } from "../../lib/get-trending";
 
 export const metadata: Metadata = {
@@ -17,12 +18,13 @@ const FEED_PAGE_LIMIT = 20;
 const TRENDING_LIMIT = 8;
 
 /**
- * ADR-0032's visible payoff, as its own route: the full "what we're
- * checking now" feed, not just the home-page preview. Server-rendered
- * (no client JS needed for the basic list — the brief explicitly says
- * keep the "live" touch simple rather than faking real-time), with a
- * plain server-rendered "load older" link driving keyset pagination via
- * `?cursor=` rather than client-side state.
+ * ADR-0032's visible payoff, as its own route, EXTENDED by ADR-0038 Wave 3:
+ * the full "what we're checking now" feed — now the UNIFIED home feed that
+ * INTERLEAVES published verdicts with OPEN THREADS (preliminary /
+ * awaiting_sources), so the AI-grounded preliminaries are finally public. Two
+ * highlight rails lead the page (Most viral + Most recent), the mixed feed
+ * renders below them. Server-rendered, with a plain "load more" link driving
+ * KEYSET pagination via the opaque `?cursor=` the API returns (no client state).
  */
 export default async function FeedPage({
   searchParams,
@@ -31,29 +33,32 @@ export default async function FeedPage({
 }): Promise<React.JSX.Element> {
   const { cursor } = await searchParams;
   const t = await getTranslations("feed");
-  // The trending stream is only shown on the first page (like the viral
-  // section) — a reader paging "load older" has already seen it. Fetched in
-  // parallel with the feed; a trending failure degrades to an empty,
-  // self-hiding section without affecting the feed.
+  // The rails + trending stream are only shown on the first page — a reader
+  // paging "load more" has already seen them (the API omits the rails on a
+  // cursor request). Fetched in parallel; a trending failure degrades to an
+  // empty, self-hiding section without affecting the feed.
   const isFirstPage = !cursor;
   const [feed, trending] = await Promise.all([
-    getFeedPage({ limit: FEED_PAGE_LIMIT, cursor: cursor ?? null }),
+    getHomeFeedPage({ limit: FEED_PAGE_LIMIT, cursor: cursor ?? null }),
     isFirstPage ? getTrending({ limit: TRENDING_LIMIT }) : Promise.resolve([]),
   ]);
 
   return (
     <div className="shell-narrow flex flex-col gap-6">
-      {/* "Trending / under review" leads the page: the fetch engine's
-          DISCOVERIES (viral items we're tracking), surfaced regardless of
-          publish status — self-hiding when there's nothing trending. */}
+      {/* ADR-0038 Wave 3: two highlight rails lead the page. "Most viral"
+          (top by reach) and "Most recent" (the second rail — a Most-followed
+          FALLBACK until a claim_follows counter exists; see MostRecentSection).
+          Both self-hide (render null) when empty, so an empty/early feed is
+          unaffected. Each spans published verdicts AND open threads. */}
+      <ViralSection items={feed.mostViral} />
+      <MostRecentSection items={feed.mostRecent} />
+
+      {/* "Trending / under review": the fetch engine's DISCOVERIES (viral items
+          we're tracking), surfaced regardless of publish status — self-hiding
+          when there's nothing trending. */}
       <TrendingSection items={trending} />
 
-      {/* "Most viral right now" (top-3 PUBLISHED by reach) sits below it —
-          additive, and self-hiding (renders null) when nothing qualifies, so
-          an all-submission feed is unaffected. */}
-      {/* ADR-0038 Wave 3: a second "Most followed" rail (new claim_follows counter) attaches here alongside Most-viral — deferred until the follows counter exists. */}
-      <ViralSection items={feed.topViral} />
-
+      {/* The main MIXED feed (published + open threads), keyset-paginated. */}
       <FeedSection
         items={feed.items}
         isMock={feed.isMock}
