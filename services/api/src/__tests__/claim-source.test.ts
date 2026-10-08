@@ -158,7 +158,7 @@ describe("submitClaimSource (ADR-0038 Wave 2)", () => {
 
     const published = publisher.published[0]!;
     expect(published.url).toBe(REVERIFY_URL);
-    expect(published.deduplicationId).toBe(`reverify:${checkId}:2`);
+    expect(published.deduplicationId).toBe(`reverify-${checkId}-2`);
     const payload = published.body as ReverifyPayload;
     // Payload is a valid pipeline VerifyHopRequest (no reverify/check_id keys —
     // the hop re-identifies the check via submission_id and tells a re-verify

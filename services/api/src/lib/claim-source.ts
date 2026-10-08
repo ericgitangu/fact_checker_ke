@@ -374,12 +374,21 @@ export async function submitClaimSource(
       // given count enqueues at most once, so a QStash retry of the submit — or
       // a double-tap — never double-fans-out, while a LATER accepted source
       // (a higher count, more docs) does enqueue a fresh, richer re-verify.
-      await deps.publisher.publish({
-        url: deps.reverifyHopUrl,
-        body: payload,
-        deduplicationId: `reverify:${args.checkId}:${acceptedCount}`,
-      });
-      reVerifyQueued = true;
+      // NOTE: QStash DeduplicationId must not contain ':' — use '-' (checkId is a
+      // UUID, so hyphen-joining stays collision-free).
+      try {
+        await deps.publisher.publish({
+          url: deps.reverifyHopUrl,
+          body: payload,
+          deduplicationId: `reverify-${args.checkId}-${acceptedCount}`,
+        });
+        reVerifyQueued = true;
+      } catch {
+        // Non-fatal: the source is already stored + accepted. A failed re-verify
+        // enqueue must not fail the submission (the next accepted source, or the
+        // expiry sweep, still moves the item). reVerifyQueued stays false.
+        reVerifyQueued = false;
+      }
     }
   }
 
