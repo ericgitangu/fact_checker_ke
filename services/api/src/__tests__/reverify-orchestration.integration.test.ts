@@ -96,13 +96,19 @@ async function seedCheck(
   return { submissionId, checkId: check!.id };
 }
 
-function payloadFor(submissionId: string): ReverifyPayload {
+function payloadFor(submissionId: string, docCount = 1): ReverifyPayload {
   return {
     submission_id: submissionId,
     org_id: ORG_ID,
     claim_text: "a crowdsourced claim thread",
     language: "en",
-    injected_docs: [{ url: "https://nation.africa/story", title: "nation.africa", text: "reader-submitted corroboration" }],
+    // injected_docs length == accepted-source count at enqueue time; the hybrid
+    // publish threshold (default 2) reads it to decide publish vs. preliminary.
+    injected_docs: Array.from({ length: docCount }, (_, i) => ({
+      url: `https://nation.africa/story-${i}`,
+      title: "nation.africa",
+      text: "reader-submitted corroboration",
+    })),
   };
 }
 
@@ -180,7 +186,7 @@ describe.skipIf(!connectionString)("ADR-0038 Wave 2 re-verify persistence (real 
     expect(check!.lifecycleState).toBe("awaiting_sources");
   });
 
-  it("PUBLISHES an existing non-named thread that clears the band, and persists evidence", async () => {
+  it("PUBLISHES an existing non-named thread that clears the band with >= 2 sources, and persists evidence", async () => {
     const { submissionId, checkId } = await seedCheck(db, {
       lifecycleState: "awaiting_sources",
       isDraft: true,
@@ -189,7 +195,9 @@ describe.skipIf(!connectionString)("ADR-0038 Wave 2 re-verify persistence (real 
     const outcome = await runReverifyOrchestration({
       db,
       pipelineBaseUrl: "http://pipeline.invalid",
-      payload: payloadFor(submissionId),
+      // 2 accepted sources — meets the hybrid publish threshold, so a would-publish
+      // re-verify actually publishes (one source alone would cap at preliminary).
+      payload: payloadFor(submissionId, 2),
       fetchImpl: stubVerify({ autoPublish: true, lifecycle: "published" }),
       featurePreliminaryThreads: true,
     });
@@ -204,6 +212,74 @@ describe.skipIf(!connectionString)("ADR-0038 Wave 2 re-verify persistence (real 
     // Evidence rows persisted (sources + check_evidence).
     const evidence = await db.select().from(schema.checkEvidence).where(eq(schema.checkEvidence.checkId, checkId));
     expect(evidence.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("HYBRID THRESHOLD: a would-publish re-verify backed by ONE source caps at a caveated preliminary, not published", async () => {
+    // The pipeline says auto_publish (non-named, cleared the band), but only ONE
+    // accepted source backs it (< publish threshold 2). Credibility guard: hold
+    // it as a caveated preliminary carrying the draft stance — never a hard
+    // auto-published verdict on a single community source.
+    const { submissionId, checkId } = await seedCheck(db, {
+      lifecycleState: "awaiting_sources",
+      isDraft: true,
+      publishedAt: null,
+    });
+    const outcome = await runReverifyOrchestration({
+      db,
+      pipelineBaseUrl: "http://pipeline.invalid",
+      payload: payloadFor(submissionId, 1),
+      fetchImpl: stubVerify({ autoPublish: true, lifecycle: "published", rating: "False" }),
+      featurePreliminaryThreads: true,
+    });
+    expect(outcome.outcome).toBe("updated");
+    expect(outcome).toMatchObject({ lifecycle: "preliminary" });
+    const [check] = await db.select().from(schema.checks).where(eq(schema.checks.id, checkId));
+    expect(check!.isDraft).toBe(true); // HELD, never published
+    expect(check!.publishedAt).toBeNull();
+    expect(check!.lifecycleState).toBe("preliminary");
+    // Non-named preliminary carries the caveated draft stance (rating set).
+    expect(check!.rating).toBe("False");
+    // And with 2 sources the SAME would-publish verdict DOES publish (control).
+    const second = await seedCheck(db, { lifecycleState: "awaiting_sources", isDraft: true, publishedAt: null });
+    const publishedOutcome = await runReverifyOrchestration({
+      db,
+      pipelineBaseUrl: "http://pipeline.invalid",
+      payload: payloadFor(second.submissionId, 2),
+      fetchImpl: stubVerify({ autoPublish: true, lifecycle: "published" }),
+      featurePreliminaryThreads: true,
+    });
+    expect(publishedOutcome.outcome).toBe("published");
+  });
+
+  it("NO-DOWNGRADE: a weaker re-verify never moves a preliminary thread back to awaiting_sources", async () => {
+    // A preliminary thread already shows an AI-grounded conclusion. A community
+    // re-verify that lands softer (non-publish, awaiting_sources) must NOT tear
+    // it down — the thread keeps its lifecycle + conclusion, only activity bumps.
+    const { submissionId, checkId } = await seedCheck(db, {
+      lifecycleState: "preliminary",
+      isDraft: true,
+      publishedAt: null,
+    });
+    const [before] = await db.select().from(schema.checks).where(eq(schema.checks.id, checkId));
+    const outcome = await runReverifyOrchestration({
+      db,
+      pipelineBaseUrl: "http://pipeline.invalid",
+      payload: payloadFor(submissionId),
+      fetchImpl: stubVerify({ autoPublish: false, lifecycle: "awaiting_sources" }),
+      featurePreliminaryThreads: true,
+    });
+    expect(outcome.outcome).toBe("noop");
+    const [check] = await db.select().from(schema.checks).where(eq(schema.checks.id, checkId));
+    // Lifecycle held at preliminary — NOT downgraded to awaiting_sources.
+    expect(check!.lifecycleState).toBe("preliminary");
+    // Content was NOT overwritten by the weaker re-verify.
+    expect(check!.summary).toBe("Preliminary: awaiting corroborating sources.");
+    expect(check!.summary).not.toContain("Re-verified");
+    // No evidence persisted (the guard returns before the evidence insert).
+    const evidence = await db.select().from(schema.checkEvidence).where(eq(schema.checkEvidence.checkId, checkId));
+    expect(evidence.length).toBe(0);
+    // Activity clock advanced (the submission IS activity, even when held).
+    expect(check!.lastActivityAt!.getTime()).toBeGreaterThanOrEqual(before!.lastActivityAt!.getTime());
   });
 
   it("NEVER auto-publishes a named-person item routed to editor_review, even when auto_publish + publishable", async () => {

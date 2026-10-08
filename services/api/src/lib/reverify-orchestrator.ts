@@ -51,6 +51,19 @@ export interface RunReverifyOrchestrationArgs {
    * suppression armed). Off ⇒ today's held-draft fallback.
    */
   featurePreliminaryThreads?: boolean;
+  /**
+   * ADR-0038 HYBRID THRESHOLD (credibility guard). The TRIGGER threshold
+   * (claim-source.ts `reverifyThreshold`, default 1) decides when ONE accepted
+   * authoritative source enqueues a re-verify — enough to lift a thread to a
+   * caveated `preliminary`. This SEPARATE publish threshold (default 2) is the
+   * minimum number of independent accepted community sources required before a
+   * re-verify may AUTO-PUBLISH a hard verdict: a lone community source must
+   * never flip a public verdict on its own. A re-verify that would publish but
+   * is backed by fewer sources is held as a caveated `preliminary` instead.
+   * Read from the payload's `injected_docs` length (== the accepted count at
+   * enqueue time). Named persons are never auto-published regardless.
+   */
+  publishMinAcceptedSources?: number;
 }
 
 export type ReverifyOutcome =
@@ -62,6 +75,28 @@ export type ReverifyOutcome =
   | { outcome: "updated"; checkId: string; lifecycle: CheckLifecycle | null }
   // Re-verified and the existing check was published (non-named, cleared the band).
   | { outcome: "published"; checkId: string };
+
+/**
+ * Lifecycle progress rank for the ADR-0038 no-downgrade guard. A community
+ * re-verify may move a thread FORWARD (toward published) or hold it, never
+ * backward: a `preliminary` already shows an AI-grounded conclusion, so a weaker
+ * re-verify must not drop it to `awaiting_sources`. Terminal/verifying states
+ * rank 0 (they are handled by the terminal no-op before this is consulted).
+ */
+function lifecycleRank(ls: CheckLifecycle | null): number {
+  switch (ls) {
+    case "published":
+      return 4;
+    case "editor_review":
+      return 3;
+    case "preliminary":
+      return 2;
+    case "awaiting_sources":
+      return 1;
+    default:
+      return 0;
+  }
+}
 
 export async function runReverifyOrchestration(
   args: RunReverifyOrchestrationArgs,
@@ -123,7 +158,7 @@ export async function runReverifyOrchestration(
   // ADR-0038 contract A gating — identical to runSubmissionOrchestration.
   const lifecycleOn = args.featurePreliminaryThreads === true;
   const hopLifecycle = lifecycleOn ? (verify.publish.lifecycle ?? null) : null;
-  const nonPublishLifecycle: NonNullable<(typeof schema.checks.$inferSelect)["lifecycleState"]> | null =
+  let nonPublishLifecycle: NonNullable<(typeof schema.checks.$inferSelect)["lifecycleState"]> | null =
     hopLifecycle === "preliminary" ||
     hopLifecycle === "awaiting_sources" ||
     hopLifecycle === "dismissed" ||
@@ -133,11 +168,46 @@ export async function runReverifyOrchestration(
   const hopSourceKind = lifecycleOn ? (verify.publish.source_kind ?? null) : null;
   const hopAuthoritative = lifecycleOn ? (verify.publish.authoritative ?? true) : true;
 
+  const evidenceItems = verify.evidence ?? [];
+  const hasEvidence = evidenceItems.length > 0;
+  const hasContext = typeof verify.verdict?.context === "string" && verify.verdict.context.trim().length > 0;
+  const publishable = hasEvidence && hasContext;
+  // HARD named-person invariant: hopLifecycle !== "editor_review" so a named person
+  // cleared by crowdsourced sources is held for a human editor, never auto-published.
+  const wouldAutoPublish = verify.publish.auto_publish && publishable && hopLifecycle !== "editor_review";
+
+  // HYBRID THRESHOLD publish cap (ADR-0038 credibility guard): a re-verify that
+  // WOULD auto-publish but is backed by fewer than `publishMinAcceptedSources`
+  // (default 2) independent accepted community sources is NOT published — one
+  // community source must never flip a public verdict on its own. Instead it is
+  // held as a caveated `preliminary` (non-named; a named person is already
+  // excluded from `wouldAutoPublish` above and routes to editor_review). The
+  // source count is the payload's injected_docs length (== accepted count at
+  // enqueue time). Only applies when the lifecycle track is on.
+  const acceptedSourceCount = args.payload.injected_docs?.length ?? 0;
+  const publishMinAcceptedSources = args.publishMinAcceptedSources ?? 2;
+  const cappedBelowPublishThreshold =
+    wouldAutoPublish && lifecycleOn && acceptedSourceCount < publishMinAcceptedSources;
+  const autoPublish = wouldAutoPublish && !cappedBelowPublishThreshold;
+  if (cappedBelowPublishThreshold) {
+    // Lift to a caveated preliminary rather than publishing. Overrides the
+    // hop's "published" lifecycle (which mapped nonPublishLifecycle -> null).
+    nonPublishLifecycle = "preliminary";
+  }
+
+  // NO-DOWNGRADE GUARD (ADR-0038): a community re-verify may only move a thread
+  // FORWARD (toward published) or hold it — never BACKWARD. If the non-publish
+  // outcome ranks below the current lifecycle (e.g. preliminary -> awaiting_sources),
+  // keep the existing thread + its conclusion intact; only note the activity so the
+  // expiry clock advances. Submitting a source must never make a thread weaker.
+  if (!autoPublish && nonPublishLifecycle !== null && lifecycleRank(nonPublishLifecycle) < lifecycleRank(lifecycle)) {
+    await args.db.update(schema.checks).set({ lastActivityAt: new Date() }).where(eq(schema.checks.id, check.id));
+    return { outcome: "noop", reason: `re-verify would downgrade ${lifecycle ?? "null"} -> ${nonPublishLifecycle}; thread kept` };
+  }
+
   // (d) PERSIST onto the EXISTING check. First the fresh evidence rows (sources +
   // check_evidence), same shape as the orchestrator — a published check must cite
-  // at least one source (ADR-0031 AT-0031-1), and these are the re-verify's cited
-  // sources (including the newly-injected crowdsourced ones the pipeline accepted).
-  const evidenceItems = verify.evidence ?? [];
+  // at least one source, and these are the re-verify's cited sources.
   for (const ev of evidenceItems) {
     const [src] = await args.db
       .insert(schema.sources)
@@ -186,11 +256,6 @@ export async function runReverifyOrchestration(
   // invariant: an un-cited or context-less verdict is never auto-published, and
   // an item the pipeline routed to editor_review (named-person / escalated) is
   // NEVER auto-published by this autonomous edge regardless of auto_publish.
-  const hasEvidence = evidenceItems.length > 0;
-  const hasContext = typeof verify.verdict?.context === "string" && verify.verdict.context.trim().length > 0;
-  const publishable = hasEvidence && hasContext;
-  const autoPublish = verify.publish.auto_publish && publishable && hopLifecycle !== "editor_review";
-
   if (autoPublish) {
     const enactment = await enactPublishDecision(args.db, {
       checkId: check.id,

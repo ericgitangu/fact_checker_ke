@@ -88,6 +88,10 @@ export interface InternalRoutesDeps {
    * itself). Optional + defaulted so existing `InternalRoutesDeps` literals keep
    * compiling. */
   featureCrowdsourceSources?: boolean;
+  /** ADR-0038 HYBRID THRESHOLD: minimum accepted community sources a re-verify
+   * needs before it may AUTO-PUBLISH a hard verdict (default 2); fewer caps the
+   * outcome at a caveated `preliminary`. See RunReverifyOrchestrationArgs. */
+  reverifyPublishMinAcceptedSources?: number;
   /** ADR-0038 (FEATURE_LIFECYCLE_EXPIRY): gates POST /internal/lifecycle/expire.
    * Off/omitted ⇒ the sweep is a no-op. */
   featureLifecycleExpiry?: boolean;
@@ -223,6 +227,7 @@ export async function internalRoutes(app: FastifyInstance, deps: InternalRoutesD
       // lifecycle fields (and arm the editor_review suppression) when the flag
       // is on. In practice a crowdsourced thread only exists when it is on.
       featurePreliminaryThreads: deps.featurePreliminaryThreads ?? false,
+      publishMinAcceptedSources: deps.reverifyPublishMinAcceptedSources ?? 2,
     });
     return reply.status(200).send(outcome);
   });
