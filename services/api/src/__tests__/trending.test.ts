@@ -84,7 +84,9 @@ describe("GET /v1/trending", () => {
       submissionStatus: "analyzing",
       check: null,
     });
-    // under_review (held draft) — must NOT leak the draft's checkId
+    // under_review — ADR-0038: ONLY an `editor_review` escalation reads
+    // under_review now (a plain held draft is `monitoring`). Must NOT leak the
+    // draft's checkId.
     trending.seed({
       ...base,
       submissionId: "10000000-0000-0000-0000-000000000002",
@@ -92,7 +94,12 @@ describe("GET /v1/trending", () => {
       viralityScore: 30,
       observedAt: "2026-10-02T00:00:00.000Z",
       submissionStatus: "ready",
-      check: { checkId: "99999999-9999-9999-9999-999999999999", isDraft: true, publishedAt: null },
+      check: {
+        checkId: "99999999-9999-9999-9999-999999999999",
+        isDraft: true,
+        publishedAt: null,
+        lifecycleState: "editor_review",
+      },
     });
     // published — links the checkId
     trending.seed({

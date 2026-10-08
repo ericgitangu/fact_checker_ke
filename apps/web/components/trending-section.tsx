@@ -1,4 +1,4 @@
-import type { TrendingItem } from "@fact-checker-ke/core";
+import type { TrendingItemView } from "../lib/lifecycle-read-model";
 import { getTranslations } from "next-intl/server";
 import { Reveal, RadarIcon } from "@fact-checker-ke/brand";
 import { TrendingCard } from "./trending-card";
@@ -19,7 +19,7 @@ import { TrendingCard } from "./trending-card";
  * It shows only each discovered video's own metadata + a tracking status — it
  * never renders a held draft's rating/summary (decision C).
  */
-export async function TrendingSection({ items }: { items: TrendingItem[] }): Promise<React.JSX.Element | null> {
+export async function TrendingSection({ items }: { items: TrendingItemView[] }): Promise<React.JSX.Element | null> {
   if (items.length === 0) return null;
   const t = await getTranslations("feed");
 
@@ -36,7 +36,7 @@ export async function TrendingSection({ items }: { items: TrendingItem[] }): Pro
 
       <ol className="feed-list trending-list">
         {await Promise.all(
-          items.map(async (item: TrendingItem, i: number) => (
+          items.map(async (item: TrendingItemView, i: number) => (
             <li key={item.submissionId}>
               <Reveal motion="rise" delay={Math.min(i, 4) * 0.06}>
                 {await TrendingCard({ item })}

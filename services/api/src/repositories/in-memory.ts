@@ -3,17 +3,21 @@ import type {
   BillingProvider,
   Check,
   EntitlementTier,
-  FeedItem,
   IngestSource,
   Submission,
   SubmissionStatus,
-  TrendingItem,
   WaitlistSignupInput,
   WaitlistSignupResult,
 } from "@fact-checker-ke/core";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import { deriveTrendingStatus, type TrendingCheckPointer } from "../lib/trending-status.js";
 import { cleanTrendingTitle } from "../lib/trending-title.js";
+import {
+  type CheckWithLifecycle,
+  type FeedItemWithLifecycle,
+  type LifecycleReadFields,
+  type TrendingItemWithLifecycle,
+} from "../lib/read-model-lifecycle.js";
 import type {
   CheckRepository,
   DeviceTokenRepository,
@@ -80,18 +84,32 @@ export class InMemoryCheckRepository implements CheckRepository {
   // without every other `Check` literal in the codebase needing a new
   // required field.
   private readonly ingestSourceByCheckId = new Map<string, IngestSource>();
+  // ADR-0038 contract B: the lifecycle read fields aren't on the shared `Check`
+  // type (packages/core is not edited this wave), so — exactly like
+  // `ingestSourceByCheckId` above — they're tracked alongside the store. A
+  // seed() call that omits them gets the DB-default-equivalent (null/true/null).
+  private readonly lifecycleByCheckId = new Map<string, LifecycleReadFields>();
 
-  seed(check: Check, ingestSource: IngestSource = "submission"): void {
+  seed(check: Check, ingestSource: IngestSource = "submission", lifecycle?: Partial<LifecycleReadFields>): void {
     this.store.set(check.id, check);
     this.ingestSourceByCheckId.set(check.id, ingestSource);
+    this.lifecycleByCheckId.set(check.id, {
+      lifecycleState: lifecycle?.lifecycleState ?? null,
+      authoritative: lifecycle?.authoritative ?? true,
+      sourceKind: lifecycle?.sourceKind ?? null,
+    });
   }
 
-  async getById(id: string): Promise<RepoResult<Check>> {
+  private lifecycleOf(checkId: string): LifecycleReadFields {
+    return this.lifecycleByCheckId.get(checkId) ?? { lifecycleState: null, authoritative: true, sourceKind: null };
+  }
+
+  async getById(id: string): Promise<RepoResult<CheckWithLifecycle>> {
     const found = this.store.get(id);
     if (!found) {
       return { ok: false, error: { kind: "not_found", message: `Check ${id} not found` } };
     }
-    return { ok: true, value: found };
+    return { ok: true, value: { ...this.lifecycleOf(found.id), ...found } };
   }
 
   async getLatestForSubmission(submissionId: string): Promise<{ id: string; published: boolean } | null> {
@@ -102,7 +120,7 @@ export class InMemoryCheckRepository implements CheckRepository {
     return { id: latest.id, published: !latest.isDraft && latest.publishedAt !== null };
   }
 
-  async listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItem[]> {
+  async listPublished(opts: { limit: number; cursor?: string | null }): Promise<FeedItemWithLifecycle[]> {
     const published = [...this.store.values()]
       .filter((c) => !c.isDraft && c.publishedAt !== null)
       .sort((a, b) => (b.publishedAt as string).localeCompare(a.publishedAt as string));
@@ -114,7 +132,7 @@ export class InMemoryCheckRepository implements CheckRepository {
     return afterCursor.slice(0, opts.limit).map((check) => this.toFeedItem(check));
   }
 
-  async listTopViral(opts: { limit: number }): Promise<FeedItem[]> {
+  async listTopViral(opts: { limit: number }): Promise<FeedItemWithLifecycle[]> {
     // Feed-quality (virality): published checks with a non-null virality score,
     // highest first, nulls EXCLUDED, ties broken by recency — mirrors the
     // postgres repo's `listTopViral` ordering so the two back the same route.
@@ -128,11 +146,12 @@ export class InMemoryCheckRepository implements CheckRepository {
       .map((check) => this.toFeedItem(check));
   }
 
-  private toFeedItem(check: Check): FeedItem {
+  private toFeedItem(check: Check): FeedItemWithLifecycle {
     return {
+      ...this.lifecycleOf(check.id),
       id: check.id,
       claim: check.summary,
-      rating: check.rating as FeedItem["rating"],
+      rating: check.rating as FeedItemWithLifecycle["rating"],
       calibratedConfidence: check.calibratedConfidence,
       ingestSource: this.ingestSourceByCheckId.get(check.id) ?? "submission",
       riskTier: check.riskTier,
@@ -153,7 +172,7 @@ export class InMemoryCheckRepository implements CheckRepository {
             credibilityTier: source.credibilityTier,
           };
         })
-        .filter((s): s is FeedItem["sources"][number] => s !== null),
+        .filter((s): s is FeedItemWithLifecycle["sources"][number] => s !== null),
     };
   }
 }
@@ -174,6 +193,11 @@ export interface TrendingSeedInput {
   observedAt: string;
   submissionStatus: SubmissionStatus;
   check: TrendingCheckPointer | null;
+  /** ADR-0038 contract B: the chosen check's lifecycle read fields. Optional;
+   * omitted ⇒ the defaults (null/true/null), same as a discovery with no check.
+   * `check.lifecycleState` is what the status derivation reads; these three are
+   * what the trending read model exposes to the web for the card affordance. */
+  lifecycle?: Partial<LifecycleReadFields>;
 }
 
 /**
@@ -188,7 +212,7 @@ export class InMemoryTrendingRepository implements TrendingRepository {
     this.store.push(input);
   }
 
-  async listTrending(opts: { limit: number }): Promise<TrendingItem[]> {
+  async listTrending(opts: { limit: number }): Promise<TrendingItemWithLifecycle[]> {
     return [...this.store]
       .sort((a, b) => {
         // NULLS LAST on virality, then observation recency (desc).
@@ -203,6 +227,9 @@ export class InMemoryTrendingRepository implements TrendingRepository {
       .map((row) => {
         const { status, checkId } = deriveTrendingStatus(row.submissionStatus, row.check);
         return {
+          lifecycleState: row.lifecycle?.lifecycleState ?? row.check?.lifecycleState ?? null,
+          authoritative: row.lifecycle?.authoritative ?? true,
+          sourceKind: row.lifecycle?.sourceKind ?? null,
           submissionId: row.submissionId,
           // Display-cleaned (ad/hashtag/echo stripped) to match the Postgres
           // repo's contract — see lib/trending-title.ts.

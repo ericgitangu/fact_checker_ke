@@ -145,7 +145,22 @@ export async function enactPublishDecision(
   await db.transaction(async (tx) => {
     await tx
       .update(schema.checks)
-      .set({ isDraft: false, publishedAt, rating: args.rating, ingestSource: args.ingestSource })
+      .set({
+        isDraft: false,
+        publishedAt,
+        rating: args.rating,
+        ingestSource: args.ingestSource,
+        // ADR-0038: auto-publish is the ONE place the `published` terminal
+        // lifecycle is enacted (atomically with isDraft/publishedAt, so a
+        // published row never briefly reads a pre-publish lifecycle). The
+        // non-publish lifecycle states (preliminary/awaiting_sources) are set
+        // by the orchestrator from the verify-hop — not here — so this never
+        // double-sets. Idempotent via the `check.publishedAt` early-return
+        // above. `last_activity_at` is bumped: publishing is activity, and it
+        // is the clock the expiry sweep reads.
+        lifecycleState: "published",
+        lastActivityAt: publishedAt,
+      })
       .where(eq(schema.checks.id, args.checkId));
 
     await writeAuditLog(tx, {

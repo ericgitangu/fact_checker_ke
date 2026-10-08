@@ -53,6 +53,31 @@ export interface ResolvedConfig {
   /** ADR-0018: Upstash Redis TCP (SUBSCRIBE/PUBLISH) endpoint, `rediss://...`. */
   redisTcpUrl: string | null;
   /**
+   * ADR-0038 Wave 1 (status-progression lifecycle), all flag-gated + env-tunable.
+   * Optional (not just defaulted) for the same reason as the fields below:
+   * several tests construct a `ResolvedConfig` literal directly, so an omitted
+   * value is treated as the documented default by the wiring (app.ts).
+   *
+   * `featurePreliminaryThreads` (FEATURE_PRELIMINARY_THREADS): when ON, the
+   * submission orchestrator trusts and persists the verify-hop's
+   * `lifecycle`/`source_kind`/`authoritative` fields (ADR-0038 contract A) onto
+   * the check; when OFF (default) it ignores them and falls back to today's
+   * held-draft behaviour — i.e. the lifecycle work ships dark. */
+  featurePreliminaryThreads?: boolean;
+  /**
+   * `featureLifecycleExpiry` (FEATURE_LIFECYCLE_EXPIRY): gates the auto-expire
+   * sweep (`POST /internal/lifecycle/expire`). OFF (default) ⇒ the sweep is a
+   * no-op; the rollback path in ADR-0038 ("disable the flags → sweep no-ops"). */
+  featureLifecycleExpiry?: boolean;
+  /** `LIFECYCLE_EXPIRY_DAYS` (default 7): TTL in days after which a stale
+   * `preliminary`/`awaiting_sources` check is archived by the sweep. A
+   * non-positive / non-numeric value falls back to 7 (never 0, which would
+   * expire everything on the next run). */
+  lifecycleExpiryDays?: number;
+  /** `EDITOR_REVIEW_EXPIRY_DAYS` (default 30): the longer TTL for
+   * `editor_review` — a human-owned item isn't yanked at 7d (ADR-0038). */
+  editorReviewExpiryDays?: number;
+  /**
    * ADR-0007 kill-switch mechanism (AT-0007-A): the apps/web origin and
    * shared secret for the `/api/revalidate` webhook (see
    * apps/web/app/api/revalidate/route.ts) that the kill-switch route
@@ -190,6 +215,14 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     qstashNextSigningKey: env.QSTASH_NEXT_SIGNING_KEY ?? null,
     capabilityTokenSecret: capabilityTokenSecret ?? "dev-only-insecure-capability-secret",
     redisTcpUrl: env.REDIS_TCP_URL ?? null,
+    // ADR-0038 Wave 1: flags default OFF (ship dark); the day-TTLs default to
+    // 7 / 30 and reject non-positive/non-numeric overrides.
+    featurePreliminaryThreads: env.FEATURE_PRELIMINARY_THREADS === "true" || env.FEATURE_PRELIMINARY_THREADS === "1",
+    featureLifecycleExpiry: env.FEATURE_LIFECYCLE_EXPIRY === "true" || env.FEATURE_LIFECYCLE_EXPIRY === "1",
+    lifecycleExpiryDays:
+      env.LIFECYCLE_EXPIRY_DAYS && Number(env.LIFECYCLE_EXPIRY_DAYS) > 0 ? Number(env.LIFECYCLE_EXPIRY_DAYS) : 7,
+    editorReviewExpiryDays:
+      env.EDITOR_REVIEW_EXPIRY_DAYS && Number(env.EDITOR_REVIEW_EXPIRY_DAYS) > 0 ? Number(env.EDITOR_REVIEW_EXPIRY_DAYS) : 30,
     webBaseUrl: env.WEB_BASE_URL ?? null,
     revalidateSecret: env.REVALIDATE_SECRET ?? null,
     pipelineCallbackSecret: env.PIPELINE_CALLBACK_SECRET ?? null,
