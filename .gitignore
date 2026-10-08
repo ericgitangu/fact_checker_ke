@@ -73,3 +73,4 @@ infra/terraform/**/.envrc
 
 # Advocate legal-review drafts — sensitive, delivered privately, never commit to the public repo
 docs/legal/advocate-review/
+.env*

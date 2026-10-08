@@ -73,6 +73,15 @@ module "api_service" {
     PIPELINE_BASE_URL = "https://fact-checker-ke-pipeline-zytlwdcoxa-bq.a.run.app"
     API_SELF_BASE_URL = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
     HOST              = "::"
+    # ADR-0038 HYBRID crowdsource thresholds (explicit for operability — tune
+    # without a code deploy as KE source availability dictates). TRIGGER=1: a
+    # single accepted authoritative community source re-verifies a thread and can
+    # lift it to a caveated `preliminary` (thin-source KE reality). PUBLISH=2: a
+    # HARD auto-published verdict still needs >= 2 independent accepted sources —
+    # one community source never flips a public verdict on its own. These match
+    # the services/api/src/config.ts defaults; set here so they are visible.
+    CROWDSOURCE_REVERIFY_THRESHOLD         = "1"
+    CROWDSOURCE_REVERIFY_PUBLISH_THRESHOLD = "2"
   }
 }
 
