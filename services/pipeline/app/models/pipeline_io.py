@@ -119,6 +119,21 @@ class PublishDecisionPayload(BaseModel):
     # a UI transparency chip. In shadow mode it is recorded but did not move
     # the decision. Nullable/defaulted so every existing caller is unaffected.
     corroboration_state: str | None = None
+    # ADR-0038 editorial lifecycle OUTCOME (the pipeline emits the outcome; the
+    # API persists it onto checks.lifecycle_state/source_kind/authoritative — this
+    # service never writes Neon). The three fields are the orthogonal *editorial*
+    # track, distinct from the processing state-machine and from auto_publish:
+    #   - lifecycle: "published" | "preliminary" | "awaiting_sources" | "dismissed"
+    #     (None = no editorial outcome emitted — the pre-ADR-0038 held-draft
+    #     behaviour, which is what FEATURE_PRELIMINARY_THREADS=false restores).
+    #   - source_kind: provenance tag, e.g. "ai_grounded_preliminary"; None for a
+    #     fully-verified published check.
+    #   - authoritative: whether this outcome is a settled verdict (true) vs a
+    #     non-authoritative AI-grounded thread-starter / open thread (false).
+    # Nullable/defaulted so every existing caller + pre-ADR-0038 response is valid.
+    lifecycle: str | None = None
+    source_kind: str | None = None
+    authoritative: bool = True
 
 
 class VerifyEvidence(BaseModel):

@@ -225,55 +225,80 @@ class RealGeminiCorroboration:
         _log.info("corroboration translated %s claim to English for grounding", language)
         return english, _estimate_usd(response)
 
-    async def assess(self, *, claim_text: str, language: str) -> tuple[Stance, list[str], float]:
+    async def _generate_grounded(
+        self, *, contents: str, grounded: bool, max_output_tokens: int, label: str
+    ) -> tuple[object, float]:
+        """Run the (optionally grounded) SDK call off the event loop, with a
+        single bounded retry when grounding is ON but returns ZERO citations.
+
+        ADR-0038 reliability fix: Vertex Google-Search grounding is non-
+        deterministic about surfacing `grounding_chunks` — the SAME claim can
+        return 0 citations on one call and many on the next (observed on a real
+        prod Swahili claim: 0 one call, 11 the next). A rescue/assess whose only
+        failure is an empty citation set is retried ONCE before giving up, so a
+        transient empty-grounding call no longer silently discards an otherwise
+        good assessment. The retry is skipped when grounding is OFF (no citations
+        are ever expected) and never loops more than once (cost-bounded). Returns
+        the chosen response plus the summed USD across the attempts actually made.
+        """
+        import anyio
+
         types = self._types
+        config = types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())] if grounded else None,
+            temperature=0.0,
+            max_output_tokens=max_output_tokens,
+        )
+
+        def _call() -> object:
+            return self._client.models.generate_content(
+                model=_model(), contents=contents, config=config
+            )
+
+        attempts = 2 if grounded else 1
+        response: object | None = None
+        spent = 0.0
+        for attempt in range(attempts):
+            response = await anyio.to_thread.run_sync(_call)
+            spent += _estimate_usd(response)
+            if not grounded or _extract_citations(response) or attempt == attempts - 1:
+                break
+            _log.info(
+                "%s grounding returned 0 citations; retrying grounded call once (attempt %d/%d)",
+                label,
+                attempt + 1,
+                attempts,
+            )
+        return response, spent
+
+    async def assess(self, *, claim_text: str, language: str) -> tuple[Stance, list[str], float]:
         ground_claim, translate_usd = await self._ground_text(claim_text=claim_text, language=language)
         try:
             # GROUNDING IS BILLABLE and 429s on the free tier (verified) — default
             # OFF for the near-0 MVP: an ungrounded second opinion is free-tier
             # eligible. Flip GEMINI_CORROBORATION_GROUNDED=true once billing is on
             # to get fresh web evidence + citations.
-            grounded = _grounding_enabled()
-            config = types.GenerateContentConfig(
-                tools=[types.Tool(google_search=types.GoogleSearch())] if grounded else None,
-                temperature=0.0,
+            response, grounded_usd = await self._generate_grounded(
+                contents=_PROMPT.format(claim=ground_claim),
+                grounded=_grounding_enabled(),
                 max_output_tokens=256,
-            )
-            # The SDK call is synchronous; run it without blocking the event loop.
-            import anyio
-
-            response = await anyio.to_thread.run_sync(
-                lambda: self._client.models.generate_content(
-                    model=_model(),
-                    contents=_PROMPT.format(claim=ground_claim),
-                    config=config,
-                )
+                label="corroboration assess",
             )
         except Exception as exc:
             raise CorroborationError(f"Gemini corroboration call failed: {exc}") from exc
 
         stance = _parse_stance(getattr(response, "text", "") or "")
         citations = await _resolve_citations(_extract_citations(response))
-        usd = _estimate_usd(response) + translate_usd
-        return stance, citations, usd
+        return stance, citations, grounded_usd + translate_usd
 
     async def rescue(self, *, claim_text: str, language: str) -> tuple[Stance, str, list[str], float]:
-        types = self._types
         ground_claim, translate_usd = await self._ground_text(claim_text=claim_text, language=language)
         try:
-            config = types.GenerateContentConfig(
-                tools=[types.Tool(google_search=types.GoogleSearch())],  # grounding ALWAYS on for a rescue
-                temperature=0.0,
+            response, grounded_usd = await self._generate_grounded(
+                contents=_RESCUE_PROMPT.format(claim=ground_claim),
+                grounded=True,  # grounding ALWAYS on for a rescue (it is the whole point)
                 max_output_tokens=512,
-            )
-            import anyio
-
-            response = await anyio.to_thread.run_sync(
-                lambda: self._client.models.generate_content(
-                    model=_model(),
-                    contents=_RESCUE_PROMPT.format(claim=ground_claim),
-                    config=config,
-                )
+                label="corroboration rescue",
             )
         except Exception as exc:
             raise CorroborationError(f"Gemini rescue call failed: {exc}") from exc
@@ -282,7 +307,7 @@ class RealGeminiCorroboration:
         if not text:
             raise CorroborationError("Gemini rescue returned no text")
         citations = await _resolve_citations(_extract_citations(response))
-        return _parse_stance(text), text, citations, _estimate_usd(response) + translate_usd
+        return _parse_stance(text), text, citations, grounded_usd + translate_usd
 
 
 def _extract_citations(response: object) -> list[str]:

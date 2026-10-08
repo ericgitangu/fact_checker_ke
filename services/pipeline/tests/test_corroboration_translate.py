@@ -17,10 +17,35 @@ import pytest
 from app.clients.corroboration_gemini import RealGeminiCorroboration
 
 
+class _Web:
+    def __init__(self, uri: str) -> None:
+        self.uri = uri
+
+
+class _Chunk:
+    def __init__(self, uri: str) -> None:
+        self.web = _Web(uri)
+
+
+class _GroundingMeta:
+    def __init__(self, uris: list[str]) -> None:
+        self.grounding_chunks = [_Chunk(u) for u in uris]
+
+
+class _Candidate:
+    def __init__(self, uris: list[str]) -> None:
+        self.grounding_metadata = _GroundingMeta(uris)
+
+
 class _Resp:
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, *, citations: list[str] | None = None) -> None:
         self.text = text
-        self.candidates: list[Any] = []
+        # ADR-0038: a successful grounding response carries ≥1 citation. These
+        # tests assert translation ROUTING via call count, so the grounding stub
+        # returns a citation — otherwise the ADR-0038 retry-on-zero-citations
+        # (corroboration_gemini._generate_grounded) would legitimately fire a
+        # second grounding call and the call-count assertions would double.
+        self.candidates: list[Any] = [_Candidate(citations)] if citations else []
         self.usage_metadata = None
 
 
@@ -34,7 +59,10 @@ class _Models:
         is_translate = getattr(config, "tools", None) in (None, [])
         if is_translate:
             return _Resp("The Governor of Nairobi has been arrested by the EACC.")
-        return _Resp("SUPPORTED\nReputable sources confirm the arrest.")
+        return _Resp(
+            "SUPPORTED\nReputable sources confirm the arrest.",
+            citations=["https://nation.africa/kenya/news"],
+        )
 
 
 class _RecordingClient:
@@ -96,6 +124,72 @@ async def test_assess_also_translates(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(seen) == 2
     assert "Governor of Nairobi" in seen[1]
     assert stance == "supported"
+
+
+# --- ADR-0038 retry-on-zero-citations reliability fix ----------------------
+class _FlakyGroundingModels:
+    """Grounding returns 0 citations on the first call, then citations on the
+    second — the observed Vertex non-determinism ADR-0038's retry guards."""
+
+    def __init__(self, outer: _RecordingClient) -> None:
+        self._outer = outer
+        self._grounding_calls = 0
+
+    def generate_content(self, *, model: str, contents: str, config: Any) -> _Resp:
+        self._outer.contents_seen.append(contents)
+        is_translate = getattr(config, "tools", None) in (None, [])
+        if is_translate:  # pragma: no cover - English claim here, no translate
+            return _Resp("translated")
+        self._grounding_calls += 1
+        if self._grounding_calls == 1:
+            return _Resp("INCONCLUSIVE\nNo sources surfaced this call.", citations=None)
+        return _Resp(
+            "SUPPORTED\nSecond grounded call surfaced sources.",
+            citations=["https://nation.africa/kenya/news"],
+        )
+
+
+def _flaky_client() -> RealGeminiCorroboration:
+    c = RealGeminiCorroboration.__new__(RealGeminiCorroboration)
+    from google.genai import types  # type: ignore[import-not-found]
+
+    c._types = types  # type: ignore[attr-defined]
+    rc = _RecordingClient()
+    rc.models = _FlakyGroundingModels(rc)  # type: ignore[assignment]
+    c._client = rc  # type: ignore[attr-defined]
+    return c
+
+
+async def test_rescue_retries_once_when_grounding_returns_zero_citations() -> None:
+    c = _flaky_client()
+    stance, _text, cites, _usd = await c.rescue(
+        claim_text="The Nairobi governor was arrested.", language="en"
+    )
+    # Exactly one retry: 2 grounding calls total, and the citations from the
+    # SECOND (non-empty) call win rather than the first call's empty set.
+    assert len(c._client.contents_seen) == 2  # type: ignore[attr-defined]
+    assert cites == ["https://nation.africa/kenya/news"]
+    assert stance == "supported"
+
+
+async def test_rescue_does_not_retry_beyond_once() -> None:
+    # A persistently-empty grounding is tried at most twice, then returns the
+    # (citation-less) assessment rather than looping — cost-bounded.
+    c = _client()
+
+    class _AlwaysEmpty(_Models):
+        def generate_content(self, *, model: str, contents: str, config: Any) -> _Resp:
+            self._outer.contents_seen.append(contents)
+            if getattr(config, "tools", None) in (None, []):  # pragma: no cover
+                return _Resp("translated")
+            return _Resp("INCONCLUSIVE\nnothing", citations=None)
+
+    c._client.models = _AlwaysEmpty(c._client)  # type: ignore[attr-defined]
+    _stance, _text, cites, _usd = await c.rescue(
+        claim_text="The Nairobi governor was arrested.", language="en"
+    )
+    assert len(c._client.contents_seen) == 2  # type: ignore[attr-defined] # one retry, no more
+    assert cites == []
 
 
 # --- ADR-0037 citation redirect resolution ---------------------------------
