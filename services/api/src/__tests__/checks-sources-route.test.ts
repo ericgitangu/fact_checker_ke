@@ -96,7 +96,7 @@ describe("POST /v1/checks/:id/sources (ADR-0038 Wave 2)", () => {
     await app.close();
   });
 
-  it("201 accepts an authoritative source and returns the outcome", async () => {
+  it("201 accepts an authoritative source and triggers a re-verify at the (default 1) threshold", async () => {
     const { store, checkId } = seededStore();
     const publisher = new FakePublisher();
     const app = await buildApp({
@@ -112,7 +112,9 @@ describe("POST /v1/checks/:id/sources (ADR-0038 Wave 2)", () => {
       payload: { url: "https://knbs.or.ke/release", note: "official" },
     });
     expect(res.statusCode).toBe(201);
-    expect(res.json()).toEqual({ status: "accepted", reVerifyQueued: false });
+    // ADR-0038 hybrid threshold: TRIGGER=1, so a single accepted authoritative
+    // (tier1 knbs.or.ke) source now enqueues a re-verify (was false at threshold 2).
+    expect(res.json()).toEqual({ status: "accepted", reVerifyQueued: true });
     expect(res.headers["cache-control"]).toBe("private, no-store");
     await app.close();
   });

@@ -98,6 +98,15 @@ export interface ResolvedConfig {
    */
   crowdsourceReverifyThreshold?: number;
   /**
+   * `CROWDSOURCE_REVERIFY_PUBLISH_THRESHOLD` (default 2): the minimum number of
+   * ACCEPTED authoritative community sources a re-verify needs before it may
+   * AUTO-PUBLISH a hard verdict (ADR-0038 hybrid-threshold credibility guard).
+   * Fewer than this caps the re-verify outcome at a caveated `preliminary`, so a
+   * single community source never flips a public verdict on its own. Paired with
+   * the lower (default 1) `crowdsourceReverifyThreshold` trigger.
+   */
+  crowdsourceReverifyPublishThreshold?: number;
+  /**
    * ADR-0007 kill-switch mechanism (AT-0007-A): the apps/web origin and
    * shared secret for the `/api/revalidate` webhook (see
    * apps/web/app/api/revalidate/route.ts) that the kill-switch route
@@ -244,12 +253,22 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     editorReviewExpiryDays:
       env.EDITOR_REVIEW_EXPIRY_DAYS && Number(env.EDITOR_REVIEW_EXPIRY_DAYS) > 0 ? Number(env.EDITOR_REVIEW_EXPIRY_DAYS) : 30,
     // ADR-0038 Wave 2: default ON (ship the crowdsource endpoint live); only an
-    // explicit "false"/"0" disables it. Threshold defaults to 2, rejecting a
-    // non-positive/non-numeric override.
+    // explicit "false"/"0" disables it.
     featureCrowdsourceSources: !(env.FEATURE_CROWDSOURCE_SOURCES === "false" || env.FEATURE_CROWDSOURCE_SOURCES === "0"),
+    // HYBRID THRESHOLD (ADR-0038). TRIGGER default 1: a single accepted
+    // authoritative source re-verifies a thread (thin-source KE reality) and can
+    // lift it to a caveated `preliminary`. A non-positive/non-numeric override
+    // falls back to 1.
     crowdsourceReverifyThreshold:
       env.CROWDSOURCE_REVERIFY_THRESHOLD && Number(env.CROWDSOURCE_REVERIFY_THRESHOLD) > 0
         ? Number(env.CROWDSOURCE_REVERIFY_THRESHOLD)
+        : 1,
+    // PUBLISH default 2: a HARD auto-published verdict still needs >= 2 independent
+    // accepted sources — a lone community source never flips a public verdict
+    // (credibility guard); fewer caps the re-verify at a caveated `preliminary`.
+    crowdsourceReverifyPublishThreshold:
+      env.CROWDSOURCE_REVERIFY_PUBLISH_THRESHOLD && Number(env.CROWDSOURCE_REVERIFY_PUBLISH_THRESHOLD) > 0
+        ? Number(env.CROWDSOURCE_REVERIFY_PUBLISH_THRESHOLD)
         : 2,
     webBaseUrl: env.WEB_BASE_URL ?? null,
     revalidateSecret: env.REVALIDATE_SECRET ?? null,
