@@ -210,6 +210,13 @@ async def run_fetch_hop(
         except FetchSourceError as exc:
             _log.warning("fetch source %s failed, skipping: %s", source.platform, exc)
             continue
+        # Observability (ADR-0038): a source returning an EMPTY list previously
+        # logged nothing, so a silently-dead source was indistinguishable from a
+        # quiet news day. Log every source's yield so the fetch engine is no
+        # longer a black box (the "virals stale" RCA). WARNING level because the
+        # app logger defaults to WARNING (no INFO config), and a dead source IS
+        # operationally noteworthy.
+        _log.warning("fetch source %s returned %d candidate(s)", source.platform, len(candidates))
         for candidate in candidates:
             result.candidates_observed += 1
             await _process_candidate(
@@ -226,6 +233,12 @@ async def run_fetch_hop(
                 transcriber=transcriber,
             )
 
+    _log.warning(
+        "fetch run complete: observed=%d across %d source(s) [%s]",
+        result.candidates_observed,
+        len(sources),
+        ",".join(s.platform for s in sources),
+    )
     return result
 
 
