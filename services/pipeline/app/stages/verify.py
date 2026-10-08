@@ -23,6 +23,7 @@ import json
 import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
@@ -44,6 +45,17 @@ from app.protocols.corroboration import Corroboration, CorroborationError
 # ADR-0036 grounded rescue: a grounded web assessment call costs ~$0.04 (same as
 # a grounded corroboration), charged to the shared "corroboration" daily lane.
 GROUNDED_RESCUE_USD = 0.04
+
+# Credibility ordering for picking the STRONGEST grounded citation as the lead
+# evidence source (ADR-0038 flywheel). Higher = more credible. Used only to
+# choose which surfaced publisher anchors the grounded-assessment evidence row;
+# never a retrieval filter (ADR-0004 §5).
+_TIER_RANK: dict[CredibilityTier, int] = {
+    CredibilityTier.tier1_primary: 4,
+    CredibilityTier.tier2_established_media: 3,
+    CredibilityTier.tier3_general: 2,
+    CredibilityTier.tier4_unverified: 1,
+}
 
 
 def _grounded_rescue_enabled() -> bool:
@@ -119,6 +131,7 @@ def _editorial_lifecycle(
     if rescue_has_assessment:
         return "preliminary", _AI_GROUNDED_PRELIMINARY, False
     return "awaiting_sources", None, False
+from app.clients.corroboration_gemini import grounded_model_name
 from app.protocols.embedder import Embedder
 from app.protocols.factcheck_client import FactCheckClient
 from app.protocols.llm_client import LlmClient, LlmCompletionError
@@ -131,6 +144,7 @@ from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
 from app.stages.json_extract import strip_code_fences
 from app.stages.publish import finalize_publish
 from app.stores.engine_breaker import EngineCostBreaker
+from app.stores.llm_call_store import LlmCall, LlmCallStore
 
 # Cosine-similarity threshold for dedup reuse (ADR-0004 step 3 / amendment
 # #8). Not yet tuned against a real eval set (tracked as tech debt — see
@@ -233,6 +247,13 @@ async def run_verify_hop(
     reverse_image_search: ReverseImageSearch | None = None,
     corroboration_client: Corroboration | None = None,
     corroboration_breaker: EngineCostBreaker | None = None,
+    # Per-call cost audit (ADR-0011 §7 / llm_calls). Optional + fake-first: a
+    # caller that does not wire it records nothing (existing callers/tests are a
+    # pure no-op). app/main.py passes the env-selected Postgres/in-memory store.
+    # Used ONLY for the grounded-rescue row below — the rescue's usd is not
+    # surfaced in VerifyResult, so unlike the draft/corroboration rows (written at
+    # the hop boundary in app/main.py from the result) it must be recorded here.
+    llm_call_store: LlmCallStore | None = None,
 ) -> VerifyResult:
     store = store or InMemoryIdempotencyStore()
     if corroboration_client is None:
@@ -415,6 +436,9 @@ async def run_verify_hop(
     # Vertex returns non-deterministically — see corroboration_gemini retry).
     rescue_has_assessment = False
     if not retrieved and _grounded_rescue_enabled() and request.claim_text.strip():
+        # rescue_usd is left None unless a rescue call actually returns, so the
+        # cost row below is recorded only for a rescue that really ran.
+        rescue_usd: float | None = None
         allow = True
         if corroboration_breaker is not None:
             try:
@@ -423,9 +447,31 @@ async def run_verify_hop(
                 allow = False  # fail-closed: skip the billable rescue if we can't meter it
         if allow:
             try:
-                _rescue_stance, assessment_text, cite_urls, _usd = await corroboration_client.rescue(
+                _rescue_stance, assessment_text, cite_urls, rescue_usd = await corroboration_client.rescue(
                     claim_text=request.claim_text, language=request.language
                 )
+                # Per-call cost audit for the grounded no-source rescue (ADR-0011
+                # §7 / llm_calls). Recorded HERE (not at the app/main.py hop
+                # boundary) because the rescue's usd is not carried out in
+                # VerifyResult. The gemini SDK returns only a usd estimate for a
+                # rescue (no token breakdown — see _estimate_usd in
+                # corroboration_gemini), so token counts are 0. `store.record` is
+                # contractually fail-open (never raises; logs its own failures —
+                # this module has no logger), so no try/except is needed and the
+                # hop can never be failed by this bookkeeping. This sits BEFORE the
+                # citation/tier block below and does not touch it.
+                if llm_call_store is not None:
+                    llm_call_store.record(
+                        LlmCall(
+                            org_id=request.org_id,
+                            stage="grounded_rescue",
+                            model=grounded_model_name(),
+                            input_tokens=0,
+                            cached_tokens=0,
+                            output_tokens=0,
+                            usd=rescue_usd,
+                        )
+                    )
                 if assessment_text.strip():
                     # An assessment exists → preliminary-eligible regardless of
                     # citations (ADR-0038 behaviour #2). The rescue is NO LONGER
@@ -433,18 +479,47 @@ async def run_verify_hop(
                     # real prod Swahili claim: 0 citations one call, many the next).
                     rescue_has_assessment = True
                     if cite_urls:
-                        # Citations present → append as the citable tier4_unverified
-                        # evidence doc the draft can quote (unchanged behaviour).
-                        # Absent → still preliminary (above), but no evidence doc to
-                        # build; the API surfaces the AI stance/summary as the
-                        # non-authoritative thread-starter.
+                        # Citations present → append the AI assessment as the citable
+                        # evidence doc the draft quotes. Absent → still preliminary
+                        # (above), but no evidence doc to build; the API surfaces the
+                        # AI stance/summary as the non-authoritative thread-starter.
+                        #
+                        # ADR-0038 flywheel fix: tier this by the STRONGEST surfaced
+                        # publisher via the SAME credibility registry the API uses for
+                        # human-submitted sources (tier_for_url), instead of a blanket
+                        # tier4 that buried a genuinely authoritative KE source
+                        # (nation.africa, standardmedia, pesacheck …). The quote stays
+                        # a real span of the grounded assessment, so ADR-0023 §2
+                        # citation integrity AND VerifyEvidence's "real quoted source"
+                        # invariant are both preserved; the "(via {host})" title keeps
+                        # the AI-grounded provenance explicit to the reader. This does
+                        # NOT move the publish gate — decide_publish_policy is
+                        # confidence-/risk-tier-driven and never reads evidence tier
+                        # (verified in publish.py) — so richer tiering can never
+                        # auto-publish an AI-only verdict; it only makes the thread's
+                        # lead source honest and correctly weighted.
+                        #
+                        # Only the strongest citation is emitted as evidence: the
+                        # OTHER surfaced URLs have no fetchable text to quote (their
+                        # publishers block our egress IP), so emitting them as
+                        # VerifyEvidence would require a fabricated quote and break the
+                        # "real quoted source" invariant. Surfacing them as un-quoted
+                        # "referenced sources" is a deliberate follow-up (needs a
+                        # separate wire/UI channel), not a silent invariant weakening.
+                        anchor_url = max(
+                            cite_urls,
+                            key=lambda u: _TIER_RANK.get(
+                                tier_for_url(u, default=CredibilityTier.tier4_unverified), 0
+                            ),
+                        )
+                        anchor_host = (urlparse(anchor_url).hostname or "").removeprefix("www.") or "grounded web search"
                         rescue_doc_id = "grounded-web-assessment"
                         retrieved.append(RetrievedDoc(doc_id=rescue_doc_id, text=assessment_text))
                         source_meta[rescue_doc_id] = _SourceMeta(
-                            url=cite_urls[0],
-                            title="AI grounded web assessment (unverified)",
-                            publisher="grounded web search",
-                            credibility_tier=CredibilityTier.tier4_unverified,
+                            url=anchor_url,
+                            title=f"AI-grounded web assessment (via {anchor_host})",
+                            publisher=anchor_host,
+                            credibility_tier=tier_for_url(anchor_url, default=CredibilityTier.tier4_unverified),
                             published_at=None,
                         )
             except CorroborationError:
