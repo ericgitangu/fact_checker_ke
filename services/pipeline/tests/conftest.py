@@ -54,5 +54,9 @@ def pg_conn() -> Iterator[psycopg.Connection]:
             cur.execute("DELETE FROM fetch_observations")
             cur.execute("DELETE FROM fetch_candidates")
             cur.execute("DELETE FROM engine_spend_daily")
+            # llm_calls (ADR-0011 §7 per-call cost audit) is exclusively owned by
+            # this slice's tests and nothing references it, so a full DELETE here
+            # is safe — same scoping rationale as the tables above.
+            cur.execute("DELETE FROM llm_calls")
         conn.commit()
         conn.close()
