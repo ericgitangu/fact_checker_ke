@@ -46,6 +46,14 @@ export const SubmissionStatusSchema = z.enum([
   "verifying",
   "ready",
   "failed",
+  // ADR-0038: distinct NON-ERROR terminal outcomes split out of the old
+  // catch-all `failed`. `needs_quote` is user-actionable (a URL submission with
+  // no quote — the pipeline never transcribes third-party media, ADR-0004 #6 /
+  // ADR-0002; the submitter must paste the exact claim). `no_checkable_claims`
+  // is a thin/opinion submission with nothing checkable. Appended at the END so
+  // the derived pgEnum `ADD VALUE` stays ordering-independent.
+  "needs_quote",
+  "no_checkable_claims",
 ]);
 export type SubmissionStatus = z.infer<typeof SubmissionStatusSchema>;
 
@@ -59,11 +67,14 @@ export const SUBMISSION_STATUS_TRANSITIONS: Readonly<
   Record<SubmissionStatus, readonly SubmissionStatus[]>
 > = {
   received: ["analyzing", "failed"],
-  analyzing: ["analyzed", "failed"],
+  analyzing: ["analyzed", "needs_quote", "no_checkable_claims", "failed"],
   analyzed: ["verifying", "failed"],
   verifying: ["ready", "failed"],
   ready: [],
   failed: [],
+  // ADR-0038: terminal, like `failed`/`ready` (a resubmit starts a NEW submission).
+  needs_quote: [],
+  no_checkable_claims: [],
 };
 
 export const SubmissionSchema = z.object({

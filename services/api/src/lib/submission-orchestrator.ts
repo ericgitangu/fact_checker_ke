@@ -228,7 +228,11 @@ export async function runSubmissionOrchestration(
   });
 
   if (analyze.needs_quote) {
-    await advance("analyzing", "failed");
+    // ADR-0038: a URL submission with no quote is NOT an error — the pipeline
+    // never transcribes third-party media (ADR-0004 #6 / ADR-0002), so we need
+    // the submitter's exact quote. Surface a distinct, actionable status instead
+    // of the catch-all `failed` (which the web rendered as "Something went wrong").
+    await advance("analyzing", "needs_quote");
     return { kind: "needs_quote" };
   }
 
@@ -241,7 +245,9 @@ export async function runSubmissionOrchestration(
   const checkable = analyze.claims.find((c) => c.claim_type === "checkable");
   const claimText = checkable?.text?.trim();
   if (!claimText) {
-    await advance("analyzing", "failed");
+    // ADR-0038: nothing checkable (opinion/rhetoric/empty) is a distinct
+    // non-error terminal, not `failed`.
+    await advance("analyzing", "no_checkable_claims");
     return { kind: "no_checkable_claims" };
   }
 

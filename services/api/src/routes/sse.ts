@@ -7,7 +7,14 @@ import type { PubSub } from "../lib/pubsub.js";
 import type { ConcurrencyGuard } from "../lib/concurrency-guard.js";
 import { NO_STORE_CACHE_CONTROL } from "../lib/cache-headers.js";
 
-const TERMINAL_STATUSES: readonly SubmissionStatus[] = ["ready", "failed"];
+const TERMINAL_STATUSES: readonly SubmissionStatus[] = [
+  "ready",
+  "failed",
+  // ADR-0038: distinct non-error terminals — also end the SSE stream, else the
+  // client polls forever waiting for a close.
+  "needs_quote",
+  "no_checkable_claims",
+];
 
 export interface SseRouteDeps {
   db: Database | null;
