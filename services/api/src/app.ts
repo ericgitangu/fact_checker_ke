@@ -261,7 +261,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
         // AND writes the fresh verdict back onto the existing check) — NOT the
         // pipeline's stateless /hops/verify, which moved nothing.
         reverifyHopUrl: `${config.apiSelfBaseUrl ?? "http://localhost:8080"}/internal/hops/reverify`,
-        reverifyThreshold: config.crowdsourceReverifyThreshold ?? 2,
+        reverifyThreshold: config.crowdsourceReverifyThreshold ?? 1,
         featureCrowdsourceSources: config.featureCrowdsourceSources ?? true,
         fetchImpl: options.claimSourceFetchImpl,
       },
@@ -311,6 +311,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       // ADR-0038 Wave 2: gates POST /internal/hops/reverify (the re-verify
       // persister); same flag the crowdsource route uses. Defaults ON.
       featureCrowdsourceSources: config.featureCrowdsourceSources ?? true,
+      // ADR-0038 hybrid threshold: >= 2 accepted sources to auto-publish a hard
+      // verdict; fewer caps at a caveated preliminary (the re-verify trigger is 1).
+      reverifyPublishMinAcceptedSources: config.crowdsourceReverifyPublishThreshold ?? 2,
       featureLifecycleExpiry: config.featureLifecycleExpiry,
       lifecycleExpiryDays: config.lifecycleExpiryDays,
       editorReviewExpiryDays: config.editorReviewExpiryDays,
