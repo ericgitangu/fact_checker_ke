@@ -30,8 +30,12 @@ const SubmissionAdvancedBodySchema = z.object({
 // injected_docs. Bounds mirror the pipeline model so a malformed delivery 400s
 // here rather than being forwarded to the hop.
 const ReverifyBodySchema = z.object({
-  submission_id: z.string().uuid(),
-  org_id: z.string().uuid(),
+  // NOT z.string().uuid(): the default org id (00000000-0000-0000-0000-000000000001)
+  // is a nil-ish UUID that fails zod v4's strict version/variant check, which 400'd
+  // every re-verify. These are identity keys — match the pipeline VerifyHopRequest's
+  // loose min-length validation.
+  submission_id: z.string().min(1).max(64),
+  org_id: z.string().min(1).max(64),
   claim_text: z.string().min(1).max(2000),
   language: z.string().min(1).max(64),
   injected_docs: z
