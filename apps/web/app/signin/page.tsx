@@ -51,14 +51,31 @@ export default async function SignInPage({
 }
 
 /**
- * Open-redirect guard: only ever return to a same-origin, absolute path.
- * Rejects protocol-relative (`//evil.com`), absolute URLs, and anything not
- * beginning with a single "/". Auth.js validates the callbackUrl against the
- * app origin too, but we sanitise at the boundary rather than trust the query.
+ * Open-redirect guard: only ever return to a same-origin path.
+ *
+ * A naive `startsWith("/") && !startsWith("//")` check is NOT enough — browsers
+ * (WHATWG URL) treat "\" as "/" and strip tab/CR/LF, so `/\evil.com`,
+ * `/\/evil.com` and `/%09/evil.com` (a tab after decoding) all normalise to an
+ * off-origin `https://evil.com/`. This `redirect()` is our own (outside Auth.js,
+ * which only backstops its own sign-in hop), so we must be airtight here:
+ *   1) reject any backslash or C0/DEL control char up front (what browsers
+ *      normalise away), then
+ *   2) resolve against a sentinel origin and require the result to STAY on it —
+ *      an absolute or protocol-relative URL lands on a different origin and is
+ *      rejected; only a genuine same-origin path survives, returned normalised.
  */
-function sanitizeCallbackUrl(raw: string | string[] | undefined): string {
+export function sanitizeCallbackUrl(raw: string | string[] | undefined): string {
   const value = Array.isArray(raw) ? raw[0] : raw;
-  if (typeof value !== "string") return "/";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/";
-  return value;
+  if (typeof value !== "string" || value === "") return "/";
+  // eslint-disable-next-line no-control-regex -- intentional: these are exactly
+  // the chars browsers normalise ("\"->"/") or strip (tab/CR/LF) to escape origin.
+  if (/[\\\u0000-\u001f\u007f]/.test(value)) return "/";
+  try {
+    const SENTINEL = "https://callback.invalid";
+    const url = new URL(value, SENTINEL);
+    if (url.origin !== SENTINEL) return "/";
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/";
+  }
 }

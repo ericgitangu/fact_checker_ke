@@ -133,8 +133,8 @@ describe("ADR-0033 AT-0033-6: Privacy Policy / Terms copy-lint", () => {
     expect(section?.body).toBe(EU_CROSS_BORDER_DISCLOSURE);
   });
 
-  it("the retention table mirrors all ADR-0021 data classes (8 rows, including two indefinite)", () => {
-    expect(PRIVACY_RETENTION_CLASSES).toHaveLength(8);
+  it("the retention table mirrors all ADR-0021 data classes (9 rows, including two indefinite)", () => {
+    expect(PRIVACY_RETENTION_CLASSES).toHaveLength(9);
     const indefinite = PRIVACY_RETENTION_CLASSES.filter((row) => row.retentionDays === null);
     expect(indefinite.map((row) => row.dataClass)).toEqual([
       "Published checks + evidence files",

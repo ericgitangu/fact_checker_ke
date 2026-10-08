@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ApiClient, ApiClientError, SubmissionInputSchema } from "@fact-checker-ke/core";
+import { auth } from "../../../auth";
 
 /**
  * BFF proxy: the browser posts here (same-origin, no CORS), and this route
@@ -20,6 +21,16 @@ import { ApiClient, ApiClientError, SubmissionInputSchema } from "@fact-checker-
  * reimplementing the submit call by hand.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  // Auth gate (server-side): submitting a claim is one of the two gated actions
+  // (the other is add-source). The /submit PAGE redirects a logged-out visitor,
+  // but THIS is the BFF that actually spends LLM budget downstream, so it must
+  // enforce the session itself — a logged-out script must not reach the pipeline
+  // via a minted device token. 401 → the client routes to /signin?callbackUrl=/submit.
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "auth_required" }, { status: 401 });
+  }
+
   const body: unknown = await request.json().catch(() => null);
   const parsed = SubmissionInputSchema.safeParse(body);
   if (!parsed.success) {

@@ -142,6 +142,13 @@ export function SubmitForm({ initialUrl = "" }: { initialUrl?: string } = {}): R
         },
         body: JSON.stringify(payload),
       });
+      // Auth gate (return-to): the BFF requires a session; a logged-out submit
+      // gets 401, so route to sign-in with this page as the callback rather than
+      // surfacing a bare "failed with status 401".
+      if (res.status === 401) {
+        router.push(`/signin?callbackUrl=${encodeURIComponent("/submit")}`);
+        return;
+      }
       if (res.status !== 202) {
         const body: unknown = await res.json().catch(() => ({}));
         const message =
