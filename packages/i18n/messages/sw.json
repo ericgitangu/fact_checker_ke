@@ -146,6 +146,7 @@
       "verifying": "AI inapima ushahidi na kuweka uhakika",
       "ready": "Inachapishwa kama tathmini yenye uzito wa uhakika, vyanzo vikitajwa — binadamu anakagua baadaye"
     },
+    "resolving": "Inafuata kiungo kifupi…",
     "awaitingReview": "Inasubiri tathmini — si uamuzi bado",
     "success": "Imetumwa. Fuatilia inavyopitia mchakato.",
     "error": {
@@ -162,7 +163,9 @@
       "analyzed": "Imechambuliwa",
       "verifying": "Inahakikiwa",
       "ready": "Tayari",
-      "failed": "Imeshindwa"
+      "failed": "Imeshindwa",
+      "needs_quote": "Tunahitaji dai kamili",
+      "no_checkable_claims": "Hakuna dai linaloweza kukaguliwa"
     },
     "desc": {
       "received": "Dai lako liko kwenye foleni ya uchambuzi.",
@@ -170,8 +173,12 @@
       "analyzed": "Madai yametolewa. Yanalinganishwa na vyanzo vinavyoaminika.",
       "verifying": "Tunapima ushahidi na kuweka kiwango cha uhakika kwa tathmini.",
       "ready": "Tathmini imekamilika.",
-      "failed": "Hitilafu imetokea wakati wa kuchakata dai hili."
+      "failed": "Hitilafu imetokea wakati wa kuchakata dai hili.",
+      "needs_quote": "Hatunakili video — bandika sentensi au dai mahususi kutoka kwenye video hii (na takriban lini linasemwa) nasi tutalikagua.",
+      "no_checkable_claims": "Hatukupata dai la kweli linaloweza kukaguliwa katika uwasilishaji huu — huenda ni maoni, maneno ya kisiasa, au machache mno kuthibitishwa. Jaribu kuwasilisha kauli mahususi unayotaka ikaguliwe."
     },
+    "resubmitWithQuote": "Ongeza dai kamili",
+    "resubmitNew": "Wasilisha dai jingine",
     "viewCheck": "Angalia tathmini iliyochapishwa",
     "viewReview": "Angalia hali ya ukaguzi",
     "readyHeld": "Imetathminiwa na inasubiri ukaguzi wa mhariri kabla ya kuchapishwa — bado si ya umma.",

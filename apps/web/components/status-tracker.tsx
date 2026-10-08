@@ -3,11 +3,22 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { SubmissionStatus } from "@fact-checker-ke/core";
-import { subscribeToSubmissionEvents } from "../lib/submission-events";
+import { isTerminalStatus, subscribeToSubmissionEvents } from "../lib/submission-events";
 
 const ORDER: SubmissionStatus[] = ["received", "analyzing", "analyzed", "verifying", "ready"];
 
-function stateFor(current: SubmissionStatus, step: SubmissionStatus): "done" | "active" | "pending" | "failed" {
+/**
+ * ADR-0038: terminal outcomes that are NOT pipeline progress. Each renders as a
+ * single step; only `failed` is an error (red). `needs_quote` is actionable and
+ * `no_checkable_claims` is a neutral dead-end — neither gets the failure dot.
+ */
+const SINGLE_STEP_TERMINALS: readonly SubmissionStatus[] = ["failed", "needs_quote", "no_checkable_claims"];
+
+type StepState = "done" | "active" | "pending" | "failed" | "action" | "neutral";
+
+function stateFor(current: SubmissionStatus, step: SubmissionStatus): StepState {
+  if (current === "needs_quote") return step === "needs_quote" ? "action" : "pending";
+  if (current === "no_checkable_claims") return step === "no_checkable_claims" ? "neutral" : "pending";
   if (current === "failed") {
     return step === "failed" ? "failed" : "pending";
   }
@@ -30,6 +41,7 @@ export function StatusTracker({
   initialStatus,
   initialCheckId = null,
   initialCheckPublished = false,
+  submittedUrl = null,
 }: {
   submissionId: string;
   initialStatus: SubmissionStatus;
@@ -38,6 +50,8 @@ export function StatusTracker({
    * once the tracker reaches `ready` through SSE/polling (see below). */
   initialCheckId?: string | null;
   initialCheckPublished?: boolean;
+  /** The URL that was submitted, if any — lets the needs_quote CTA prefill /submit?url=. */
+  submittedUrl?: string | null;
 }): React.JSX.Element {
   const t = useTranslations("status");
   const tCheck = useTranslations("check");
@@ -47,7 +61,7 @@ export function StatusTracker({
   const [checkPublished, setCheckPublished] = useState<boolean>(initialCheckPublished);
 
   useEffect(() => {
-    if (initialStatus === "ready" || initialStatus === "failed") return;
+    if (isTerminalStatus(initialStatus)) return;
     const handle = subscribeToSubmissionEvents(submissionId, {
       onStatus: setStatus,
       onModeChange: setMode,
@@ -81,11 +95,13 @@ export function StatusTracker({
     };
   }, [status, checkId, submissionId]);
 
-  const steps: SubmissionStatus[] = status === "failed" ? ["failed"] : ORDER;
+  const isSingleStep = SINGLE_STEP_TERMINALS.includes(status);
+  const steps: SubmissionStatus[] = isSingleStep ? [status] : ORDER;
+  const resubmitHref = submittedUrl ? `/submit?url=${encodeURIComponent(submittedUrl)}` : "/submit";
 
   return (
     <div className="flex flex-col gap-4">
-      {status !== "ready" && status !== "failed" && (
+      {!isTerminalStatus(status) && (
         <p className="ai-assisted-note" style={{ alignSelf: "flex-start" }}>
           {tCheck("aiAssisted")}
         </p>
@@ -111,6 +127,16 @@ export function StatusTracker({
         <p className="form-note form-note-muted" role="status">
           {t("readyHeld")}
         </p>
+      )}
+      {status === "needs_quote" && (
+        <a className="btn btn-primary" style={{ alignSelf: "flex-start" }} href={resubmitHref}>
+          {t("resubmitWithQuote")}
+        </a>
+      )}
+      {status === "no_checkable_claims" && (
+        <a className="btn" style={{ alignSelf: "flex-start" }} href="/submit">
+          {t("resubmitNew")}
+        </a>
       )}
       {status === "ready" && checkId !== null && (
         <a className="btn btn-primary" style={{ alignSelf: "flex-start" }} href={`/checks/${checkId}`}>

@@ -146,6 +146,7 @@
       "verifying": "AI weighs the evidence and sets a confidence",
       "ready": "Published as a confidence-weighted assessment, sources cited — a human audits it afterward"
     },
+    "resolving": "Following the short link…",
     "awaitingReview": "Awaiting assessment — not a verdict yet",
     "success": "Submitted. Watch it move through the pipeline.",
     "error": {
@@ -162,7 +163,9 @@
       "analyzed": "Analyzed",
       "verifying": "Verifying",
       "ready": "Ready",
-      "failed": "Failed"
+      "failed": "Failed",
+      "needs_quote": "We need the exact claim",
+      "no_checkable_claims": "No checkable claim found"
     },
     "desc": {
       "received": "Your submission is queued for analysis.",
@@ -170,8 +173,12 @@
       "analyzed": "Claims extracted. Matching each one against credible sources.",
       "verifying": "Weighing the evidence and setting a confidence level for the assessment.",
       "ready": "The assessment is complete.",
-      "failed": "Something went wrong processing this submission."
+      "failed": "Something went wrong processing this submission.",
+      "needs_quote": "We don't transcribe videos — paste the specific sentence or claim from this video (and roughly when it's said) and we'll check it.",
+      "no_checkable_claims": "We couldn't find a checkable factual claim in this submission — it may be opinion, rhetoric, or too thin to verify. Try submitting the specific statement you want checked."
     },
+    "resubmitWithQuote": "Add the exact claim",
+    "resubmitNew": "Submit another claim",
     "viewCheck": "View the published assessment",
     "viewReview": "See the review status",
     "readyHeld": "Assessed and held for editor review before publishing — not yet public.",
