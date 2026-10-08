@@ -21,6 +21,7 @@ import {
   AttributionSchema,
   BillingProviderSchema,
   ClaimTypeSchema,
+  CheckLifecycleSchema,
   CommentStatusSchema,
   CredibilityTierSchema,
   DemonstrationMediaMisinfoStatusSchema,
@@ -100,6 +101,10 @@ export const rightOfReplyStatusEnum = pgEnum(
 );
 export const commentStatusEnum = pgEnum("comment_status", enumValues("comment_status", CommentStatusSchema.options));
 export const riskTierEnum = pgEnum("risk_tier", enumValues("risk_tier", RiskTierSchema.options));
+// ADR-0038: the editorial lifecycle track (orthogonal to submission.status and
+// to the isDraft/publishedAt publish gate). Nullable on checks + backfilled, so
+// the whole feature is additive and reversible.
+export const checkLifecycleEnum = pgEnum("check_lifecycle", enumValues("check_lifecycle", CheckLifecycleSchema.options));
 export const asyncAuditOutcomeEnum = pgEnum("async_audit_outcome", ASYNC_AUDIT_OUTCOMES);
 
 /**
@@ -383,10 +388,26 @@ export const checks = pgTable(
     // fetch check predating the field — the "most viral" feed ranking excludes
     // nulls rather than treating them as zero.
     viralityScore: numeric("virality_score", { precision: 12, scale: 4 }),
+    // ADR-0038 editorial lifecycle (all additive + nullable except `authoritative`,
+    // which defaults true so every existing/auto-published row is authoritative).
+    // `lifecycle_state` is the orthogonal editorial track; isDraft/publishedAt
+    // remain the authoritative publish gate. Backfilled by migration 0024 from
+    // (isDraft, publishedAt, submission.status). `last_activity_at` is the single
+    // clock the expiry sweep reads (bumped by ingest/preliminary/source/re-verify/
+    // editor touch; defaults to created_at on backfill). `source_kind` tags a
+    // preliminary ('ai_grounded_preliminary'). `authoritative=false` marks a
+    // non-verdict (AI-grounded preliminary) so the feed never renders it as a verdict.
+    lifecycleState: checkLifecycleEnum("lifecycle_state"),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
+    sourceKind: text("source_kind"),
+    authoritative: boolean("authoritative").notNull().default(true),
   },
   (table) => [
     index("checks_org_id_idx").on(table.orgId),
     index("checks_submission_id_idx").on(table.submissionId),
+    // ADR-0038: the public lifecycle feed + the expiry sweep both scan by
+    // lifecycle_state; last_activity_at drives the TTL. Partial-free (small table).
+    index("checks_lifecycle_state_idx").on(table.lifecycleState, table.lastActivityAt),
     index("checks_demonstration_id_idx").on(table.demonstrationId),
     // Ingestion-dedup lookup: find a PUBLISHED check for a given normalized
     // claim within an org. Partial (published rows only) + scoped to the two

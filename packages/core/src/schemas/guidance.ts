@@ -13,6 +13,43 @@ export const RiskTierSchema = z.enum(["A", "B", "C"]);
 export type RiskTier = z.infer<typeof RiskTierSchema>;
 
 /**
+ * ADR-0038: the editorial lifecycle of a check — orthogonal to the ADR-0017
+ * processing machine (`submissions.status`) and to the `isDraft`/`publishedAt`
+ * publish gate (which stays authoritative). This is the autonomy-first track
+ * that drives every claim to a terminal state without a human editor in the
+ * common path:
+ *  - `verifying`         — mirrors submission.status < ready.
+ *  - `preliminary`       — an AI-grounded, NON-authoritative thread-starter
+ *                          (ADR-0036 rescue); public, caveated, rating withheld
+ *                          for named persons. NOT a verdict.
+ *  - `awaiting_sources`  — open thread, no citable conclusion yet ("submit the truth").
+ *  - `editor_review`     — the bounded human-escalation queue (NOT "every draft").
+ *  - `published`         — terminal; the authoritative verdict (isDraft=false).
+ *  - `dismissed`         — terminal; not checkable / dedup / rejected.
+ *  - `archived_expired`  — terminal; aged out by the expiry sweep.
+ * Stored nullable + backfilled by derivation, so the column is reversible
+ * (drop → fall back to today's boolean behaviour). Terminal: published,
+ * dismissed, archived_expired.
+ */
+export const CheckLifecycleSchema = z.enum([
+  "verifying",
+  "preliminary",
+  "awaiting_sources",
+  "editor_review",
+  "published",
+  "dismissed",
+  "archived_expired",
+]);
+export type CheckLifecycle = z.infer<typeof CheckLifecycleSchema>;
+
+/** Terminal lifecycle states — no outbound transition except reopen-by-source. */
+export const TERMINAL_CHECK_LIFECYCLES: readonly CheckLifecycle[] = [
+  "published",
+  "dismissed",
+  "archived_expired",
+];
+
+/**
  * One cited piece of evidence backing a published assessment. `sourceId`
  * refers to a `Source` already attached to the same Check; `quote` is the
  * specific span that supports (or fails to support) the claim — ADR-0031's
