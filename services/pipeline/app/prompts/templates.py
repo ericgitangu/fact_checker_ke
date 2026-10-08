@@ -50,9 +50,21 @@ def build_draft_verdict_prompt(
     retrieved_sources: list[tuple[str, str]],
     credibility_context: str,
     named_person_involved: bool,
+    source_meta: dict[str, tuple[str, str | None]] | None = None,
 ) -> str:
+    # ADR-0038 relevance/recency guard: annotate each source with its credibility
+    # tier and publication date (or "unknown") so the model can weigh RELEVANCE
+    # (is this source about the SAME specific event?) and CURRENCY, not just
+    # presence. `source_meta` maps doc_id -> (tier, published_at|None).
+    meta = source_meta or {}
+
+    def _annotate(doc_id: str) -> str:
+        tier, date = meta.get(doc_id, ("unknown", None))
+        return f' tier="{tier}" date="{date or "unknown"}"'
+
     sources_block = "\n".join(
-        f'<untrusted_source id="{doc_id}">\n{text}\n</untrusted_source>' for doc_id, text in retrieved_sources
+        f'<untrusted_source id="{doc_id}"{_annotate(doc_id)}>\n{text}\n</untrusted_source>'
+        for doc_id, text in retrieved_sources
     )
     named_person_note = (
         "\nThis claim involves a named person. Per policy, still produce your "
@@ -73,6 +85,24 @@ def build_draft_verdict_prompt(
         "an exact substring of that source's text. If no retrieved source "
         "supports or refutes the claim, rate it Unproven rather than "
         "guessing or citing a source you were not given.\n\n"
+        "RELEVANCE (decisive): a source supports or refutes the claim ONLY if it "
+        "is about the SAME specific event, people, place and assertion — not "
+        "merely the same topic or category. A source describing a DIFFERENT "
+        "incident of the same kind (a different theft, a different person, a "
+        "different date/place) is NOT support; treat it as background at most and "
+        "do NOT raise the rating on its basis. That similar events occur, or that "
+        "the general phenomenon is real, is NOT evidence that THIS specific claim "
+        "is true — never infer a confirming rating (True/MostlyTrue) from "
+        "category-level plausibility. Each source is tagged with a `tier` and a "
+        "`date`.\n\n"
+        "RECENCY: weigh each source's `date` against the claim. A source dated "
+        "before the specific event the claim describes, or whose date is "
+        '"unknown", cannot by itself confirm a current or specific assertion; '
+        "when the claim is about a recent/specific event and the only on-point "
+        "sources are undated or older, keep the rating conservative and say so. "
+        "A `tier4_unverified` AI-grounded web summary is a LEAD, not confirmation: "
+        "it can justify a hedged/Unproven assessment but not a confident "
+        "True/MostlyTrue on its own.\n\n"
         "Write `context` as the reader-facing lead, in this exact order: "
         "(a) what the claim asserts; (b) the misconception — precisely how the "
         "claim misleads (for a Misleading rating, name the out-of-context or "
