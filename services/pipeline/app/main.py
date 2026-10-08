@@ -16,11 +16,11 @@ from app.clients.fetch_source_factory import make_fetch_sources
 from app.clients.llm_anthropic import make_llm_client
 from app.clients.provenance_factory import make_provenance_checker
 from app.clients.reverse_image_factory import make_reverse_image_search
+from app.clients.transcriber_factory import make_transcriber
 from app.clients.youtube_fetch_source import YouTubeFetchSource
 from app.config import UnpaidGeminiUsageError, assert_no_unpaid_gemini_usage
 from app.fakes.fake_abuse_scan import FakeAbuseScan
 from app.fakes.fake_synthetic_media import FakeSyntheticMediaDetector
-from app.fakes.fake_transcriber import FakeTranscriber
 from app.models.hop_requests import (
     AnalyzeHopEnvelope,
     MediaProcessHopRequest,
@@ -123,14 +123,11 @@ _fetch_scoring_config = FetchScoringConfig.from_env()
 # YouTube key present — fetch_metadata returns None otherwise). Metadata only,
 # never a transcript; no network at construction.
 _metadata_fetcher = YouTubeFetchSource()
-# ADR-0032/0005 AT-0032-4 / AT-0005-5: no real STT vendor is wired in this
-# slice (HARD RULE: no billable/live calls) -- FakeTranscriber never calls
-# out, so the compliant-subset "STT allowed" path still makes zero real
-# vendor calls today. The gate itself (app/stages/fetch_hop.py's
-# `_resolve_claim_text`) is vendor-agnostic: swapping this singleton for a
-# real Transcriber implementation later does not change the compliance
-# boundary that decides WHETHER it gets called.
-_transcriber = FakeTranscriber()
+# ADR-0005 STT backend: `_transcriber` is constructed BELOW, after the cost
+# breaker it meters on exists. It is real (Chirp_2) only when SUBMISSION_STT_ENABLED
+# is on + a project is configured; otherwise FakeTranscriber. The compliance
+# boundary (app/stages/stt_gate.py's stt_eligible check) is unchanged and still
+# decides WHETHER it is ever called — third-party audio is never transcribed.
 
 # ADR-0032 fetch-enactment slice (migration 0013): when a database is
 # configured, the fetch engine's dedup state, outbox emission, and spend
@@ -172,6 +169,11 @@ _fetch_cost_breaker: EngineCostBreaker = (
 _llm_call_store: LlmCallStore = (
     PostgresLlmCallStore(_fetch_db_conn) if _fetch_db_conn is not None else InMemoryLlmCallStore()
 )
+# ADR-0005: real Chirp_2 STT backend, metered on the dedicated "stt" breaker
+# lane. Ships DARK (SUBMISSION_STT_ENABLED default off -> FakeTranscriber); the
+# stt_gate's stt_eligible fence is unchanged and still decides WHETHER this is
+# ever called. Constructed after the breaker so it can be passed in.
+_transcriber = make_transcriber(breaker=_fetch_cost_breaker)
 
 
 def _fetch_emit_submission(
@@ -209,7 +211,7 @@ def _ensure_fetch_conn() -> None:
     cheaply and reconnect + rebuild the stores that hold the reference. A
     no-op when the fetch engine is running on in-memory stores
     (_fetch_db_conn is None)."""
-    global _fetch_db_conn, _fetch_dedup_store, _fetch_cost_breaker, _llm_call_store
+    global _fetch_db_conn, _fetch_dedup_store, _fetch_cost_breaker, _llm_call_store, _transcriber
     if _fetch_db_conn is None:
         return
     try:
@@ -229,6 +231,9 @@ def _ensure_fetch_conn() -> None:
     _fetch_dedup_store = PostgresFetchDedupStore(_fetch_db_conn)
     _fetch_cost_breaker = PostgresEngineCostBreaker(_fetch_db_conn)
     _llm_call_store = PostgresLlmCallStore(_fetch_db_conn)
+    # Rebuild the transcriber too — it captured the (now-rebuilt) breaker for its
+    # "stt" lane metering; otherwise it would meter on the closed connection.
+    _transcriber = make_transcriber(breaker=_fetch_cost_breaker)
 
 
 # `/health` (NOT `/healthz`): Cloud Run's frontend intercepts any `*z` path on a

@@ -27,6 +27,13 @@ dependencies = [
   # pinned here because corroboration_gemini.py imports it directly to run the
   # sync SDK call off the event loop.
   "google-genai>=0.3.0",
+  # ADR-0005: the REAL GCP Speech-to-Text v2 Chirp_2 transcription backend.
+  # Only app/clients/transcriber_chirp2.py imports it, lazily inside __init__,
+  # and that module is only constructed when SUBMISSION_STT_ENABLED=true AND
+  # GOOGLE_CLOUD_PROJECT is set (activate-on-config), so a dark/keyless
+  # deployment never touches it. Ships py.typed (proto-plus), so no mypy
+  # ignore_missing_imports override is needed.
+  "google-cloud-speech>=2.27.0",
   "anyio>=4.0.0",
 ]
 
