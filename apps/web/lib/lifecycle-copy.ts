@@ -124,8 +124,23 @@ export interface AddSourceFormCopy {
   submit: string;
   submitting: string;
   cancel: string;
-  /** Ack for an accepted/rejected submission — we logged it and will re-check. */
-  ackSubmitted: string;
+  /**
+   * Ack when the source was ACCEPTED (tier1_primary/tier2_established_media)
+   * AND it crossed the re-verify threshold — `reVerifyQueued: true` on the
+   * submit response. A re-check is genuinely enqueued now.
+   */
+  ackQueued: string;
+  /**
+   * Ack when the source was ACCEPTED but did NOT cross the threshold —
+   * `reVerifyQueued: false`. Recorded, but no re-check fires yet; must not
+   * promise one is imminent.
+   */
+  ackAcceptedPending: string;
+  /**
+   * Ack when the source was REJECTED (non-credible domain/tier). It will not
+   * move the verdict; invite a stronger source instead of implying a re-check.
+   */
+  ackRejected: string;
   /** Ack for a duplicate (already submitted for this check). */
   ackDuplicate: string;
   /** Generic failure. */
@@ -141,7 +156,11 @@ const FORM_COPY: Record<Locale, AddSourceFormCopy> = {
     submit: "Submit source",
     submitting: "Submitting…",
     cancel: "Cancel",
-    ackSubmitted: "Thanks — source submitted; we'll re-check.",
+    ackQueued: "Thanks — that's enough credible sources; we're re-checking now.",
+    ackAcceptedPending:
+      "Source recorded from a credible publisher. We re-check once enough credible sources are gathered.",
+    ackRejected:
+      "That link isn't from a publisher we recognise as credible, so it won't move the verdict on its own. A source from a recognised outlet or primary record would help.",
     ackDuplicate: "Already submitted — thanks.",
     error: "Couldn't submit that source. Please try again.",
   },
@@ -153,7 +172,11 @@ const FORM_COPY: Record<Locale, AddSourceFormCopy> = {
     submit: "Wasilisha chanzo",
     submitting: "Inawasilisha…",
     cancel: "Ghairi",
-    ackSubmitted: "Asante — chanzo kimewasilishwa; tutakagua tena.",
+    ackQueued: "Asante — hivyo ni vyanzo vya kutosha vinavyoaminika; tunakagua tena sasa.",
+    ackAcceptedPending:
+      "Chanzo kimerekodiwa kutoka chapisho linaloaminika. Tunakagua tena baada ya kukusanya vyanzo vya kutosha vinavyoaminika.",
+    ackRejected:
+      "Kiungo hicho si cha chapisho tunalolitambua kuwa linaloaminika, kwa hivyo hakitabadilisha uamuzi peke yake. Chanzo kutoka chombo kinachotambulika au kumbukumbu asili kingesaidia.",
     ackDuplicate: "Tayari kimewasilishwa — asante.",
     error: "Imeshindikana kuwasilisha chanzo. Tafadhali jaribu tena.",
   },
