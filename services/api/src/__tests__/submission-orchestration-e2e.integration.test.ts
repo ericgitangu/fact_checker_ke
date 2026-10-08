@@ -443,11 +443,11 @@ describe.skipIf(!connectionString)(
       const rows = await db.select().from(schema.checks).where(eq(schema.checks.submissionId, submissionId));
       expect(rows).toHaveLength(0); // never even created a draft, let alone published
 
-      // RC1: a pre-verification dead-end (no checkable claim) is terminal
-      // `failed`, not a frozen `received` — the tracker must show the run
-      // ended, with a reason, rather than hanging forever.
+      // RC1: a pre-verification dead-end (no checkable claim) is terminal —
+      // the tracker must show the run ended, with a reason, rather than hanging
+      // forever. ADR-0038: now a DISTINCT non-error terminal, not catch-all `failed`.
       const [sub] = await db.select().from(schema.submissions).where(eq(schema.submissions.id, submissionId));
-      expect(sub!.status).toBe("failed");
+      expect(sub!.status).toBe("no_checkable_claims");
     }, 30_000);
 
     it("an ordinary checkable claim, at FakeLlmClient's real (uncalibrated, 0.4-confidence) draft output, is created as a draft but never auto-published", async () => {
