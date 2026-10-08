@@ -16,7 +16,15 @@ export const metadata: Metadata = {
  * reached from the hero's primary CTA, the header nav, and anywhere else
  * that links to it. The form itself (<SubmitForm>) is unchanged.
  */
-export default async function SubmitPage(): Promise<React.JSX.Element> {
+export default async function SubmitPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ url?: string | string[] }>;
+}): Promise<React.JSX.Element> {
+  // ?url= prefill (the needs_quote tracker CTA deep-links here). Treated as
+  // untrusted text: it only seeds the textarea, which the user can edit.
+  const { url } = await searchParams;
+  const initialUrl = typeof url === "string" ? url.slice(0, 2048) : "";
   const t = await getTranslations("submit");
 
   return (
@@ -27,7 +35,7 @@ export default async function SubmitPage(): Promise<React.JSX.Element> {
         </h1>
         <p style={{ maxWidth: "52ch", color: "var(--ink-2)" }}>{t("lede")}</p>
       </Stagger>
-      <SubmitForm />
+      <SubmitForm initialUrl={initialUrl} />
     </div>
   );
 }

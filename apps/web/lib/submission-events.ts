@@ -49,7 +49,20 @@ const STATUS_VALUES: readonly SubmissionStatus[] = [
   "verifying",
   "ready",
   "failed",
+  // ADR-0038: distinct non-error terminal outcomes.
+  "needs_quote",
+  "no_checkable_claims",
 ];
+
+/** Terminal statuses: no further transitions, so the stream/poll can stop. */
+export function isTerminalStatus(status: SubmissionStatus): boolean {
+  return (
+    status === "ready" ||
+    status === "failed" ||
+    status === "needs_quote" ||
+    status === "no_checkable_claims"
+  );
+}
 
 function isSubmissionStatus(value: unknown): value is SubmissionStatus {
   return typeof value === "string" && (STATUS_VALUES as readonly string[]).includes(value);
@@ -123,7 +136,7 @@ export function subscribeToSubmissionEvents(
             const status = (body as { status: unknown }).status;
             if (isSubmissionStatus(status)) {
               dedupAndEmit(undefined, status);
-              if (status === "ready" || status === "failed") {
+              if (isTerminalStatus(status)) {
                 closed = true;
                 return;
               }
@@ -165,7 +178,7 @@ export function subscribeToSubmissionEvents(
       const status = parseStatusPayload(String(ev.data));
       if (status) {
         dedupAndEmit(ev.lastEventId || undefined, status);
-        if (status === "ready" || status === "failed") {
+        if (isTerminalStatus(status)) {
           close();
         }
       }

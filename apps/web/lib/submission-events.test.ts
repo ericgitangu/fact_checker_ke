@@ -82,6 +82,22 @@ describe("subscribeToSubmissionEvents", () => {
     expect(es.closed).toBe(true);
   });
 
+  it.each(["needs_quote", "no_checkable_claims"] as const)(
+    "treats %s as terminal (ADR-0038) and closes the stream",
+    (terminal) => {
+      const statuses: string[] = [];
+      subscribeToSubmissionEvents(
+        "sub-t",
+        { onStatus: (s) => statuses.push(s) },
+        { EventSourceCtor: MockEventSource as unknown as typeof EventSource },
+      );
+      const es = MockEventSource.instances[0]!;
+      es.emit({ status: terminal }, "evt-t");
+      expect(statuses).toEqual([terminal]);
+      expect(es.closed).toBe(true);
+    },
+  );
+
   it("reconnects on error up to maxReconnectAttempts, creating a new EventSource each time", () => {
     const modeChanges: string[] = [];
     subscribeToSubmissionEvents(

@@ -78,6 +78,31 @@ function tryParseUrl(raw: string): URL | null {
   }
 }
 
+/**
+ * Link shorteners / share redirectors whose target platform can't be known
+ * without following the redirect (e.g. `share.google/…` -> a YouTube watch
+ * URL). Deliberately EXCLUDES `youtu.be`, which `detectPlatform` already
+ * treats as a real platform. This list is also the SSRF allowlist for
+ * `/api/resolve-url` — a host not in here is never fetched server-side.
+ */
+export const SHORTENER_HOSTS: ReadonlySet<string> = new Set([
+  "share.google",
+  "g.co",
+  "goo.gl",
+  "bit.ly",
+  "t.co",
+  "tinyurl.com",
+  "ow.ly",
+  "lnkd.in",
+]);
+
+/** True when `raw` parses as an http(s) URL whose host is a known shortener. */
+export function isShortenerUrl(raw: string): boolean {
+  const url = tryParseUrl(raw.trim());
+  if (!url) return false;
+  return SHORTENER_HOSTS.has(url.hostname.toLowerCase().replace(/^www\./, ""));
+}
+
 export function detectSource(raw: string): Detection {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return { kind: "empty" };

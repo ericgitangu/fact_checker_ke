@@ -1575,6 +1575,19 @@ a:hover {
   background: var(--false);
 }
 
+/* ADR-0038 non-error terminals: a HOLLOW ring (never the filled red failure
+   dot) — needs_quote is actionable (brand ring), no_checkable_claims is a
+   neutral dead-end (muted ring). */
+.pipeline-track li[data-state="action"]::before {
+  background: var(--paper);
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+
+.pipeline-track li[data-state="neutral"]::before {
+  background: var(--paper);
+  box-shadow: inset 0 0 0 2px var(--unproven);
+}
+
 .pipeline-track h3 {
   font-size: 1.02rem;
   margin-bottom: 4px;

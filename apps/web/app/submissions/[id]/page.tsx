@@ -54,6 +54,7 @@ export default async function SubmissionStatusPage({
         initialStatus={submission.status}
         initialCheckId={submission.checkId}
         initialCheckPublished={submission.checkPublished}
+        submittedUrl={submission.url}
       />
     </div>
   );
