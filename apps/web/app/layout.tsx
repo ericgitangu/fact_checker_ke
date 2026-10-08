@@ -5,6 +5,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import { AppFooter, AppHeader } from "../components/site-chrome";
+import { GoogleAnalytics } from "../components/analytics/google-analytics";
 import { ConsentBanner } from "../components/ads/consent-banner";
 import { ConsentRegionProvider } from "../components/ads/consent-region-provider";
 import { countryRequiresConsent } from "../lib/consent-region";
@@ -149,6 +150,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         {/* Must be the first thing in <body> so it runs before paint. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* GA-4 (Consent Mode v2). No-op unless NEXT_PUBLIC_GA_MEASUREMENT_ID is
+            set in the environment, so it ships nothing until the property exists;
+            analytics defaults denied in EEA/UK (server-decided), granted else. */}
+        <GoogleAnalytics
+          measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? ""}
+          consentRequired={serverRequiresConsent}
+        />
         <NextIntlClientProvider locale={locale} messages={messages}>
           {/* ADR-0012 §4: the server-decided region flag is the authoritative
               signal for the consent gate below; wraps the whole tree so every
