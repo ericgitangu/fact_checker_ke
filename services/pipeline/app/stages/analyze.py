@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 
 from pydantic import ValidationError
 
@@ -18,8 +19,17 @@ from app.models.hop_requests import AnalyzeHopRequest
 from app.models.pipeline_io import AnalyzeResult, DetectedClaim, UsageRecord
 from app.prompts.templates import build_analyze_prompt
 from app.protocols.llm_client import LlmClient, LlmCompletionError
+from app.protocols.video_metadata import VideoMetadataFetcher
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
 from app.stages.json_extract import strip_code_fences
+
+
+def _enrich_video_metadata_enabled() -> bool:
+    """ADR-0038 enrichment kill-switch (default OFF — ships dark). When ON, a
+    bare video-URL submission with no quote is enriched from LAWFUL publisher
+    metadata (title+description, NOT a transcript) instead of dead-ending at
+    needs_quote. Read FRESH per call so it's flippable without a redeploy."""
+    return os.environ.get("ENRICH_VIDEO_METADATA", "false").strip().lower() == "true"
 
 # ADR-0004 AT-0004-E / ADR-0023 §5: at least 10% of dropped (non-checkable)
 # items are sampled to editors so a misclassification doesn't silently drop
@@ -63,6 +73,7 @@ async def run_analyze_hop(
     *,
     llm: LlmClient,
     store: InMemoryIdempotencyStore | None = None,
+    metadata_fetcher: VideoMetadataFetcher | None = None,
 ) -> AnalyzeResult:
     store = store or InMemoryIdempotencyStore()
 
@@ -83,14 +94,33 @@ async def run_analyze_hop(
     # and return an explicit, typed "needs a quote" outcome instead of a
     # fabricated/empty analysis.
     if is_video_url and not (submitted_text or "").strip():
-        return AnalyzeResult(
-            language="unknown",
-            translation_en="",
-            claims=[],
-            attribution=attribution,
-            usage=UsageRecord(stage="analyze", model="none", input_tokens=0, output_tokens=0, usd=0.0),
-            needs_quote=True,
-        )
+        # ADR-0038 enrichment (flag-gated, default OFF): before dead-ending at
+        # needs_quote, try LAWFUL publisher metadata (title+description via the
+        # platform data API — NOT a transcript, so the ADR-0002/0004 #6 fence
+        # holds). The metadata is the uploader's framing (attribution stays
+        # "unverified") and flows through the normal analyze -> verify path, so
+        # verify's grounded sourcing + the relevance/recency guard decide any
+        # verdict. Best-effort: any miss falls back to needs_quote unchanged.
+        enriched: str | None = None
+        if _enrich_video_metadata_enabled() and metadata_fetcher is not None and request.content.url:
+            try:
+                meta = await metadata_fetcher.fetch_metadata(request.content.url)
+            except Exception:  # noqa: BLE001 - enrichment is best-effort; never crash analyze
+                meta = None
+            if meta is not None:
+                candidate_text = f"{meta.title}\n{meta.description}".strip()
+                enriched = candidate_text or None
+        if enriched is None:
+            return AnalyzeResult(
+                language="unknown",
+                translation_en="",
+                claims=[],
+                attribution=attribution,
+                usage=UsageRecord(stage="analyze", model="none", input_tokens=0, output_tokens=0, usd=0.0),
+                needs_quote=True,
+            )
+        submitted_text = enriched
+        # attribution is already "unverified" (set for a video URL above).
 
     cache_key = f"analyze:{request.submission_id}:{content_hash(submitted_text or '')}"
     cached = store.get(cache_key)
