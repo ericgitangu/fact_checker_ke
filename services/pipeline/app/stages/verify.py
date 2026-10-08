@@ -168,12 +168,18 @@ async def _draft_once(
     retrieved: list[RetrievedDoc],
     llm: LlmClient,
     named_person_involved: bool,
+    source_meta: dict[str, _SourceMeta] | None = None,
 ) -> tuple[DraftVerdictOutput, UsageRecord]:
+    # ADR-0038 relevance/recency guard: pass each source's tier + date so the
+    # draft can weigh RELEVANCE and CURRENCY (doc_id -> (tier, published_at)).
+    meta = source_meta or {}
+    annotations = {doc_id: (m.credibility_tier.value, m.published_at) for doc_id, m in meta.items()}
     prompt = build_draft_verdict_prompt(
         claim_text=claim_text,
         retrieved_sources=[(doc.doc_id, doc.text) for doc in retrieved],
         credibility_context=render_registry_as_prompt_context(),
         named_person_involved=named_person_involved,
+        source_meta=annotations,
     )
     # ADR-0034 raised the draft's output size (the new `context` field, on top
     # of already token-dense citation URLs + rationale), so 1024 output tokens
@@ -547,6 +553,7 @@ async def run_verify_hop(
                 retrieved=retrieved,
                 llm=llm,
                 named_person_involved=request.named_person_involved,
+                source_meta=source_meta,
             )
             # ADR-0004 amendment #5: a named-person draft never carries a
             # visible rating to the submitter until editor approval. We
