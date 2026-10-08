@@ -105,6 +105,11 @@ export const riskTierEnum = pgEnum("risk_tier", enumValues("risk_tier", RiskTier
 // to the isDraft/publishedAt publish gate). Nullable on checks + backfilled, so
 // the whole feature is additive and reversible.
 export const checkLifecycleEnum = pgEnum("check_lifecycle", enumValues("check_lifecycle", CheckLifecycleSchema.options));
+// ADR-0038 Wave 2: a crowdsourced source submission's review state. pending until
+// server-side tiering resolves; accepted (tier-gated authoritative) counts toward
+// the re-verify threshold; rejected (invalid/low-tier) is community context only;
+// duplicate (already submitted for this check) is deduped.
+export const claimSourceStatusEnum = pgEnum("claim_source_status", ["pending", "accepted", "rejected", "duplicate"]);
 export const asyncAuditOutcomeEnum = pgEnum("async_audit_outcome", ASYNC_AUDIT_OUTCOMES);
 
 /**
@@ -449,6 +454,40 @@ export const checkEvidence = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("check_evidence_check_id_idx").on(table.checkId)],
+);
+
+/**
+ * ADR-0038 Wave 2: public crowdsourced source submissions for a check in
+ * preliminary / awaiting_sources / editor_review ("Submit the truth"). A submitted
+ * URL is UNTRUSTED content (ADR-0023/0036 citation-integrity): it is resolved +
+ * tiered server-side via tier_for_url/credibility_registry, and only accepted
+ * tier≤2 sources count toward the re-verify threshold — tier4/unknown are kept as
+ * community context, never auto-ingested as evidence. Device-hash rate-limited +
+ * deduped per check.
+ */
+export const claimSourceSubmissions = pgTable(
+  "claim_source_submissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    checkId: uuid("check_id")
+      .notNull()
+      .references(() => checks.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    note: text("note"),
+    submitterDeviceHash: text("submitter_device_hash").notNull(),
+    status: claimSourceStatusEnum("status").notNull().default("pending"),
+    // Derived server-side from the resolved URL's domain; null until resolved.
+    credibilityTier: credibilityTierEnum("credibility_tier"),
+    resolvedUrl: text("resolved_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    reviewedBy: text("reviewed_by"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("claim_source_submissions_check_id_status_idx").on(table.checkId, table.status),
+    // Dedup probe: has this device already submitted this URL for this check?
+    index("claim_source_submissions_check_url_idx").on(table.checkId, table.url),
+  ],
 );
 
 export const claims = pgTable(
