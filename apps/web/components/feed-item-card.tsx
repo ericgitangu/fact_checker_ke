@@ -4,7 +4,7 @@ import { VerdictChip } from "./verdict";
 import { FeedItemCaveatNote } from "./legal-caveat";
 import { MarkdownText } from "./markdown-text";
 import { LifecycleAffordance } from "./lifecycle-affordance";
-import { addSourceFormCopyFor, lifecycleAffordanceFor } from "../lib/lifecycle-copy";
+import { addSourceFormCopyFor, aiGroundedStancePrefixFor, lifecycleAffordanceFor } from "../lib/lifecycle-copy";
 import type { FeedItemView } from "../lib/lifecycle-read-model";
 
 /**
@@ -32,19 +32,25 @@ export async function FeedItemCard({ item }: { item: FeedItemView }): Promise<Re
   const t = await getTranslations("feed");
   const tCheck = await getTranslations("check");
   const locale = await getLocale();
-  const publishedDate = new Intl.DateTimeFormat("en-KE", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(item.publishedAt));
+  // ADR-0038 Wave 3: an OPEN THREAD has no publishedAt — fall back to createdAt
+  // for the row's timestamp, and omit the <time> entirely if neither exists.
+  const dateIso = item.publishedAt ?? item.createdAt ?? null;
+  const displayDate = dateIso
+    ? new Intl.DateTimeFormat("en-KE", { year: "numeric", month: "short", day: "numeric" }).format(new Date(dateIso))
+    : null;
 
-  // ADR-0038 per-card affordance. The feed is published-only, so for an
-  // ordinary published row this resolves to null and the card renders the
-  // verdict + confidence exactly as before. For any non-published lifecycle
-  // (defensive — e.g. a preliminary surfaced through this card), it renders the
-  // next-step affordance INSTEAD of a verdict, so a non-authoritative /
-  // not-yet-verified item (incl. named-person) never shows a rating chip.
+  // ADR-0038 per-card affordance. For an ordinary PUBLISHED row this resolves
+  // to null and the card renders the verdict + confidence. For an OPEN THREAD
+  // (preliminary / awaiting_sources — now surfaced in the unified home feed) it
+  // renders the next-step affordance INSTEAD of the authoritative verdict chip.
   const affordance = lifecycleAffordanceFor(item.lifecycleState, locale);
+  // Wave 3 stance visibility: a NON-named preliminary carries the AI draft
+  // stance (the read model already withholds a named-person 'C' rating, so if a
+  // rating reached here on an open thread it is safe to show). Rendered as a
+  // caveated "AI-grounded: <stance>" chip — deliberately NOT the saturated
+  // verdict chip, so it reads as a stance, never the authoritative verdict.
+  const aiStance =
+    affordance && item.rating ? `${aiGroundedStancePrefixFor(locale)}${tCheck(`rating.${item.rating}`)}` : null;
 
   return (
     <article className="feedcard" aria-label={item.claim}>
@@ -59,8 +65,14 @@ export async function FeedItemCard({ item }: { item: FeedItemView }): Promise<Re
           // `item.id` IS the check id (FeedItemSchema.id), so the add-source CTA
           // is interactive here — unlike a trending draft, a feed item always
           // carries a real, linkable check id.
-          <LifecycleAffordance affordance={affordance} checkId={item.id} formCopy={addSourceFormCopyFor(locale)} />
+          <span className="feedcard-affordance-group">
+            {aiStance && (
+              <span className="feedcard-caveat-note feedcard-ai-stance">{aiStance}</span>
+            )}
+            <LifecycleAffordance affordance={affordance} checkId={item.id} formCopy={addSourceFormCopyFor(locale)} />
+          </span>
         ) : (
+          item.rating && (
           <>
             {await VerdictChip({ rating: item.rating })}
             {item.calibratedConfidence !== null && (
@@ -72,6 +84,7 @@ export async function FeedItemCard({ item }: { item: FeedItemView }): Promise<Re
               />
             )}
           </>
+          )
         )}
       </div>
 
@@ -108,8 +121,12 @@ export async function FeedItemCard({ item }: { item: FeedItemView }): Promise<Re
       )}
 
       <p className="feedcard-meta">
-        <time dateTime={item.publishedAt}>{publishedDate}</time>
-        {" · "}
+        {displayDate && dateIso && (
+          <>
+            <time dateTime={dateIso}>{displayDate}</time>
+            {" · "}
+          </>
+        )}
         <a href={`/checks/${item.id}`}>{t("viewCheck")}</a>
       </p>
 

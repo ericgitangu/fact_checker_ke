@@ -6,14 +6,19 @@ import type {
   WaitlistSignupResult,
 } from "@fact-checker-ke/core";
 import { createDb, schema, type Database } from "@fact-checker-ke/db";
-import { and, desc, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lt, or, sql, type SQL } from "drizzle-orm";
 import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import { deriveTrendingStatus } from "../lib/trending-status.js";
 import { cleanTrendingTitle } from "../lib/trending-title.js";
 import {
+  decodeHomeFeedCursor,
+  encodeHomeFeedCursor,
+  homeFeedExposedRating,
   lifecycleFieldsOf,
   type CheckWithLifecycle,
   type FeedItemWithLifecycle,
+  type HomeFeedCursor,
+  type HomeFeedItem,
   type TrendingItemWithLifecycle,
 } from "../lib/read-model-lifecycle.js";
 import type {
@@ -260,6 +265,161 @@ export class PostgresCheckRepository implements CheckRepository {
       .limit(opts.limit);
 
     return this.hydrateFeedItems(checkRows);
+  }
+
+  /**
+   * ADR-0038 Wave 3 inclusion predicate: a PUBLISHED verdict (the authoritative
+   * boolean publish gate) OR an OPEN THREAD (`preliminary`/`awaiting_sources`).
+   * `editor_review` (private queue), `dismissed`, `archived_expired` and
+   * `verifying` are all excluded by construction.
+   */
+  private homeEligiblePredicate(): SQL {
+    return or(
+      and(eq(schema.checks.isDraft, false), isNotNull(schema.checks.publishedAt)),
+      inArray(schema.checks.lifecycleState, ["preliminary", "awaiting_sources"]),
+    ) as SQL;
+  }
+
+  /**
+   * Keyset predicate for "rows strictly after `cursor`" under the ordering
+   * `(virality_score DESC NULLS LAST, created_at DESC, id DESC)`. The virality
+   * bound is cast `::numeric` so an exact numeric match at the page boundary is
+   * precise (no float round-trip), and the id bound `::uuid` so the final
+   * tiebreak compares as uuid, not text. NULLS-LAST is handled explicitly: a
+   * null-virality cursor only advances within the trailing null region.
+   */
+  private homeKeysetPredicate(cursor: HomeFeedCursor): SQL {
+    // cursor.c is an ISO timestamp string — cast it ::timestamptz in SQL. Binding
+    // a JS Date into the sql`` template fails to serialize through the pg driver
+    // ("string argument ... Received an instance of Date"), the same class of bug
+    // as the lifecycle sweep; keep the comparison server-side and exact.
+    const c0 = sql`${cursor.c}::timestamptz`;
+    if (cursor.v === null) {
+      return sql`${schema.checks.viralityScore} is null and (${schema.checks.createdAt} < ${c0} or (${schema.checks.createdAt} = ${c0} and ${schema.checks.id} < ${cursor.id}::uuid))`;
+    }
+    return sql`(${schema.checks.viralityScore} is null or ${schema.checks.viralityScore} < ${cursor.v}::numeric or (${schema.checks.viralityScore} = ${cursor.v}::numeric and (${schema.checks.createdAt} < ${c0} or (${schema.checks.createdAt} = ${c0} and ${schema.checks.id} < ${cursor.id}::uuid))))`;
+  }
+
+  async listHomeFeed(opts: { limit: number; cursor?: string | null }): Promise<{
+    items: HomeFeedItem[];
+    nextCursor: string | null;
+  }> {
+    const whereClauses: SQL[] = [this.homeEligiblePredicate()];
+    // A malformed/stale cursor decodes to null and is served as a first page
+    // (never a 500) — the cursor is opaque client state, not trusted input.
+    const cursor = opts.cursor ? decodeHomeFeedCursor(opts.cursor) : null;
+    if (cursor) whereClauses.push(this.homeKeysetPredicate(cursor));
+
+    const checkRows = await this.db
+      .select()
+      .from(schema.checks)
+      .where(and(...whereClauses))
+      .orderBy(sql`${schema.checks.viralityScore} desc nulls last`, desc(schema.checks.createdAt), desc(schema.checks.id))
+      .limit(opts.limit);
+
+    const items = await this.hydrateHomeItems(checkRows);
+    const last = checkRows[checkRows.length - 1];
+    const nextCursor =
+      checkRows.length === opts.limit && last
+        ? encodeHomeFeedCursor({
+            v: last.viralityScore === null ? null : String(last.viralityScore),
+            c: last.createdAt.toISOString(),
+            id: last.id,
+          })
+        : null;
+    return { items, nextCursor };
+  }
+
+  async listHomeRailViral(opts: { limit: number }): Promise<HomeFeedItem[]> {
+    // "Most viral" rail over the eligible set (published + open threads), nulls
+    // EXCLUDED, ties by recency. Over ALL rows, not a keyset page.
+    const checkRows = await this.db
+      .select()
+      .from(schema.checks)
+      .where(and(this.homeEligiblePredicate(), isNotNull(schema.checks.viralityScore)))
+      .orderBy(desc(schema.checks.viralityScore), desc(schema.checks.createdAt), desc(schema.checks.id))
+      .limit(opts.limit);
+    return this.hydrateHomeItems(checkRows);
+  }
+
+  async listHomeRailRecent(opts: { limit: number }): Promise<HomeFeedItem[]> {
+    // "Most followed" rail — Most-recent FALLBACK until a claim_follows counter
+    // exists (packages/db fenced this wave). Over the same eligible set.
+    const checkRows = await this.db
+      .select()
+      .from(schema.checks)
+      .where(this.homeEligiblePredicate())
+      .orderBy(desc(schema.checks.createdAt), desc(schema.checks.id))
+      .limit(opts.limit);
+    return this.hydrateHomeItems(checkRows);
+  }
+
+  /** Project a set of raw `checks` rows to `HomeFeedItem`s — resolves the
+   * `check_evidence` <-> `sources` join (shared with `hydrateFeedItems`),
+   * applies the Wave-3 stance-visibility rule to each row's rating, and carries
+   * the nullable `publishedAt` + `createdAt` + `sourceCount` an open thread
+   * needs. Preserves input order. */
+  private async hydrateHomeItems(checkRows: (typeof schema.checks.$inferSelect)[]): Promise<HomeFeedItem[]> {
+    if (checkRows.length === 0) return [];
+
+    const checkIds = checkRows.map((c) => c.id);
+    const evidenceRows = await this.db
+      .select({
+        checkId: schema.checkEvidence.checkId,
+        quote: schema.checkEvidence.quote,
+        sourceId: schema.sources.id,
+        url: schema.sources.url,
+        title: schema.sources.title,
+        publisher: schema.sources.publisher,
+        credibilityTier: schema.sources.credibilityTier,
+      })
+      .from(schema.checkEvidence)
+      .innerJoin(schema.sources, eq(schema.checkEvidence.sourceId, schema.sources.id))
+      .where(inArray(schema.checkEvidence.checkId, checkIds));
+
+    const sourcesByCheckId = new Map<string, HomeFeedItem["sources"]>();
+    for (const row of evidenceRows) {
+      const list = sourcesByCheckId.get(row.checkId) ?? [];
+      list.push({
+        sourceId: row.sourceId,
+        quote: row.quote,
+        url: row.url,
+        title: row.title,
+        publisher: row.publisher,
+        credibilityTier: row.credibilityTier,
+      });
+      sourcesByCheckId.set(row.checkId, list);
+    }
+
+    return checkRows.map((row) => {
+      const lifecycle = lifecycleFieldsOf(row);
+      const isPublished = row.isDraft === false && row.publishedAt !== null;
+      const sources = sourcesByCheckId.get(row.id) ?? [];
+      return {
+        ...lifecycle,
+        id: row.id,
+        claim: row.summary,
+        // Wave-3 stance rule: a named-person ('C') open thread never exposes a
+        // rating; a non-authoritative non-named preliminary exposes its AI draft
+        // stance; a published verdict always carries its rating.
+        rating: homeFeedExposedRating({
+          isPublished,
+          rating: (row.rating as HomeFeedItem["rating"]) ?? null,
+          authoritative: lifecycle.authoritative,
+          riskTier: row.riskTier,
+        }),
+        calibratedConfidence: row.calibratedConfidence === null ? null : Number(row.calibratedConfidence),
+        ingestSource: row.ingestSource,
+        riskTier: row.riskTier,
+        whatWouldChangeThis: row.whatWouldChangeThis,
+        context: row.context,
+        sources,
+        sourceCount: sources.length,
+        viralityScore: row.viralityScore === null ? null : Number(row.viralityScore),
+        createdAt: toIsoString(row.createdAt),
+        publishedAt: row.publishedAt ? toIsoString(row.publishedAt) : null,
+      };
+    });
   }
 
   /** Resolve the `check_evidence` <-> `sources` join for a set of check rows

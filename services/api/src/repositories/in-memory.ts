@@ -13,8 +13,13 @@ import { generateDeviceToken, hashDeviceToken } from "../lib/device-token.js";
 import { deriveTrendingStatus, type TrendingCheckPointer } from "../lib/trending-status.js";
 import { cleanTrendingTitle } from "../lib/trending-title.js";
 import {
+  decodeHomeFeedCursor,
+  encodeHomeFeedCursor,
+  homeFeedExposedRating,
   type CheckWithLifecycle,
   type FeedItemWithLifecycle,
+  type HomeFeedCursor,
+  type HomeFeedItem,
   type LifecycleReadFields,
   type TrendingItemWithLifecycle,
 } from "../lib/read-model-lifecycle.js";
@@ -144,6 +149,142 @@ export class InMemoryCheckRepository implements CheckRepository {
       })
       .slice(0, opts.limit)
       .map((check) => this.toFeedItem(check));
+  }
+
+  // ---- ADR-0038 Wave 3: unified home feed (published + open threads) ----
+
+  /** Eligible for the home feed: a published verdict, or an open thread
+   * (`preliminary`/`awaiting_sources`). Mirrors the Postgres inclusion. */
+  private homeEligible(check: Check): boolean {
+    if (!check.isDraft && check.publishedAt !== null) return true;
+    const ls = this.lifecycleOf(check.id).lifecycleState;
+    return ls === "preliminary" || ls === "awaiting_sources";
+  }
+
+  /** Total order matching the Postgres ordering: virality DESC NULLS LAST,
+   * created_at DESC, id DESC. Negative ⇒ (av,ac,aid) sorts BEFORE (bv,bc,bid). */
+  private homeOrder(
+    av: number | null,
+    ac: string,
+    aid: string,
+    bv: number | null,
+    bc: string,
+    bid: string,
+  ): number {
+    if (av !== bv) {
+      if (av === null) return 1; // nulls last
+      if (bv === null) return -1;
+      return bv - av; // higher virality first
+    }
+    if (ac !== bc) return ac < bc ? 1 : -1; // newer first
+    // id DESC tiebreak; 0 only when fully equal (same row), so the keyset
+    // "strictly after cursor" filter excludes the cursor row itself.
+    return aid < bid ? 1 : aid > bid ? -1 : 0;
+  }
+
+  async listHomeFeed(opts: { limit: number; cursor?: string | null }): Promise<{
+    items: HomeFeedItem[];
+    nextCursor: string | null;
+  }> {
+    const eligible = [...this.store.values()]
+      .filter((c) => this.homeEligible(c))
+      .sort((a, b) =>
+        this.homeOrder(
+          a.viralityScore ?? null,
+          a.createdAt as string,
+          a.id,
+          b.viralityScore ?? null,
+          b.createdAt as string,
+          b.id,
+        ),
+      );
+
+    const cursor: HomeFeedCursor | null = opts.cursor ? decodeHomeFeedCursor(opts.cursor) : null;
+    const afterCursor = cursor
+      ? eligible.filter(
+          (c) =>
+            // cursor sorts strictly BEFORE c ⇒ c is on a later page.
+            this.homeOrder(
+              cursor.v === null ? null : Number(cursor.v),
+              cursor.c,
+              cursor.id,
+              c.viralityScore ?? null,
+              c.createdAt as string,
+              c.id,
+            ) < 0,
+        )
+      : eligible;
+
+    const page = afterCursor.slice(0, opts.limit);
+    const items = page.map((c) => this.toHomeItem(c));
+    const last = page[page.length - 1];
+    const nextCursor =
+      page.length === opts.limit && last
+        ? encodeHomeFeedCursor({
+            v: (last.viralityScore ?? null) === null ? null : String(last.viralityScore),
+            c: last.createdAt as string,
+            id: last.id,
+          })
+        : null;
+    return { items, nextCursor };
+  }
+
+  async listHomeRailViral(opts: { limit: number }): Promise<HomeFeedItem[]> {
+    return [...this.store.values()]
+      .filter((c) => this.homeEligible(c) && (c.viralityScore ?? null) !== null)
+      .sort((a, b) =>
+        this.homeOrder(a.viralityScore ?? null, a.createdAt as string, a.id, b.viralityScore ?? null, b.createdAt as string, b.id),
+      )
+      .slice(0, opts.limit)
+      .map((c) => this.toHomeItem(c));
+  }
+
+  async listHomeRailRecent(opts: { limit: number }): Promise<HomeFeedItem[]> {
+    return [...this.store.values()]
+      .filter((c) => this.homeEligible(c))
+      .sort((a, b) => ((a.createdAt as string) < (b.createdAt as string) ? 1 : (a.createdAt as string) > (b.createdAt as string) ? -1 : a.id < b.id ? 1 : -1))
+      .slice(0, opts.limit)
+      .map((c) => this.toHomeItem(c));
+  }
+
+  private toHomeItem(check: Check): HomeFeedItem {
+    const lifecycle = this.lifecycleOf(check.id);
+    const isPublished = !check.isDraft && check.publishedAt !== null;
+    const sources = check.evidence
+      .map((item) => {
+        const source = check.sources.find((s) => s.id === item.sourceId);
+        if (!source) return null;
+        return {
+          sourceId: item.sourceId,
+          quote: item.quote,
+          url: source.url,
+          title: source.title,
+          publisher: source.publisher,
+          credibilityTier: source.credibilityTier,
+        };
+      })
+      .filter((s): s is HomeFeedItem["sources"][number] => s !== null);
+    return {
+      ...lifecycle,
+      id: check.id,
+      claim: check.summary,
+      rating: homeFeedExposedRating({
+        isPublished,
+        rating: check.rating ?? null,
+        authoritative: lifecycle.authoritative,
+        riskTier: check.riskTier,
+      }),
+      calibratedConfidence: check.calibratedConfidence,
+      ingestSource: this.ingestSourceByCheckId.get(check.id) ?? "submission",
+      riskTier: check.riskTier,
+      whatWouldChangeThis: check.whatWouldChangeThis,
+      context: check.context,
+      sources,
+      sourceCount: sources.length,
+      viralityScore: check.viralityScore ?? null,
+      createdAt: check.createdAt as string,
+      publishedAt: (check.publishedAt as string | null) ?? null,
+    };
   }
 
   private toFeedItem(check: Check): FeedItemWithLifecycle {

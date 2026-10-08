@@ -14,6 +14,7 @@ import type {
 import type {
   CheckWithLifecycle,
   FeedItemWithLifecycle,
+  HomeFeedItem,
   TrendingItemWithLifecycle,
 } from "../lib/read-model-lifecycle.js";
 
@@ -61,6 +62,43 @@ export interface CheckRepository {
    * `listPublished` — the descending feed is unchanged.
    */
   listTopViral(opts: { limit: number }): Promise<FeedItemWithLifecycle[]>;
+  /**
+   * ADR-0038 Wave 3: the UNIFIED public home feed — PUBLISHED verdicts
+   * (`isDraft=false AND publishedAt IS NOT NULL`) INTERLEAVED with OPEN THREADS
+   * (`lifecycle_state IN ('preliminary','awaiting_sources')`), so the
+   * AI-grounded preliminaries (including reader-submitted ones) are finally
+   * visible instead of invisible. Deliberately EXCLUDES `editor_review` (the
+   * private escalation queue), `dismissed`, `archived_expired`, and `verifying`.
+   *
+   * Ordered `(virality_score DESC NULLS LAST, created_at DESC, id DESC)` and
+   * KEYSET-paginated: `cursor` is the opaque token this method returns as
+   * `nextCursor` (base64url of the last row's tuple — see
+   * `encodeHomeFeedCursor`), not an offset, so a concurrent insert never
+   * skips/duplicates a row. `nextCursor` is null when the page is the last.
+   *
+   * Each item's `rating` is gated by the Wave-3 stance rule
+   * (`homeFeedExposedRating`): a named-person ('C') open thread NEVER exposes a
+   * rating; a non-authoritative non-named preliminary exposes its AI draft
+   * stance; a published verdict always carries its rating.
+   */
+  listHomeFeed(opts: { limit: number; cursor?: string | null }): Promise<{
+    items: HomeFeedItem[];
+    nextCursor: string | null;
+  }>;
+  /**
+   * ADR-0038 Wave 3 "Most viral" rail: the top-N items (published OR open
+   * thread) by `virality_score` DESC, nulls EXCLUDED (not ranked as zero),
+   * ties broken by `created_at` DESC. Computed over ALL eligible rows, not a
+   * keyset page — the rail that leads the home page.
+   */
+  listHomeRailViral(opts: { limit: number }): Promise<HomeFeedItem[]>;
+  /**
+   * ADR-0038 Wave 3 "Most followed" rail — FALLBACK to "Most recent" by
+   * `created_at` DESC until a `claim_follows` counter exists (packages/db is
+   * fenced this wave, so no follows table yet). Over the same eligible set
+   * (published + open threads).
+   */
+  listHomeRailRecent(opts: { limit: number }): Promise<HomeFeedItem[]>;
 }
 
 export interface TrendingRepository {
