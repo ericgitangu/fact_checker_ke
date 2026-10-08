@@ -434,8 +434,21 @@ async def run_verify_hop(
     # back so the editorial-lifecycle outcome can branch on it below, decoupled
     # from whether grounding happened to surface a citable URL this call (which
     # Vertex returns non-deterministically — see corroboration_gemini retry).
+    #
+    # ADR-0038 flywheel closer: ALSO re-ground on a CROWDSOURCE RE-VERIFY
+    # (injected_docs present). A re-verify's injected docs carry only the
+    # submitter's NOTE + domain title as text — never the article body, because
+    # the publishers block our egress IP (see reference-cloudrun-egress-ip-block).
+    # Drafting against those thin labels alone can't verify anything (observed in
+    # prod: the KTN claim stayed awaiting_sources with "the sources do not verify
+    # this — one is a bare label, the other a one-line summary"). So when a
+    # re-verify injects authoritative sources, we grind fresh grounded web
+    # evidence TOO and let the draft rate against grounding + the injected
+    # authoritative tiers together — turning a credibility SIGNAL into an actual
+    # verdict. Grounding runs from Google infra (not IP-blocked), unlike a direct
+    # fetch of the submitted URL. Cost-bounded by the same breaker.
     rescue_has_assessment = False
-    if not retrieved and _grounded_rescue_enabled() and request.claim_text.strip():
+    if (not retrieved or request.injected_docs) and _grounded_rescue_enabled() and request.claim_text.strip():
         # rescue_usd is left None unless a rescue call actually returns, so the
         # cost row below is recorded only for a rescue that really ran.
         rescue_usd: float | None = None
