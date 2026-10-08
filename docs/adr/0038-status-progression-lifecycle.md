@@ -283,4 +283,61 @@ flag-gate all of it.
 - Add-source UI → `POST /v1/checks/:id/sources`. **Remove the "a human editor is still assessing it" copy** anywhere it renders for non-`editor_review` items — it is false; replace with the real lifecycle affordance. Preliminary cards must render the ADR-0033 AI-grounded, non-authoritative caveat and never present a named-person rating.
 
 ### Config (all env-tunable, flag-gated)
-`FEATURE_PRELIMINARY_THREADS`, `FEATURE_CROWDSOURCE_SOURCES`, `FEATURE_LIFECYCLE_EXPIRY`, `LIFECYCLE_EXPIRY_DAYS=7`, `EDITOR_REVIEW_EXPIRY_DAYS=30`, `CROWDSOURCE_REVERIFY_THRESHOLD=2`.
+`FEATURE_PRELIMINARY_THREADS`, `FEATURE_CROWDSOURCE_SOURCES`, `FEATURE_LIFECYCLE_EXPIRY`, `LIFECYCLE_EXPIRY_DAYS=7`, `EDITOR_REVIEW_EXPIRY_DAYS=30`, `CROWDSOURCE_REVERIFY_THRESHOLD=1` (see Amendments), `CROWDSOURCE_REVERIFY_PUBLISH_THRESHOLD=2`.
+
+---
+
+## Amendments (2026-10-08) — flywheel reliability
+
+Triggered by a live diagnosis: a viral Swahili KTN claim sat permanently at
+`awaiting_sources` despite a community source submission. Root cause was NOT a
+code bug — the re-verify never fired because the trigger threshold (2) was not
+met (1 accepted authoritative source), and the grounded-rescue sources we DID
+find were buried at `tier4`. Three decisions, all flag/env-tunable and
+additive. (Empirical note: authoritative sites — CDC/NIH/Reuters and Kenyan
+outlets — block the Cloud Run egress IP, so server-side content-fetch of a
+submitted URL is unreliable; grounding runs from Google infra and is not
+blocked, which is why grounded sourcing — not URL fetching — is the lever.)
+
+1. **Hybrid re-verify threshold (credibility-preserving).** TRIGGER lowered
+   `2 → 1`: a single accepted tier≤2 community source now re-verifies a thread
+   (thin-source KE reality — the ADR's own "community conversion < 10%" review
+   trigger). A SEPARATE publish threshold (`CROWDSOURCE_REVERIFY_PUBLISH_THRESHOLD`,
+   default 2) gates HARD auto-publish: a re-verify that would publish but is
+   backed by `< 2` independent accepted sources is held as a caveated
+   `preliminary` instead. One community source can start/advance a thread but
+   never flips a public verdict alone. Enforced in `reverify-orchestrator.ts`
+   (reads the accepted count from the re-verify payload's `injected_docs`).
+   Named persons remain never-auto-published (unchanged hard invariant).
+
+2. **No-downgrade guard on re-verify.** A community re-verify may only move a
+   thread FORWARD (toward `published`) or hold it — never backward. A weaker
+   re-verify that would drop a `preliminary` (which already shows an AI-grounded
+   conclusion) to `awaiting_sources` is a no-op that keeps the existing thread +
+   conclusion, bumping only `last_activity_at`. Lifecycle rank in
+   `reverify-orchestrator.ts#lifecycleRank`.
+
+3. **Grounded citations tiered by the credibility registry.** The grounded
+   rescue (`verify.py`) no longer stamps its surfaced sources a blanket
+   `tier4_unverified`; it credits the STRONGEST surfaced publisher at its real
+   registry tier via `tier_for_url` (so nation.africa/standardmedia/pesacheck
+   show tier2, who.int/CDC tier1), with a `"AI-grounded web assessment (via
+   {host})"` title keeping provenance explicit. The AI SYNTHESIS itself stays an
+   honest quoted-span evidence row; this does NOT change the publish decision
+   (`decide_publish_policy` is confidence-/risk-tier-driven and never reads
+   evidence tier — verified), so richer tiering can never auto-publish an
+   AI-only verdict. **Known limitation / follow-up:** only the strongest
+   citation is emitted as evidence — the others have no fetchable text to quote
+   (publisher IP-block), and emitting them with a fabricated quote would break
+   VerifyEvidence's "real quoted source" invariant. Surfacing the rest as
+   un-quoted *referenced sources* needs a separate wire/UI channel (deferred,
+   not silently worked around).
+
+**Observability:** the `llm_calls` table was defined but never written (per-call
+LLM/grounding spend un-auditable; only `engine_spend_daily` populated). Wiring
+per-call rows is in progress alongside these changes.
+
+**Review triggers (additions):** a single-source `preliminary` converting to a
+defamation complaint (re-tighten publish threshold or named gate); grounded
+tiering mis-crediting a spoofed/low-quality domain as tier≤2 (harden
+`tier_for_url` host matching — today it uses a substring fallback).
