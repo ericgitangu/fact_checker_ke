@@ -16,6 +16,7 @@ from app.clients.fetch_source_factory import make_fetch_sources
 from app.clients.llm_anthropic import make_llm_client
 from app.clients.provenance_factory import make_provenance_checker
 from app.clients.reverse_image_factory import make_reverse_image_search
+from app.clients.youtube_fetch_source import YouTubeFetchSource
 from app.config import UnpaidGeminiUsageError, assert_no_unpaid_gemini_usage
 from app.fakes.fake_abuse_scan import FakeAbuseScan
 from app.fakes.fake_synthetic_media import FakeSyntheticMediaDetector
@@ -117,6 +118,11 @@ _abuse_scan = FakeAbuseScan()
 # app/clients/fetch_source_factory.py.
 _fetch_sources = make_fetch_sources()
 _fetch_scoring_config = FetchScoringConfig.from_env()
+# ADR-0038 enrichment: a lawful video-METADATA fetcher for the analyze hop (used
+# only when ENRICH_VIDEO_METADATA=true and the URL is a recognised video with a
+# YouTube key present — fetch_metadata returns None otherwise). Metadata only,
+# never a transcript; no network at construction.
+_metadata_fetcher = YouTubeFetchSource()
 # ADR-0032/0005 AT-0032-4 / AT-0005-5: no real STT vendor is wired in this
 # slice (HARD RULE: no billable/live calls) -- FakeTranscriber never calls
 # out, so the compliant-subset "STT allowed" path still makes zero real
@@ -247,7 +253,10 @@ def _record_llm_call(org_id: str, usage: UsageRecord | None) -> None:
 async def hop_analyze(event: AnalyzeHopEnvelope) -> AnalyzeResult:
     try:
         result = await run_analyze_hop(
-            event.to_hop_request(), llm=_haiku_llm, store=_hop_idempotency_store
+            event.to_hop_request(),
+            llm=_haiku_llm,
+            store=_hop_idempotency_store,
+            metadata_fetcher=_metadata_fetcher,
         )
     except AnalyzeHopError as exc:
         logger.warning("analyze hop failed: %s", exc)
