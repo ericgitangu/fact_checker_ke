@@ -158,7 +158,15 @@ module "pipeline_service" {
     FETCH_ENGINE_ENABLED         = "true"
     YOUTUBE_PUBLISHED_AFTER_DAYS = "3"
     YOUTUBE_FETCH_QUERY          = "Kenya Ruto maandamano"
-    API_BASE_URL                 = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
+    # Virals-stale fix (2026-10-08): the "search" keyword mode went quiet + is
+    # quota-heavy (100 units/call); "trending" pulls YouTube's own mostPopular KE
+    # chart (1 unit, virality-native) — the right source for a "Most viral" feed.
+    YOUTUBE_DISCOVERY_MODE = "trending"
+    # ADR-0037 velocity: with reobserve OFF a seen (platform,native_id) was
+    # dropped forever without re-scoring, so the feed could never accrue velocity
+    # and froze once the trending set was seen. ON = trend/velocity accumulates.
+    FETCH_VELOCITY_REOBSERVE = "true"
+    API_BASE_URL             = "https://fact-checker-ke-api-zytlwdcoxa-bq.a.run.app"
     # ADR-0036 corroboration gate (reconciled 2026-10-07, rev w/ Vertex grounding):
     # SHADOW on (zero confidence lift until a per-stratum artifact is fitted).
     # GROUNDING ON via Vertex AI — authed by the pipeline SA's ADC
