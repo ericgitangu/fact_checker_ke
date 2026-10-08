@@ -51,6 +51,56 @@ def _grounded_rescue_enabled() -> bool:
     for a sourced assessment the draft can cite (instead of an inconclusive,
     held draft). Default ON; set GROUNDED_RESCUE_ENABLED=false to disable."""
     return os.environ.get("GROUNDED_RESCUE_ENABLED", "true").strip().lower() != "false"
+
+
+def _preliminary_threads_enabled() -> bool:
+    """ADR-0038 FEATURE_PRELIMINARY_THREADS (read FRESH from os.environ every
+    call so it is flippable at runtime, not import-time baked).
+
+    Default ON — materialising a non-auto-published item as a public
+    `preliminary`/`awaiting_sources` editorial thread (instead of an invisible
+    held draft) is the whole point of ADR-0038. Flip to false to fall back to
+    today's held-draft behaviour: auto-publish still emits lifecycle="published"
+    (unchanged publish semantics), but held items emit NO editorial lifecycle
+    (lifecycle=None), exactly as before this ADR."""
+    return os.environ.get("FEATURE_PRELIMINARY_THREADS", "true").strip().lower() != "false"
+
+
+# ADR-0038 provenance tag for an AI-grounded, non-authoritative preliminary
+# thread-starter (carried on the wire as PublishDecisionPayload.source_kind so
+# the API can persist checks.source_kind). The only non-null source_kind this
+# hop emits today.
+_AI_GROUNDED_PRELIMINARY = "ai_grounded_preliminary"
+
+
+def _editorial_lifecycle(
+    *, auto_publish: bool, rescue_has_assessment: bool, dismissed: bool = False
+) -> tuple[str | None, str | None, bool]:
+    """Compute the ADR-0038 editorial OUTCOME `(lifecycle, source_kind,
+    authoritative)` the API will persist. The *processing* decision
+    (auto_publish) is untouched; this is the orthogonal editorial track.
+
+    - auto-publish  → ("published", None, True) — ALWAYS, flag on or off
+      (auto-publish semantics are unchanged by ADR-0038; the named-person
+      auto-publish ban is already enforced upstream in finalize_publish/Tier-C,
+      so no [A] edge reaches `published` for a named person).
+    - FLAG OFF (and not auto-publish) → (None, None, True): byte-for-byte the
+      pre-ADR-0038 held-draft behaviour — no editorial lifecycle emitted.
+    - FLAG ON, held, rescue produced an assessment → preliminary (AI-grounded,
+      non-authoritative). Rating-withholding for named persons is unchanged (the
+      API withholds `verdict.rating` pre-approval, per the contract below).
+    - FLAG ON, held, no usable rescue → awaiting_sources (open thread, no verdict).
+    - FLAG ON, hard failure (rejected draft) → dismissed.
+    """
+    if auto_publish:
+        return "published", None, True
+    if not _preliminary_threads_enabled():
+        return None, None, True
+    if dismissed:
+        return "dismissed", None, False
+    if rescue_has_assessment:
+        return "preliminary", _AI_GROUNDED_PRELIMINARY, False
+    return "awaiting_sources", None, False
 from app.protocols.embedder import Embedder
 from app.protocols.factcheck_client import FactCheckClient
 from app.protocols.llm_client import LlmClient, LlmCompletionError
@@ -308,6 +358,13 @@ async def run_verify_hop(
     # the claim gets a real, cited verdict that flows through the normal publish
     # policy + audit. Cost-bounded (shared "corroboration" daily lane) and
     # fail-open: any error degrades to the unchanged no-source draft. ---
+    # ADR-0038: a rescue that produces an assessment (stance + text) WITH OR
+    # WITHOUT citations makes the item a `preliminary` AI-grounded thread-starter
+    # rather than an invisible held draft. We record whether an assessment came
+    # back so the editorial-lifecycle outcome can branch on it below, decoupled
+    # from whether grounding happened to surface a citable URL this call (which
+    # Vertex returns non-deterministically — see corroboration_gemini retry).
+    rescue_has_assessment = False
     if not retrieved and _grounded_rescue_enabled() and request.claim_text.strip():
         allow = True
         if corroboration_breaker is not None:
@@ -320,16 +377,27 @@ async def run_verify_hop(
                 _rescue_stance, assessment_text, cite_urls, _usd = await corroboration_client.rescue(
                     claim_text=request.claim_text, language=request.language
                 )
-                if assessment_text.strip() and cite_urls:
-                    rescue_doc_id = "grounded-web-assessment"
-                    retrieved.append(RetrievedDoc(doc_id=rescue_doc_id, text=assessment_text))
-                    source_meta[rescue_doc_id] = _SourceMeta(
-                        url=cite_urls[0],
-                        title="AI grounded web assessment (unverified)",
-                        publisher="grounded web search",
-                        credibility_tier=CredibilityTier.tier4_unverified,
-                        published_at=None,
-                    )
+                if assessment_text.strip():
+                    # An assessment exists → preliminary-eligible regardless of
+                    # citations (ADR-0038 behaviour #2). The rescue is NO LONGER
+                    # discarded when `cite_urls` is empty (the bug that killed a
+                    # real prod Swahili claim: 0 citations one call, many the next).
+                    rescue_has_assessment = True
+                    if cite_urls:
+                        # Citations present → append as the citable tier4_unverified
+                        # evidence doc the draft can quote (unchanged behaviour).
+                        # Absent → still preliminary (above), but no evidence doc to
+                        # build; the API surfaces the AI stance/summary as the
+                        # non-authoritative thread-starter.
+                        rescue_doc_id = "grounded-web-assessment"
+                        retrieved.append(RetrievedDoc(doc_id=rescue_doc_id, text=assessment_text))
+                        source_meta[rescue_doc_id] = _SourceMeta(
+                            url=cite_urls[0],
+                            title="AI grounded web assessment (unverified)",
+                            publisher="grounded web search",
+                            credibility_tier=CredibilityTier.tier4_unverified,
+                            published_at=None,
+                        )
             except CorroborationError:
                 pass  # fail-open: unchanged no-source draft path
 
@@ -380,6 +448,10 @@ async def run_verify_hop(
                 attribution=request.attribution.value,
                 corroboration=corroboration,
             )
+            lifecycle, source_kind, authoritative = _editorial_lifecycle(
+                auto_publish=outcome.decision.auto_publish,
+                rescue_has_assessment=rescue_has_assessment,
+            )
             result = result.model_copy(
                 update={
                     "corroboration": CorroborationPayload(
@@ -397,6 +469,9 @@ async def run_verify_hop(
                         queued_for_async_audit=outcome.decision.queued_for_async_audit,
                         requires_human_tap=outcome.decision.requires_human_tap,
                         corroboration_state=outcome.corroboration_state,
+                        lifecycle=lifecycle,
+                        source_kind=source_kind,
+                        authoritative=authoritative,
                     ),
                 }
             )
@@ -425,6 +500,15 @@ async def run_verify_hop(
         named_person_involved=request.named_person_involved,
         attribution=request.attribution.value,
     )
+    # ADR-0038: a hard failure (no schema-valid, citation-clean draft after the
+    # retry) is a terminal `dismissed` editorial outcome when the flag is on
+    # (auto_publish is always False here by construction, so _editorial_lifecycle
+    # routes to dismissed, not published); flag off → None (unchanged).
+    rej_lifecycle, rej_source_kind, rej_authoritative = _editorial_lifecycle(
+        auto_publish=rejected_outcome.decision.auto_publish,
+        rescue_has_assessment=False,
+        dismissed=True,
+    )
     rejected_result = rejected_result.model_copy(
         update={
             "publish": PublishDecisionPayload(
@@ -434,6 +518,9 @@ async def run_verify_hop(
                 publish_mode=rejected_outcome.decision.publish_mode,
                 queued_for_async_audit=rejected_outcome.decision.queued_for_async_audit,
                 requires_human_tap=rejected_outcome.decision.requires_human_tap,
+                lifecycle=rej_lifecycle,
+                source_kind=rej_source_kind,
+                authoritative=rej_authoritative,
             )
         }
     )
