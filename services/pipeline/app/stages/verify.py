@@ -74,16 +74,29 @@ _AI_GROUNDED_PRELIMINARY = "ai_grounded_preliminary"
 
 
 def _editorial_lifecycle(
-    *, auto_publish: bool, rescue_has_assessment: bool, dismissed: bool = False
+    *,
+    auto_publish: bool,
+    rescue_has_assessment: bool,
+    named_person_involved: bool = False,
+    dismissed: bool = False,
 ) -> tuple[str | None, str | None, bool]:
     """Compute the ADR-0038 editorial OUTCOME `(lifecycle, source_kind,
     authoritative)` the API will persist. The *processing* decision
     (auto_publish) is untouched; this is the orthogonal editorial track.
 
-    - auto-publish  → ("published", None, True) — ALWAYS, flag on or off
-      (auto-publish semantics are unchanged by ADR-0038; the named-person
-      auto-publish ban is already enforced upstream in finalize_publish/Tier-C,
-      so no [A] edge reaches `published` for a named person).
+    - auto-publish, NON-named → ("published", None, True) — ALWAYS, flag on or
+      off (auto-publish semantics are unchanged by ADR-0038).
+    - auto-publish, NAMED-person → ("editor_review", None, False). HARD LEGAL
+      INVARIANT (ADR-0033/0004, ADR-0038 state machine): no [A] edge ever
+      reaches `published` for a named person — the only named→published edge is
+      [E] (a human approve). This guard is REQUIRED, not belt-and-braces:
+      finalize_publish's Tier-C mode (a) returns auto_publish=True for a
+      named-person claim at calibrated_confidence ≥ TAU_C_MODE_A (0.99) —
+      verified empirically — so the editorial track must itself refuse to mark a
+      named-person outcome `published` and instead route it to the bounded
+      editor queue. This is exactly the Wave 2 re-verify case: injected
+      authoritative sources can clear a named-person claim into the
+      auto_publish=True band, and it MUST land in editor_review, never published.
     - FLAG OFF (and not auto-publish) → (None, None, True): byte-for-byte the
       pre-ADR-0038 held-draft behaviour — no editorial lifecycle emitted.
     - FLAG ON, held, rescue produced an assessment → preliminary (AI-grounded,
@@ -93,6 +106,11 @@ def _editorial_lifecycle(
     - FLAG ON, hard failure (rejected draft) → dismissed.
     """
     if auto_publish:
+        if named_person_involved:
+            # Named-person clear routes to the bounded editor queue (ADR-0038
+            # transition table: preliminary·awaiting_sources → editor_review,
+            # [C]/[A]/[E], "never auto"). NOT "published".
+            return "editor_review", None, False
         return "published", None, True
     if not _preliminary_threads_enabled():
         return None, None, True
@@ -291,6 +309,37 @@ async def run_verify_hop(
     # publisher are still available) so citations can be turned into
     # persistable evidence after the draft passes integrity checks.
     source_meta: dict[str, _SourceMeta] = {}
+
+    # --- ADR-0038 Wave 2 re-verify entry: crowdsourced injected sources ---
+    # When the API re-enqueues an open preliminary/awaiting_sources check with
+    # community-submitted, API-tier-gated (≤2) sources, fold them into
+    # `retrieved` FIRST — before the reverse-image and Fact Check Tools hits,
+    # and crucially before the `if not retrieved` no-source rescue guard below.
+    # A re-verify with real evidence therefore DRAFTS AGAINST these docs and
+    # never falls through to the grounded rescue; the draft rates on the
+    # injected evidence and routes per the ADR transition table (non-named may
+    # auto-publish; named-person is held to editor_review by _editorial_lifecycle
+    # — never auto, the hard legal invariant).
+    #
+    # Tiering: the API already resolved + tier-gated these to ≤2 (authoritative)
+    # via its fuller credibility_registry/resolved_url; the pipeline does NOT
+    # re-tier them down here (it lacks that resolved-URL context and tier_for_url
+    # would under-credit a genuinely authoritative URL absent from this service's
+    # registry), so they carry tier2_established_media as citable evidence. The
+    # draft-verdict LLM still decides the rating — never a hardcoded verdict
+    # (ADR-0023 citation integrity is enforced in code as for any other source).
+    if request.injected_docs:
+        for i, inj in enumerate(request.injected_docs):
+            inj_doc_id = f"injected-source:{i}"
+            retrieved.append(RetrievedDoc(doc_id=inj_doc_id, text=inj.text))
+            source_meta[inj_doc_id] = _SourceMeta(
+                url=inj.url,
+                title=inj.title,
+                publisher=inj.title,
+                credibility_tier=CredibilityTier.tier2_established_media,
+                published_at=None,
+            )
+
     if request.media_hash:
         try:
             earlier_copy = reverse_image_search.find_earlier_copy(request.media_hash)
@@ -451,6 +500,7 @@ async def run_verify_hop(
             lifecycle, source_kind, authoritative = _editorial_lifecycle(
                 auto_publish=outcome.decision.auto_publish,
                 rescue_has_assessment=rescue_has_assessment,
+                named_person_involved=request.named_person_involved,
             )
             result = result.model_copy(
                 update={

@@ -41,6 +41,16 @@ _AUTO_PUBLISH_FIXTURE_MARKER = "AUTO_PUBLISH_FIXTURE_HIGH_CONFIDENCE"
 # the actual hop, not a hand-built VerifyResult.
 _HARD_NEGATIVE_FIXTURE_MARKER = "HARD_NEGATIVE_FIXTURE_NAMED_PERSON"
 
+# ADR-0038 Wave 2 re-verify fixture: drives the REAL draft->publish path to a
+# high-confidence (0.99) clearing verdict that CITES the first retrieved source
+# (the injected crowdsourced doc). confidence 0.99 clears both the Tier-A/B bar
+# and Tier-C mode (a)'s 0.99 threshold, so a NON-named claim auto-publishes
+# (lifecycle=published) while a NAMED-person claim hits finalize_publish's
+# auto_publish=True Tier-C path and must be routed to editor_review by the
+# verify hop's named-person guard (never published) — the exact invariant the
+# re-verify entry must preserve.
+_REVERIFY_CLEARS_FIXTURE_MARKER = "REVERIFY_CLEARS_FIXTURE_HIGH_CONFIDENCE"
+
 
 def _looks_like_injection(prompt: str) -> bool:
     lowered = prompt.lower()
@@ -197,6 +207,44 @@ class FakeLlmClient(LlmClient):
                     "citations": [],
                     "confidence": 0.9,
                     "what_would_change_this": "A primary-source record corroborating the claim.",
+                    "language": _detect_language(claim_text),
+                    "translation_en": claim_text,
+                }
+            )
+
+        if _REVERIFY_CLEARS_FIXTURE_MARKER in claim_text:
+            # Cite the FIRST retrieved source (the injected crowdsourced doc),
+            # quoting a substring of its body so citation integrity (ADR-0023 §2)
+            # passes exactly as the default branch below does.
+            r_doc_id = ""
+            r_quoted = ""
+            marker = '<untrusted_source id="'
+            idx = prompt.find(marker)
+            if idx != -1:
+                id_start = idx + len(marker)
+                id_end = prompt.find('"', id_start)
+                r_doc_id = prompt[id_start:id_end]
+                body_start = prompt.find(">", id_end) + 1
+                body_end = prompt.find("</untrusted_source>", body_start)
+                body = prompt[body_start:body_end].strip()
+                r_quoted = body[:40]
+            return json.dumps(
+                {
+                    "rating": "MostlyTrue",
+                    "rationale": (
+                        "The crowdsourced authoritative sources corroborate the claim; "
+                        "the re-verify clears on the injected evidence."
+                    ),
+                    "context": (
+                        "The claim is supported by the community-submitted, tier-gated "
+                        "sources folded into this re-verify; the evidence now substantiates "
+                        "what was previously an open, unverified thread."
+                    ),
+                    "citations": (
+                        [{"doc_id": r_doc_id, "quoted_span": r_quoted}] if r_doc_id else []
+                    ),
+                    "confidence": 0.99,
+                    "what_would_change_this": "A retraction or contradiction by the same authoritative sources.",
                     "language": _detect_language(claim_text),
                     "translation_en": claim_text,
                 }
