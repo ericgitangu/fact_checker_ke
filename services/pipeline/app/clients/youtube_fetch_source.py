@@ -20,12 +20,36 @@ it documents.
 from __future__ import annotations
 
 import os
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 
 from app.protocols.fetch_source import FetchCandidate, FetchSourceError
+from app.protocols.video_metadata import VideoMetadata
+
+
+def _video_id_from_url(url: str) -> str | None:
+    """Parse a YouTube video id from watch?v=, youtu.be/<id>, /shorts/<id>,
+    or /embed/<id>. Returns None for anything else (incl. already-resolved
+    non-YouTube URLs — the caller then falls back to needs_quote)."""
+    try:
+        u = urlparse(url)
+    except ValueError:
+        return None
+    host = (u.hostname or "").removeprefix("www.").lower()
+    if host == "youtu.be":
+        vid = u.path.lstrip("/").split("/")[0]
+        return vid or None
+    if host not in {"youtube.com", "m.youtube.com", "music.youtube.com"}:
+        return None
+    if u.path == "/watch":
+        vals = parse_qs(u.query).get("v")
+        return vals[0] if vals else None
+    m = re.match(r"^/(?:shorts|embed|live)/([^/?#]+)", u.path)
+    return m.group(1) if m else None
 
 YOUTUBE_API_KEY_ENV = "YOUTUBE_API_KEY"
 _SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
@@ -170,6 +194,37 @@ class YouTubeFetchSource:
             raise FetchSourceError(f"YouTube Data API returned invalid JSON: {exc}") from exc
 
         return [_to_candidate(item) for item in videos_payload.get("items", [])]
+
+    async def fetch_metadata(self, url: str) -> VideoMetadata | None:
+        """ADR-0038 enrichment: lawful publisher metadata for ONE video URL via
+        videos.list by id (1 quota unit, snippet only — NEVER captions/audio, so
+        the ADR-0002 fence holds). Returns None for a non-YouTube URL, a missing
+        video, or any API error (caller falls back to needs_quote)."""
+        video_id = _video_id_from_url(url)
+        if not video_id:
+            return None
+        api_key = os.environ.get(YOUTUBE_API_KEY_ENV)
+        if not api_key:
+            return None
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.get(
+                    _VIDEOS_URL, params={"part": "snippet", "id": video_id, "key": api_key}
+                )
+                resp.raise_for_status()
+                items = resp.json().get("items", [])
+        except (httpx.HTTPError, ValueError):
+            return None
+        if not items:
+            return None
+        snip = items[0].get("snippet", {})
+        return VideoMetadata(
+            resolved_url=f"https://www.youtube.com/watch?v={video_id}",
+            title=snip.get("title", "") or "",
+            description=snip.get("description", "") or "",
+            published_at=snip.get("publishedAt"),
+            channel=snip.get("channelTitle"),
+        )
 
 
 def _to_candidate(item: dict[str, Any]) -> FetchCandidate:
