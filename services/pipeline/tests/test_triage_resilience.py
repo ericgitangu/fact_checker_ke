@@ -40,6 +40,42 @@ async def test_one_feed_fails_others_survive(monkeypatch: pytest.MonkeyPatch) ->
     assert cands[0].platform == "triage_feed"
 
 
+async def test_feed_fetched_through_proxy_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Egress-IP fix (reference-cloudrun-egress-ip-block): when TRIAGE_FEED_PROXY_URL
+    # is set, the feed is fetched THROUGH the Vercel BFF proxy (not directly to the
+    # Cloudflare-403'd pesacheck host). The request URL is the proxy with the feed
+    # as an encoded ?url= param; the proxy returns the raw RSS, parsed unchanged.
+    monkeypatch.setenv("TRIAGE_FEED_URLS", "https://pesacheck.org/tag/kenya/rss/")
+    monkeypatch.setenv("TRIAGE_FEED_PROXY_URL", "https://web.test/api/fetch-feed")
+    seen: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(str(req.url))
+        return httpx.Response(200, text=_RSS)
+
+    _patch(monkeypatch, handler)
+    cands = await TriageFeedSource().poll(limit=10)
+    assert len(cands) == 1
+    assert len(seen) == 1
+    assert seen[0].startswith("https://web.test/api/fetch-feed?url=")
+    assert "pesacheck.org" in seen[0]  # feed URL carried as the encoded query param
+
+
+async def test_direct_fetch_when_no_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
+    # No proxy configured -> fetch the feed URL directly (unchanged dev/test path).
+    monkeypatch.setenv("TRIAGE_FEED_URLS", "https://pesacheck.org/tag/kenya/rss/")
+    monkeypatch.delenv("TRIAGE_FEED_PROXY_URL", raising=False)
+    seen: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.append(str(req.url))
+        return httpx.Response(200, text=_RSS)
+
+    _patch(monkeypatch, handler)
+    await TriageFeedSource().poll(limit=10)
+    assert seen == ["https://pesacheck.org/tag/kenya/rss/"]
+
+
 async def test_all_feeds_fail_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TRIAGE_FEED_URLS", "https://a.test/feed,https://b.test/feed")
 
