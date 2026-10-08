@@ -108,6 +108,44 @@ def _reobserve_enabled() -> bool:
     return os.environ.get("FETCH_VELOCITY_REOBSERVE", "false").lower() == "true"
 
 
+def _editorial_platforms() -> frozenset[str]:
+    """ADR-0032: platforms whose items are EDITORIALLY curated — a newsroom or
+    a fact-check desk (or a fact-check-scoped Google News query) already
+    surfaced them — rather than virality-ranked.
+
+    Root cause this addresses (verified 2026-10-08, real-scorer run): the
+    virality scorer's single largest weight is `velocity`
+    (Δengagement/Δtime), which an RSS triage feed can NEVER earn — RSS carries
+    no engagement counts, and a first observation has Δ=0 regardless. So a
+    curated triage item structurally scores ~0.30-0.40 and is dropped below
+    tau=0.5, even though editorial selection is itself the highest-priority
+    check-worthiness signal ADR-0032 names ("a claim these outlets have
+    already debunked is both the highest-priority 'going viral in KE' signal
+    and an authoritative check-against hit"). Empirically, `triage_feed` had
+    NEVER emitted a candidate in the system's history because of this.
+
+    For these platforms we floor the score (see `_editorial_floor`) so a
+    curated item emits on its editorial provenance, not an engagement rate it
+    can't produce. Config-driven (FETCH_EDITORIAL_PLATFORMS, comma-separated),
+    default 'triage_feed'. Downstream guards keep this bounded: the per-run
+    `max_emissions_per_run` cap, the fetch cost breaker, exact-hash dedup (each
+    item emits at most once, ever), and — crucially — the analyze hop's real
+    claim detection (`no_checkable_claims`/`needs_quote`), which is the
+    authoritative claim filter. A floored non-claim costs one cheap analyze
+    call and is then dropped, rather than producing a misleading check."""
+    raw = os.environ.get("FETCH_EDITORIAL_PLATFORMS", "triage_feed")
+    return frozenset(p.strip() for p in raw.split(",") if p.strip())
+
+
+def _editorial_floor() -> float:
+    """Minimum check-worthiness score for an editorial-platform candidate (see
+    `_editorial_platforms`). Default 0.6, above the default tau=0.5 so a
+    curated item clears the emission gate. Config-driven (FETCH_EDITORIAL_FLOOR)
+    so retuning — or disabling, by setting it below tau — is an env change, not
+    a code change (AT-0032-2)."""
+    return float(os.environ.get("FETCH_EDITORIAL_FLOOR", "0.6"))
+
+
 def _velocity_from_history(
     history: FetchObservationHistory, *, observed_at: datetime, total_engagement: float
 ) -> tuple[float, float, float]:
@@ -349,6 +387,16 @@ async def _process_candidate(
         age_hours=age_hours,
     )
     score = score_candidate(signals, config=scoring_config)
+
+    # ADR-0032 editorial-platform floor: a curated triage item can't earn the
+    # velocity-weighted virality score (RSS has no engagement data), so its raw
+    # score lands ~0.30-0.40 and would be dropped below tau here — which is why
+    # `triage_feed` had never once emitted. Floor it to its editorial
+    # provenance instead (see `_editorial_platforms`). Applied BEFORE the tau
+    # gate so a curated item survives it; bounded by max_emissions_per_run, the
+    # cost breaker, once-ever dedup, and the analyze hop's real claim filter.
+    if candidate.platform in _editorial_platforms():
+        score = max(score, _editorial_floor())
 
     if score < scoring_config.tau_fetch:
         result.dropped_below_tau += 1
