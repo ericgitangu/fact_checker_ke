@@ -212,7 +212,7 @@ module "pipeline_service" {
     # unbounded Anthropic bill. Gemini grounding is capped separately
     # (CORROBORATION_ENGINE_DAILY_BUDGET_USD=0.30). Debut-week showcase value;
     # drop it toward bare-minimum after the launch week per the cost plan.
-    SUBMISSION_ENGINE_DAILY_BUDGET_USD = "8.00"
+    SUBMISSION_ENGINE_DAILY_BUDGET_USD = "3.00"
     # Triage feed (ADR-0032/0037). Was never in TF — only ever set by gcloud, so
     # a future apply would have wiped it. Now persisted. Verified 2026-10-08:
     # PesaCheck/Africa Check's own RSS is Cloudflare-403'd from EVERY datacenter
