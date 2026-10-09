@@ -76,6 +76,12 @@ Stage detail:
 
 Deeper diagrams (sequence flows, data model, infra topology) live in [docs/architecture.md](docs/architecture.md) and [docs/architecture/](docs/architecture/).
 
+### Access and abuse protection
+
+Reading is fully public — the feed, any individual check, the methodology and the maandamano tracker need no account. **Writing** is gated: submitting a claim or adding a source requires a reader to sign in with Google (Auth.js / OpenID Connect, JWT sessions), which upserts a lightweight reader profile kept separate from the privileged admin/editor accounts. Sign-in return paths are sanitized to a same-origin allow-list (no open redirect, no `/signin` loop).
+
+Because the API (`services/api`) is a public origin, the browser-side checks alone can't protect the cost-spending write paths from a direct POST. Two server-side layers close that: the web BFF forwards submission and add-source requests to the API with a shared **trust assertion** header, and the API rejects those routes without it — so the only accepted caller is our own BFF. reCAPTCHA v3 is wired on the submit, add-source and waitlist forms (env-gated: a no-op until the keys are set, then fail-closed). Independently of either, cost is bounded by a per-device quota and per-lane daily spend breakers (reserve-or-refund), so no single actor can run up the LLM bill.
+
 ## Monorepo layout
 
 pnpm workspaces (`apps/*`, `packages/*`, `services/api`) with [moonrepo](https://moonrepo.dev) as the task runner. The Python pipeline is managed separately by `uv` and is not a pnpm workspace.
@@ -153,6 +159,8 @@ There is no GitHub Actions CI badge: Actions billing is currently locked on this
 | Shared contracts | zod schemas + inferred TypeScript types (`packages/core`) |
 | Database | Neon serverless Postgres with pgvector, Drizzle ORM |
 | Queue / cache / cron | Upstash Redis + QStash |
+| Auth / abuse | Auth.js (Google OAuth / OIDC, JWT sessions); reCAPTCHA v3 (env-gated); BFF→API shared-secret trust gate |
+| Transactional email | Resend (adopter acknowledgement + founder notify) |
 | AI models | Anthropic Claude (Haiku for analyze, Sonnet for verify draft); Google Vertex AI Gemini grounding (corroboration + rescue); Google Fact Check Tools API (retrieval); Google Chirp_2 speech-to-text (compliant-subset audio only) |
 | Discovery | YouTube Data API (trending KE) + Google News fact-check RSS triage |
 | Infrastructure | Terraform IaC; GCP Cloud Run in `africa-south1`, scale-to-zero |
