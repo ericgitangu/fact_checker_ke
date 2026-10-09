@@ -51,6 +51,12 @@ module "api_service" {
     PIPELINE_CALLBACK_SECRET = {
       secret = module.secret_pipeline_callback_secret.secret_id
     }
+    # BFF->API trust gate (services/api/src/app.ts preHandler). Wired here so a
+    # terraform apply never drops it; the gate activates the instant a secret
+    # VERSION exists AND apps/web sends the same value. Fail-open until then.
+    BFF_PROXY_SECRET = {
+      secret = module.secret_bff_proxy_secret.secret_id
+    }
     REDIS_TCP_URL = {
       secret = module.secret_redis_tcp_url.secret_id
     }
