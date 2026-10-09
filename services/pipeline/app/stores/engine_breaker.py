@@ -203,6 +203,30 @@ class PostgresEngineCostBreaker:
         return _state_from_totals(engine, float(usd_spent), float(daily_budget_usd))
 
 
+def reserve_or_refund(breaker: EngineCostBreaker, engine: Engine, usd_cost: float) -> bool:
+    """Atomic reserve-then-check WITH refund-on-deny.
+
+    `record_spend` is a single atomic `INSERT ... ON CONFLICT DO UPDATE ...
+    RETURNING`, so concurrent callers serialize on the row and each sees a
+    distinct post-increment total — this closes the check-then-act race where
+    N concurrent callers all read the same pre-increment total and all proceed
+    (verified 2026-10-09: the corroboration lane's reported spend drifted to
+    ~$1.04 against its $0.30 cap under concurrent verify hops).
+
+    The fix this adds over a bare `record_spend(...).hard_stopped` check:
+    when the reservation tips the lane to hard_stopped, the reservation is
+    REFUNDED, so a DENIED attempt never inflates the day's running total. Before
+    this, every rejected call still added its estimate — so a burst of rejected
+    attempts inflated `usd_spent` far past the budget even though no billable
+    call was made. Returns True iff the caller now holds a reservation and may
+    proceed; False means denied (and already refunded)."""
+    state = breaker.record_spend(engine, usd_cost)
+    if state.hard_stopped:
+        breaker.record_spend(engine, -usd_cost)
+        return False
+    return True
+
+
 __all__ = [
     "DEFAULT_DAILY_BUDGET_USD",
     "HARD_STOP_FRACTION",
@@ -213,4 +237,5 @@ __all__ = [
     "InMemoryEngineCostBreaker",
     "PostgresEngineCostBreaker",
     "configured_daily_budget_usd",
+    "reserve_or_refund",
 ]

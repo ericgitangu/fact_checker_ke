@@ -143,7 +143,7 @@ from app.stages.dedup_guard import may_reuse
 from app.stages.idempotency import InMemoryIdempotencyStore, content_hash
 from app.stages.json_extract import strip_code_fences
 from app.stages.publish import finalize_publish
-from app.stores.engine_breaker import EngineCostBreaker
+from app.stores.engine_breaker import EngineCostBreaker, reserve_or_refund
 from app.stores.llm_call_store import LlmCall, LlmCallStore
 
 # Cosine-similarity threshold for dedup reuse (ADR-0004 step 3 / amendment
@@ -461,7 +461,9 @@ async def run_verify_hop(
         allow = True
         if corroboration_breaker is not None:
             try:
-                allow = not corroboration_breaker.record_spend("corroboration", GROUNDED_RESCUE_USD).hard_stopped
+                # Reserve-then-check WITH refund-on-deny: a denied rescue must not
+                # leave its estimate on the lane's total (see reserve_or_refund).
+                allow = reserve_or_refund(corroboration_breaker, "corroboration", GROUNDED_RESCUE_USD)
             except Exception:  # noqa: BLE001 - cost metering must NEVER crash the verify hop
                 allow = False  # fail-closed: skip the billable rescue if we can't meter it
         if allow:

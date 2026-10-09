@@ -105,3 +105,41 @@ def test_postgres_breaker_isolates_fetch_and_submission_rows(pg_conn, monkeypatc
 def test_thresholds_are_the_adr_0032_5_values() -> None:
     assert SOFT_STOP_FRACTION == 0.80
     assert HARD_STOP_FRACTION == 1.00
+
+
+def test_reserve_or_refund_refunds_a_denied_reservation(monkeypatch) -> None:
+    """Regression (verified 2026-10-09: the corroboration lane's reported spend
+    drifted to ~$1.04 against its $0.30 cap). A DENIED reservation must NOT leave
+    its estimate on the day's total — reserve_or_refund refunds it, so repeated
+    rejected attempts can't inflate usd_spent past the budget."""
+    from app.stores.engine_breaker import reserve_or_refund
+
+    monkeypatch.setenv("CORROBORATION_ENGINE_DAILY_BUDGET_USD", "0.30")
+    breaker = InMemoryEngineCostBreaker()
+
+    # Reserve until the cap denies the next one (the reservation that would reach
+    # >= 0.30 is denied + refunded, so the total settles just under budget).
+    allowed = 0
+    while reserve_or_refund(breaker, "corroboration", 0.003):
+        allowed += 1
+        assert allowed <= 1000  # safety against a runaway loop if the cap never trips
+    at_cap = breaker.current_state("corroboration").usd_spent
+    assert at_cap <= 0.30  # NEVER exceeded the budget
+    assert at_cap > 0.29  # ...but got right up to it
+
+    # 500 further attempts are all DENIED and REFUNDED — the total must not move.
+    for _ in range(500):
+        assert reserve_or_refund(breaker, "corroboration", 0.003) is False
+    after = breaker.current_state("corroboration").usd_spent
+    assert after == at_cap  # unchanged (pre-fix: each denied attempt added 0.003 -> ~1.80)
+
+
+def test_reserve_or_refund_allows_until_cap(monkeypatch) -> None:
+    monkeypatch.setenv("SUBMISSION_ENGINE_DAILY_BUDGET_USD", "0.10")
+    from app.stores.engine_breaker import reserve_or_refund
+
+    breaker = InMemoryEngineCostBreaker()
+    allowed = sum(1 for _ in range(10) if reserve_or_refund(breaker, "submission", 0.03))
+    # 0.03 reservations: 0.03, 0.06, 0.09 allowed (<0.10); 0.12 would cross -> denied+refunded.
+    assert allowed == 3
+    assert round(breaker.current_state("submission").usd_spent, 4) == 0.09

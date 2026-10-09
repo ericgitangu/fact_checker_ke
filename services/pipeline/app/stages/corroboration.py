@@ -35,7 +35,7 @@ from app.stages.publish_policy import (
     TAU_B_PRE_CALIBRATION,
 )
 from app.stages.risk_tier import RiskTier, classify_risk_tier, imputation_severity_from_rating
-from app.stores.engine_breaker import Engine, EngineCostBreaker
+from app.stores.engine_breaker import Engine, EngineCostBreaker, reserve_or_refund
 
 # Corroborate drafts within this much BELOW the auto threshold — the only band
 # where a confidence lift from agreement could actually flip hold -> auto.
@@ -124,7 +124,10 @@ async def run_corroboration(
     # breaker error fails closed to no_second_opinion.
     if breaker is not None:
         try:
-            if breaker.record_spend(engine, _estimated_call_usd()).hard_stopped:
+            # Reserve-then-check WITH refund-on-deny (reserve_or_refund): a denied
+            # attempt must not leave its estimate on the day's total, or a burst of
+            # rejections inflates the lane's reported spend past its cap.
+            if not reserve_or_refund(breaker, engine, _estimated_call_usd()):
                 return no_second_opinion()
         except Exception:  # noqa: BLE001 - cost metering must never crash the hop
             return no_second_opinion()

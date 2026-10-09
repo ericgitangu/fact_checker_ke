@@ -51,6 +51,7 @@ from app.stores.engine_breaker import (
     EngineCostBreaker,
     InMemoryEngineCostBreaker,
     PostgresEngineCostBreaker,
+    reserve_or_refund,
 )
 from app.stores.fetch_dedup_memory import InMemoryFetchDedupStore
 from app.stores.fetch_dedup_postgres import PostgresFetchDedupStore
@@ -254,35 +255,51 @@ def _record_llm_call(org_id: str, usage: UsageRecord | None) -> None:
     _llm_call_store.record(LlmCall.from_usage(org_id, usage))
 
 
-def _submission_budget_guard() -> None:
+# Per-hop upper-bound reservation against the submission lane. A single analyze
+# (Haiku) or verify (Sonnet draft) hop costs well under this; over-reserving
+# makes the daily cap trip conservatively early, then the reconcile below trues
+# it up to the ACTUAL spend. Overridable for ops tuning without a code change.
+SUBMISSION_ESTIMATED_CALL_USD = float(os.environ.get("SUBMISSION_ESTIMATED_CALL_USD", "0.03"))
+
+
+def _submission_budget_reserve() -> float:
     """COST-CONTROL (security audit G1/G3/G4, 2026-10-09): the analyze + verify
     hops are the single choke point every submission's LLM spend flows through —
     user-submitted AND fetch-emitted, api-routed AND (because the pipeline is
-    public) any direct caller. Before spending on the LLM, hard-stop if the
-    "submission" lane has hit 100% of its daily USD budget
-    (SUBMISSION_ENGINE_DAILY_BUDGET_USD). This is the daily ceiling that bounds a
-    scripted-abuse or viral-spike day to a known dollar figure instead of an
-    unbounded Anthropic/Gemini bill — the Gemini grounding lane is already capped
-    separately ($0.30/day), so this covers the Haiku(analyze)+Sonnet(verify)
-    spend that was previously uncapped. 429 so the caller/relay backs off without
-    incurring the call."""
-    if _fetch_cost_breaker.current_state("submission").hard_stopped:
+    public) any direct caller. ATOMICALLY reserve an estimate against the
+    "submission" lane BEFORE the LLM call (reserve_or_refund serializes
+    concurrent callers on the Postgres row, closing the check-then-act race a
+    plain current_state read had), and 429 when the reservation is denied — the
+    daily ceiling (SUBMISSION_ENGINE_DAILY_BUDGET_USD) that bounds a scripted or
+    viral-spike day to a known dollar figure instead of an unbounded Anthropic
+    bill. Returns the reserved amount so the caller reconciles to actual after.
+    Gemini grounding is capped separately on its own lane ($0.30/day)."""
+    if not reserve_or_refund(_fetch_cost_breaker, "submission", SUBMISSION_ESTIMATED_CALL_USD):
         raise HTTPException(status_code=429, detail="submission_budget_exhausted")
+    return SUBMISSION_ESTIMATED_CALL_USD
 
 
-def _meter_submission_spend(usage: UsageRecord | None) -> None:
-    """Accumulate the ACTUAL analyze/verify LLM spend against the "submission"
-    lane so the guard above trips once the daily budget is crossed. Skips the
-    no-op/reuse paths (same sentinel as _record_llm_call). record_spend is
+def _reconcile_submission_spend(usage: UsageRecord | None, reserved: float) -> None:
+    """Replace the reserved estimate with the ACTUAL spend by recording
+    (actual - reserved) against the lane. No-op/reuse paths (model='none'/None)
+    have 0 actual, so the whole reservation is refunded. record_spend is
     fail-open, so metering never fails the hop."""
-    if usage is None or usage.model == "none":
-        return
-    _fetch_cost_breaker.record_spend("submission", usage.usd)
+    actual = usage.usd if (usage is not None and usage.model != "none") else 0.0
+    _fetch_cost_breaker.record_spend("submission", actual - reserved)
+
+
+def _refund_submission_reserve(reserved: float) -> None:
+    """Refund a reservation whose hop raised before producing usage (so a failed
+    hop never leaves phantom spend on the lane)."""
+    try:
+        _fetch_cost_breaker.record_spend("submission", -reserved)
+    except Exception:  # noqa: BLE001, S110 - refund is best-effort; never mask the real error
+        pass
 
 
 @app.post("/hops/analyze")
 async def hop_analyze(event: AnalyzeHopEnvelope) -> AnalyzeResult:
-    _submission_budget_guard()  # cost ceiling (audit G1) — before any LLM spend
+    reserved = _submission_budget_reserve()  # cost ceiling (audit G1) — reserve before LLM
     try:
         result = await run_analyze_hop(
             event.to_hop_request(),
@@ -291,38 +308,46 @@ async def hop_analyze(event: AnalyzeHopEnvelope) -> AnalyzeResult:
             metadata_fetcher=_metadata_fetcher,
         )
     except AnalyzeHopError as exc:
+        _refund_submission_reserve(reserved)
         logger.warning("analyze hop failed: %s", exc)
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception:
+        _refund_submission_reserve(reserved)
+        raise
     _record_llm_call(event.org_id, result.usage)
-    _meter_submission_spend(result.usage)
+    _reconcile_submission_spend(result.usage, reserved)
     return result
 
 
 @app.post("/hops/verify")
 async def hop_verify(payload: VerifyHopRequest) -> VerifyResult:
-    _submission_budget_guard()  # cost ceiling (audit G1) — before any LLM spend
-    result = await run_verify_hop(
-        payload,
-        llm=_sonnet_llm,
-        embedder=_embedder,
-        check_store=_check_store,
-        factcheck_client=_factcheck_client,
-        store=_hop_idempotency_store,
-        reverse_image_search=_reverse_image_search,
-        corroboration_client=_corroboration_client,
-        # ADR-0036 near-0 cost cap: the grounded second gate spends on its OWN
-        # daily "corroboration" budget lane (~$0.30/day ≈ 100 calls), isolated
-        # from the fetch/submission engines — reuses the same Postgres breaker.
-        corroboration_breaker=_fetch_cost_breaker,
-        # Per-call cost audit: the store writes the grounded-RESCUE row from
-        # inside the hop (its usd is not surfaced in VerifyResult); the draft and
-        # corroboration-assess rows are written at this boundary just below.
-        llm_call_store=_llm_call_store,
-    )
+    reserved = _submission_budget_reserve()  # cost ceiling (audit G1) — reserve before LLM
+    try:
+        result = await run_verify_hop(
+            payload,
+            llm=_sonnet_llm,
+            embedder=_embedder,
+            check_store=_check_store,
+            factcheck_client=_factcheck_client,
+            store=_hop_idempotency_store,
+            reverse_image_search=_reverse_image_search,
+            corroboration_client=_corroboration_client,
+            # ADR-0036 near-0 cost cap: the grounded second gate spends on its OWN
+            # daily "corroboration" budget lane (~$0.30/day ≈ 100 calls), isolated
+            # from the fetch/submission engines — reuses the same Postgres breaker.
+            corroboration_breaker=_fetch_cost_breaker,
+            # Per-call cost audit: the store writes the grounded-RESCUE row from
+            # inside the hop (its usd is not surfaced in VerifyResult); the draft and
+            # corroboration-assess rows are written at this boundary just below.
+            llm_call_store=_llm_call_store,
+        )
+    except Exception:
+        _refund_submission_reserve(reserved)
+        raise
     # Draft-verdict LLM call (stage "verify"): real token counts + usd. None on
     # the dedup-reuse / rejected paths (no fresh draft call) — skipped there.
     _record_llm_call(payload.org_id, result.usage)
-    _meter_submission_spend(result.usage)  # cost ceiling (audit G1): accrue actual spend
+    _reconcile_submission_spend(result.usage, reserved)  # cost ceiling (audit G1): true up to actual
     # Grounded second-opinion (assess) call, when one actually ran (a real stance
     # came back — not the fail-closed/not-sampled no_second_opinion). The gemini
     # SDK reports only a usd estimate for this call (no token breakdown), so token
