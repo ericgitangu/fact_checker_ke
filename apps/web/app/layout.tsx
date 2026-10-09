@@ -6,6 +6,7 @@ import { getLocale, getMessages } from "next-intl/server";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import { AppFooter, AppHeader } from "../components/site-chrome";
 import { GoogleAnalytics } from "../components/analytics/google-analytics";
+import { RecaptchaProvider } from "../components/recaptcha/recaptcha-provider";
 import { ConsentBanner } from "../components/ads/consent-banner";
 import { ConsentRegionProvider } from "../components/ads/consent-region-provider";
 import { countryRequiresConsent } from "../lib/consent-region";
@@ -157,6 +158,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? ""}
           consentRequired={serverRequiresConsent}
         />
+        {/* reCAPTCHA v3 script loader. "use client" leaf that renders null (ships
+            no script) unless NEXT_PUBLIC_RECAPTCHA_SITE_KEY is set — so forms
+            behave exactly as today until the key exists. The required Google
+            disclosure rides in the footer via <RecaptchaNotice /> below. */}
+        <RecaptchaProvider />
         <NextIntlClientProvider locale={locale} messages={messages}>
           {/* ADR-0012 §4: the server-decided region flag is the authoritative
               signal for the consent gate below; wraps the whole tree so every

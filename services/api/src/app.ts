@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import { Redis as UpstashRedis } from "@upstash/redis";
@@ -139,6 +140,40 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   const config = options.config ?? resolveConfig();
   const warn = (msg: string): void => app.log.warn(msg);
+
+  // BFF→API trust gate (see config.bffProxySecret). services/api is public, so
+  // the apps/web login + reCAPTCHA gate on the cost-spending POST paths below is
+  // bypassable by a direct POST. When BFF_PROXY_SECRET is set on BOTH tiers, the
+  // web BFF stamps `X-BFF-Proxy-Secret` on its forwarded requests and these
+  // routes require it — closing the identity-gate bypass. Fail-OPEN when unset
+  // (hook not installed), so adding it never breaks dev/test or a half-rolled
+  // prod; fail-CLOSED once provisioned. Registered before the route plugins so
+  // the encapsulated children inherit it. Cost stays bounded by the per-device
+  // quota + the $3/day submission breaker regardless of this gate.
+  if (config.bffProxySecret) {
+    const expected = Buffer.from(config.bffProxySecret);
+    const gatedPostRoutes = new Set([
+      "/v1/submissions",
+      "/v1/submissions/:id/sources",
+      "/v1/checks/:id/sources",
+    ]);
+    app.addHook("preHandler", async (request, reply) => {
+      if (request.method !== "POST") return;
+      const routeUrl = request.routeOptions?.url;
+      if (!routeUrl || !gatedPostRoutes.has(routeUrl)) return;
+      const raw = request.headers["x-bff-proxy-secret"];
+      const provided = Array.isArray(raw) ? raw[0] : raw;
+      // Constant-time compare; timingSafeEqual throws on length mismatch, so
+      // guard length first (mirrors routes/maandamano.ts secretMatches).
+      const ok =
+        typeof provided === "string" &&
+        Buffer.byteLength(provided) === expected.length &&
+        timingSafeEqual(Buffer.from(provided), expected);
+      if (!ok) {
+        return reply.status(401).send({ error: "bff_assertion_required" });
+      }
+    });
+  }
 
   let submissions = options.submissions;
   let checks = options.checks;

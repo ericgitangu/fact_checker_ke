@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { ApiClient, ApiClientError, SubmissionInputSchema } from "@fact-checker-ke/core";
+import { auth } from "../../../auth";
+import { verifyRecaptcha } from "../../../lib/recaptcha";
 
 /**
  * BFF proxy: the browser posts here (same-origin, no CORS), and this route
@@ -20,6 +22,26 @@ import { ApiClient, ApiClientError, SubmissionInputSchema } from "@fact-checker-
  * reimplementing the submit call by hand.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  // Auth gate (server-side): submitting a claim is one of the two gated actions
+  // (the other is add-source). The /submit PAGE redirects a logged-out visitor,
+  // but THIS is the BFF that actually spends LLM budget downstream, so it must
+  // enforce the session itself — a logged-out script must not reach the pipeline
+  // via a minted device token. 401 → the client routes to /signin?callbackUrl=/submit.
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "auth_required" }, { status: 401 });
+  }
+
+  // Bot gate (after auth, before spending any downstream LLM budget). Env-gated:
+  // a NO-OP (always ok) until RECAPTCHA_SECRET_KEY is set, then fails closed.
+  const recaptcha = await verifyRecaptcha(request.headers.get("x-recaptcha-token") ?? "", {
+    expectedAction: "submit_claim",
+    minScore: 0.5,
+  });
+  if (!recaptcha.ok) {
+    return NextResponse.json({ error: "recaptcha_failed" }, { status: 400 });
+  }
+
   const body: unknown = await request.json().catch(() => null);
   const parsed = SubmissionInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -39,6 +61,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       const headers = new Headers(init?.headers);
       if (deviceToken) headers.set("X-Device-Token", deviceToken);
       if (idempotencyKey) headers.set("Idempotency-Key", idempotencyKey);
+      // BFF→API trust assertion: services/api is public, so this header is what
+      // proves the request came through our own BFF (which enforced the login +
+      // reCAPTCHA gate above) rather than a script POSTing straight to the API.
+      // No-op until BFF_PROXY_SECRET is set on both tiers (see services/api config).
+      const proxySecret = process.env.BFF_PROXY_SECRET;
+      if (proxySecret) headers.set("X-BFF-Proxy-Secret", proxySecret);
       return fetch(input, { ...init, headers });
     },
   });

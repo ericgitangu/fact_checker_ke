@@ -38,6 +38,13 @@
     "offline": {
       "title": "You're offline",
       "body": "fact_checker_ke couldn't reach the network. The app shell is cached, so pages you've already visited may still work — reconnect to submit a new claim or load fresh checks."
+    },
+    "auth": {
+      "signIn": "Sign in",
+      "signOut": "Sign out",
+      "google": "Sign in with Google",
+      "heading": "Sign in to continue",
+      "lede": "Sign in with Google to submit a claim or add a source. Everything else stays open to read."
     }
   },
   "check": {
@@ -243,18 +250,18 @@
       "intro": "The published claims spreading fastest on the platforms we monitor — ranked by reach, not by rating."
     },
     "trending": {
-        "heading": "Trending now — what we're tracking",
-        "intro": "Viral clips our engine caught on the platforms we monitor, ranked by reach. We're tracking the spread — these are not verdicts. A verdict is published only once an item clears review.",
-        "statusNote": "Tracking status — not a fact-check verdict.",
-        "status": {
-            "monitoring": "Monitoring",
-            "under_review": "Under review",
-            "published": "Published",
-            "dismissed": "Not pursued"
-        },
-        "viewSource": "Watch source",
-        "viewCheck": "Read the assessment",
-        "reach": "Reach"
+      "heading": "Trending now — what we're tracking",
+      "intro": "Viral clips our engine caught on the platforms we monitor, ranked by reach. We're tracking the spread — these are not verdicts. A verdict is published only once an item clears review.",
+      "statusNote": "Tracking status — not a fact-check verdict.",
+      "status": {
+        "monitoring": "Monitoring",
+        "under_review": "Under review",
+        "published": "Published",
+        "dismissed": "Not pursued"
+      },
+      "viewSource": "Watch source",
+      "viewCheck": "Read the assessment",
+      "reach": "Reach"
     },
     "source": {
       "fetch": "Auto-surfaced",

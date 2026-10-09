@@ -8,6 +8,14 @@ vi.mock("next-intl/server", async () => {
   return mod.createNextIntlServerMock("en");
 });
 
+// FeedItemCard renders the lifecycle affordance -> AddSourceForm, which now
+// calls useRouter() for the auth-gate return-to. Provide the router context.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 afterEach(() => {
   cleanup();
 });
