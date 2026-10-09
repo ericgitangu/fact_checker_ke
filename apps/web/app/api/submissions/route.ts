@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ApiClient, ApiClientError, SubmissionInputSchema } from "@fact-checker-ke/core";
 import { auth } from "../../../auth";
+import { verifyRecaptcha } from "../../../lib/recaptcha";
 
 /**
  * BFF proxy: the browser posts here (same-origin, no CORS), and this route
@@ -29,6 +30,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "auth_required" }, { status: 401 });
+  }
+
+  // Bot gate (after auth, before spending any downstream LLM budget). Env-gated:
+  // a NO-OP (always ok) until RECAPTCHA_SECRET_KEY is set, then fails closed.
+  const recaptcha = await verifyRecaptcha(request.headers.get("x-recaptcha-token") ?? "", {
+    expectedAction: "submit_claim",
+    minScore: 0.5,
+  });
+  if (!recaptcha.ok) {
+    return NextResponse.json({ error: "recaptcha_failed" }, { status: 400 });
   }
 
   const body: unknown = await request.json().catch(() => null);

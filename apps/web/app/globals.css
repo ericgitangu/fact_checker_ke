@@ -621,6 +621,14 @@ a:hover {
   color: var(--ink-3);
 }
 
+/* Google reCAPTCHA disclosure (components/recaptcha/recaptcha-notice.tsx),
+   shown in place of the hidden badge. Muted, sits just under the rights line;
+   the component's own inline --ink tokens carry the colour/theme. */
+.footer-recaptcha-notice {
+  margin-top: 8px;
+  max-width: 48ch;
+}
+
 @media (max-width: 860px) {
   .footer-top {
     grid-template-columns: 1fr;

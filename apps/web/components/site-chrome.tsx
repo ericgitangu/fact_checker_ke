@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { ExternalLinkIcon, Wordmark } from "@fact-checker-ke/brand";
+import { RecaptchaNotice } from "./recaptcha/recaptcha-notice";
 import { LocaleSwitcher } from "./locale-switcher";
 import { NavLink } from "./nav-link";
 import { PrimaryNav } from "./primary-nav";
@@ -215,6 +216,12 @@ export async function AppFooter(): Promise<React.JSX.Element> {
 
       <div className="footer-bottom">
         <p>{t("footer.rights", { year })}</p>
+        {/* Google's reCAPTCHA terms require the badge OR this text disclosure.
+            <RecaptchaProvider> (app/layout.tsx) hides the floating badge, so the
+            disclosure lives here — once in the footer, carried on every page the
+            gated forms render. Already styled muted via the site's own --ink
+            tokens (no new palette), and harmless when reCAPTCHA is unconfigured. */}
+        <RecaptchaNotice className="footer-recaptcha-notice" />
       </div>
     </footer>
   );

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "../../../../../auth";
+import { verifyRecaptcha } from "../../../../../lib/recaptcha";
 
 /**
  * BFF proxy for ADR-0038 Wave 2 `POST /v1/submissions/:id/sources` ("Submit the
@@ -24,6 +25,16 @@ export async function POST(
   const session = await auth();
   if (!session) {
     return NextResponse.json({ error: "auth_required" }, { status: 401 });
+  }
+
+  // Bot gate (after auth, before forwarding). Env-gated no-op until
+  // RECAPTCHA_SECRET_KEY is set, then fails closed.
+  const recaptcha = await verifyRecaptcha(request.headers.get("x-recaptcha-token") ?? "", {
+    expectedAction: "add_source",
+    minScore: 0.5,
+  });
+  if (!recaptcha.ok) {
+    return NextResponse.json({ error: "recaptcha_failed" }, { status: 400 });
   }
 
   const { id } = await params;

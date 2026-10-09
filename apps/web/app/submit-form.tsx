@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { getDeviceToken } from "../lib/device-token";
 import { detectSource, isShortenerUrl } from "../lib/claim-source-detection";
 import { detectLanguages } from "../lib/language-detect";
+import { useRecaptcha } from "../components/recaptcha/use-recaptcha";
 import { SourcePreview } from "../components/submit/source-preview";
 import { VideoMomentMarker } from "../components/submit/video-moment-marker";
 import { MediaDropzone } from "../components/submit/media-dropzone";
@@ -39,6 +40,7 @@ export function SubmitForm({ initialUrl = "" }: { initialUrl?: string } = {}): R
   const t = useTranslations("submit");
   const tCommon = useTranslations("common");
   const router = useRouter();
+  const { execute: executeRecaptcha } = useRecaptcha();
 
   const [rawInput, setRawInput] = useState(initialUrl);
   const [quote, setQuote] = useState("");
@@ -133,12 +135,19 @@ export function SubmitForm({ initialUrl = "" }: { initialUrl?: string } = {}): R
             }
           : { text: detection.text };
 
+      // reCAPTCHA v3: mint a token for this action and send it in a header (the
+      // body is the SubmissionInput contract, kept clean). Returns null when no
+      // site key is configured (dev/test) — we still submit, because the server
+      // verifier is a no-op until RECAPTCHA_SECRET_KEY is also set.
+      const recaptchaToken = await executeRecaptcha("submit_claim");
+
       const res = await fetch("/api/submissions", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "idempotency-key": idempotencyKey,
           ...(deviceToken ? { "x-device-token": deviceToken } : {}),
+          ...(recaptchaToken ? { "x-recaptcha-token": recaptchaToken } : {}),
         },
         body: JSON.stringify(payload),
       });
