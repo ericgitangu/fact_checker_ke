@@ -22,9 +22,31 @@
  * form posts the token obtained via useRecaptcha().execute(...).
  */
 
+// Hard server boundary: RECAPTCHA_SECRET_KEY must never reach the client
+// bundle. `server-only` turns an accidental import from a client component
+// into a build error rather than a silent secret leak. Verified: the only
+// importers are route handlers (lib/recaptcha is never pulled into a
+// "use client" module — the client forms import the useRecaptcha() hook).
+import "server-only";
+
 const VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
 const DEFAULT_MIN_SCORE = 0.5;
 const VERIFY_TIMEOUT_MS = 5000;
+
+/**
+ * Optional hostname allow-list (Fable hardening). reCAPTCHA v3 site keys are
+ * PUBLIC, so an attacker can embed ours on their own page and mint real tokens;
+ * Google echoes the minting `hostname` back, and verifying it closes that
+ * cross-site replay. Env-gated like the rest of the kit: a comma-separated
+ * RECAPTCHA_ALLOWED_HOSTNAMES enforces the check; unset -> skipped (today's
+ * behaviour). Set it to e.g. "fact-checker-ke-web.vercel.app,mail.ericgitangu.com".
+ */
+function allowedHostnames(): readonly string[] {
+  return (process.env.RECAPTCHA_ALLOWED_HOSTNAMES ?? "")
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter((h) => h.length > 0);
+}
 
 export interface VerifyRecaptchaOptions {
   /** If given, Google's returned `action` must equal this or verification fails. */
@@ -135,6 +157,15 @@ export async function verifyRecaptcha(
 
   if (opts.expectedAction !== undefined && action !== opts.expectedAction) {
     return { ok: false, score, action, reason: "action_mismatch" };
+  }
+
+  // Cross-site replay guard (env-gated — see allowedHostnames() above).
+  const allow = allowedHostnames();
+  if (allow.length > 0) {
+    const host = typeof payload.hostname === "string" ? payload.hostname.toLowerCase() : null;
+    if (host === null || !allow.includes(host)) {
+      return { ok: false, score, action, reason: "hostname_mismatch" };
+    }
   }
 
   // v3 always returns a score on success; a missing one is itself suspicious.

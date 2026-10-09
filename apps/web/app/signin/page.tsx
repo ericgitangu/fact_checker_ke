@@ -74,6 +74,10 @@ export function sanitizeCallbackUrl(raw: string | string[] | undefined): string 
     const SENTINEL = "https://callback.invalid";
     const url = new URL(value, SENTINEL);
     if (url.origin !== SENTINEL) return "/";
+    // Redirect-loop guard (Fable): a callbackUrl pointing back at /signin would
+    // bounce the user to the sign-in page they just left (or loop on a failed
+    // auth). Collapse any /signin[/...] target to home.
+    if (url.pathname === "/signin" || url.pathname.startsWith("/signin/")) return "/";
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return "/";

@@ -37,4 +37,12 @@ describe("sanitizeCallbackUrl", () => {
     expect(sanitizeCallbackUrl(["//evil.com", "/ok"])).toBe("/"); // first element wins, and it's hostile
     expect(sanitizeCallbackUrl(["/submit"])).toBe("/submit");
   });
+
+  it("collapses a /signin callback to '/' (redirect-loop guard)", () => {
+    expect(sanitizeCallbackUrl("/signin")).toBe("/");
+    expect(sanitizeCallbackUrl("/signin?callbackUrl=/submit")).toBe("/");
+    expect(sanitizeCallbackUrl("/signin/anything")).toBe("/");
+    // A path that merely starts with the string "signin" is NOT /signin.
+    expect(sanitizeCallbackUrl("/signins-list")).toBe("/signins-list");
+  });
 });

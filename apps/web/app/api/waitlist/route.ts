@@ -16,6 +16,23 @@ const FOUNDER_NOTIFY_TO = "developer.ericgitangu@gmail.com";
 let adopterSkipLogged = false;
 
 /**
+ * HTML-escape untrusted values before interpolating into the founder-notify
+ * email body (Fable hardening / defense-in-depth). `email` passes zod email
+ * validation and `source` is server-stamped "web", so the practical injection
+ * surface is small today — but an email-shaped value can still carry characters
+ * an HTML renderer would interpret, and this email is read by a human in a
+ * full HTML client. Escaping is unconditional rather than trusting the schema.
+ */
+function esc(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
  * Fire-and-forget notifications for a brand-new signup. Runs in `after()` so it
  * never blocks or fails the signup response. Everything here fail-soft:
  *  - Founder-notify: always attempted (no-op if RESEND_API_KEY unset).
@@ -27,7 +44,7 @@ async function notifyOnSignup(email: string, source: string): Promise<void> {
     from: FOUNDER_NOTIFY_FROM,
     to: FOUNDER_NOTIFY_TO,
     subject: `New early-access signup: ${email}`,
-    html: `<p>A new reader joined the fact_checker_ke waitlist.</p><p><strong>Email:</strong> ${email}<br><strong>Source:</strong> ${source}</p>`,
+    html: `<p>A new reader joined the fact_checker_ke waitlist.</p><p><strong>Email:</strong> ${esc(email)}<br><strong>Source:</strong> ${esc(source)}</p>`,
     text: `New early-access signup\n\nEmail: ${email}\nSource: ${source}\n`,
   });
   if (!founder.ok && founder.error !== "resend_disabled") {
