@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { getDeviceToken } from "../lib/device-token";
 import { detectSource, isShortenerUrl } from "../lib/claim-source-detection";
 import { detectLanguages } from "../lib/language-detect";
+import { useRecaptcha } from "../components/recaptcha/use-recaptcha";
 import { SourcePreview } from "../components/submit/source-preview";
 import { VideoMomentMarker } from "../components/submit/video-moment-marker";
 import { MediaDropzone } from "../components/submit/media-dropzone";
@@ -39,6 +40,7 @@ export function SubmitForm({ initialUrl = "" }: { initialUrl?: string } = {}): R
   const t = useTranslations("submit");
   const tCommon = useTranslations("common");
   const router = useRouter();
+  const { execute: executeRecaptcha } = useRecaptcha();
 
   const [rawInput, setRawInput] = useState(initialUrl);
   const [quote, setQuote] = useState("");
@@ -133,15 +135,29 @@ export function SubmitForm({ initialUrl = "" }: { initialUrl?: string } = {}): R
             }
           : { text: detection.text };
 
+      // reCAPTCHA v3: mint a token for this action and send it in a header (the
+      // body is the SubmissionInput contract, kept clean). Returns null when no
+      // site key is configured (dev/test) — we still submit, because the server
+      // verifier is a no-op until RECAPTCHA_SECRET_KEY is also set.
+      const recaptchaToken = await executeRecaptcha("submit_claim");
+
       const res = await fetch("/api/submissions", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "idempotency-key": idempotencyKey,
           ...(deviceToken ? { "x-device-token": deviceToken } : {}),
+          ...(recaptchaToken ? { "x-recaptcha-token": recaptchaToken } : {}),
         },
         body: JSON.stringify(payload),
       });
+      // Auth gate (return-to): the BFF requires a session; a logged-out submit
+      // gets 401, so route to sign-in with this page as the callback rather than
+      // surfacing a bare "failed with status 401".
+      if (res.status === 401) {
+        router.push(`/signin?callbackUrl=${encodeURIComponent("/submit")}`);
+        return;
+      }
       if (res.status !== 202) {
         const body: unknown = await res.json().catch(() => ({}));
         const message =

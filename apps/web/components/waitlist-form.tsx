@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { WaitlistInterestSchema, WaitlistSignupInputSchema, type WaitlistInterest } from "@fact-checker-ke/core";
 import { classifyWaitlistResponse } from "../lib/waitlist-outcome";
+import { useRecaptcha } from "./recaptcha/use-recaptcha";
 
 const INTEREST_OPTIONS: readonly WaitlistInterest[] = WaitlistInterestSchema.options;
 
@@ -40,6 +41,7 @@ const BUSY_STATES: ReadonlySet<WaitlistState["status"]> = new Set(["submitting"]
  */
 export function WaitlistForm(): React.JSX.Element {
   const t = useTranslations("landing.waitlist");
+  const { execute: executeRecaptcha } = useRecaptcha();
   const [email, setEmail] = useState("");
   // ADR-0012 monetization-signal capture: one low-friction optional select,
   // never required and never blocks the submit. "" means "no answer" and is
@@ -65,11 +67,19 @@ export function WaitlistForm(): React.JSX.Element {
 
     setState({ status: "submitting" });
 
+    // reCAPTCHA v3 token for this action, sent in a header (body stays just
+    // the email + optional interest). null when unconfigured → still submit;
+    // the server verify is a no-op until RECAPTCHA_SECRET_KEY is set.
+    const recaptchaToken = await executeRecaptcha("waitlist_signup");
+
     let res: Response;
     try {
       res = await fetch("/api/waitlist", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(recaptchaToken ? { "x-recaptcha-token": recaptchaToken } : {}),
+        },
         // Only the email + optional interest signal leave the browser; the
         // BFF stamps `source` server-side.
         body: JSON.stringify({

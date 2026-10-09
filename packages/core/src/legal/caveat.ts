@@ -143,6 +143,11 @@ export const PRIVACY_RETENTION_CLASSES = [
   { dataClass: "Drafts naming a person (unpublished)", retentionDays: 90 },
   { dataClass: "Published checks + evidence files", retentionDays: null },
   { dataClass: "Waitlist / newsletter signups", retentionDays: 730 },
+  // DPA 2019 s.29/s.39: "Sign in with Google" early-adopter roster — email,
+  // display name and avatar URL from the Google profile, plus first/last-seen
+  // timestamps, written on each login (packages/db `early_adopters`). Retained
+  // for 2y keyed to last_seen_at (purge older), matching the waitlist class.
+  { dataClass: "Sign-in profile (Google: email, name, avatar)", retentionDays: 730 },
   { dataClass: "Uploads (photos/audio, EXIF stripped at ingest)", retentionDays: 1 },
   { dataClass: "Application logs (Cloud Run, Vercel)", retentionDays: 30 },
   { dataClass: "Tracker-route logs (/maandamano/*, IP redacted)", retentionDays: 7 },
@@ -259,6 +264,21 @@ export const PRIVACY_SECTIONS = [
       "The table below mirrors our data-retention policy (ADR-0021): " +
       "what we collect and how long we keep it, per data class.",
     retentionTable: PRIVACY_RETENTION_CLASSES,
+  },
+  {
+    id: "sign-in",
+    heading: "Signing in with Google",
+    body:
+      "Signing in is optional — it is only required to submit a claim or add " +
+      "a source; browsing, reading verdicts and the maandamano tracker need no " +
+      "account. We use Google Sign-In and, from your Google profile, store your " +
+      "email, display name and avatar to recognise you and to keep early " +
+      "adopters informed about the pilot. We never receive your Google " +
+      "password and request only basic profile scopes (email, profile). You can " +
+      "ask us to delete this record at any time.",
+    advocateMarker:
+      "[ADVOCATE: confirm lawful basis for storing the Google Sign-In profile " +
+      "+ early-adopter contact under DPA 2019 s.29/s.30.]",
   },
   {
     id: "cross-border-transfer",

@@ -201,6 +201,22 @@ module "secret_pipeline_callback_secret" {
   ]
 }
 
+module "secret_bff_proxy_secret" {
+  source     = "../../modules/secret"
+  project_id = var.project_id
+  secret_id  = "fact-checker-ke-bff-proxy-secret"
+  # BFF->API trust gate: apps/web (Vercel) stamps X-BFF-Proxy-Secret on its
+  # forwarded submission / add-source POSTs; services/api verifies it so the
+  # public API only accepts those writes from our own BFF. Only the api
+  # runtime reads it here — the web tier gets the same value from a Vercel env
+  # var, not from Secret Manager. Fail-OPEN until a version exists (the
+  # preHandler hook isn't installed when BFF_PROXY_SECRET is unset), so the
+  # empty-secret state is the pre-gate behaviour, not a lockout.
+  accessors = [
+    google_service_account.api_runtime.email,
+  ]
+}
+
 module "secret_redis_tcp_url" {
   source     = "../../modules/secret"
   project_id = var.project_id

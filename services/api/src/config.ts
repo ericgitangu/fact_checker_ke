@@ -137,6 +137,25 @@ export interface ResolvedConfig {
    */
   pipelineCallbackSecret?: string | null;
   /**
+   * BFF→API trust assertion. services/api is public (INGRESS_TRAFFIC_ALL,
+   * ADR-0015), so the apps/web login + reCAPTCHA gate on the cost-spending
+   * write paths (POST /v1/submissions, /v1/submissions/:id/sources,
+   * /v1/checks/:id/sources) is bypassable by a script POSTing straight to the
+   * API. When this secret is set, those routes require a matching
+   * `X-BFF-Proxy-Secret` header (the web BFF sets it from the same env value),
+   * so the only accepted caller is our own BFF.
+   *
+   * Semantics differ DELIBERATELY from pipelineCallbackSecret above: this gate
+   * is ADDED to already-live endpoints, so it is fail-OPEN when unset (the
+   * hook isn't even installed) and fail-CLOSED only once the secret is
+   * provisioned on BOTH tiers (Cloud Run + Vercel) — otherwise flipping it on
+   * one side would 401 every real submission. Cost is independently bounded by
+   * the per-device quota + the $3/day submission breaker; this closes the
+   * identity-gate bypass, not a cost hole. Optional for the same test-literal
+   * reason as the fields above.
+   */
+  bffProxySecret?: string | null;
+  /**
    * ADR-0012 §3: the Paystack secret key (lead PSP — Kenya-native M-Pesa/
    * cards). Read ONLY from env, never hardcoded. Unset ⇒ the Paystack
    * adapter is `configured=false` ⇒ checkout returns 503 and every webhook
@@ -273,6 +292,7 @@ export function resolveConfig(env: NodeJS.ProcessEnv = process.env): ResolvedCon
     webBaseUrl: env.WEB_BASE_URL ?? null,
     revalidateSecret: env.REVALIDATE_SECRET ?? null,
     pipelineCallbackSecret: env.PIPELINE_CALLBACK_SECRET ?? null,
+    bffProxySecret: env.BFF_PROXY_SECRET ?? null,
     paystackSecretKey: env.PAYSTACK_SECRET_KEY ?? null,
     mpesa: {
       consumerKey: env.MPESA_C2B_CONSUMER_KEY ?? null, // gitleaks:allow -- reads an env var NAME, no secret literal

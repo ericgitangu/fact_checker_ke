@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { getDeviceToken } from "../lib/device-token";
 import type { AddSourceFormCopy } from "../lib/lifecycle-copy";
+import { useRecaptcha } from "./recaptcha/use-recaptcha";
 
 /**
  * ADR-0038 Wave 2 "Submit the truth": the interactive add-source island the
@@ -36,6 +38,8 @@ export function AddSourceForm({
   copy: AddSourceFormCopy;
   resource?: "checks" | "submissions";
 }): React.JSX.Element {
+  const router = useRouter();
+  const { execute: executeRecaptcha } = useRecaptcha();
   const [state, setState] = useState<FormState>({ status: "idle" });
   const [url, setUrl] = useState("");
   const [note, setNote] = useState("");
@@ -45,14 +49,27 @@ export function AddSourceForm({
     setState({ status: "submitting" });
     try {
       const deviceToken = await getDeviceToken();
+      // reCAPTCHA v3 token in a header (the body stays the source contract).
+      // null when unconfigured → still submit; the server verify is a no-op then.
+      const recaptchaToken = await executeRecaptcha("add_source");
       const res = await fetch(`/api/${resource}/${checkId}/sources`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
           ...(deviceToken ? { "x-device-token": deviceToken } : {}),
+          ...(recaptchaToken ? { "x-recaptcha-token": recaptchaToken } : {}),
         },
         body: JSON.stringify({ url, ...(note.trim() ? { note: note.trim() } : {}) }),
       });
+      if (res.status === 401) {
+        // Gated action, not signed in: route to the sign-in flow with a
+        // return-to so they land back on this exact check/trending card after
+        // Google (which does a full redirect to callbackUrl, so the session
+        // cookie is fresh on return regardless).
+        const returnTo = `${window.location.pathname}${window.location.search}`;
+        router.push(`/signin?callbackUrl=${encodeURIComponent(returnTo)}`);
+        return;
+      }
       if (res.status === 200 || res.status === 201) {
         const body = (await res.json().catch(() => ({}))) as {
           status?: "accepted" | "rejected" | "duplicate";

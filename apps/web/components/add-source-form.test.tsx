@@ -8,6 +8,15 @@ vi.mock("../lib/device-token", () => ({
   getDeviceToken: vi.fn(async () => "device-token-xyz"),
 }));
 
+// AddSourceForm now calls useRouter() to route a logged-out reader to /signin
+// on a 401 (auth-gate return-to). Provide the app-router context the real hook
+// asserts on — same pattern as the a11y suites.
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const copy = addSourceFormCopyFor("en");
 const CHECK_ID = "11111111-1111-1111-1111-111111111111";
 

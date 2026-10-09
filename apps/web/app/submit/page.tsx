@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Stagger } from "@fact-checker-ke/brand";
 import { SubmitForm } from "../submit-form";
+import { auth } from "../../auth";
 
 export const metadata: Metadata = {
   title: "Submit a claim — fact_checker_ke",
@@ -21,6 +23,14 @@ export default async function SubmitPage({
 }: {
   searchParams: Promise<{ url?: string | string[] }>;
 }): Promise<React.JSX.Element> {
+  // Auth gate (server-side): submitting a claim is one of the two gated
+  // actions (the other is add-source). Logged-out visitors are sent to the
+  // sign-in flow with a return-to, so after Google they land back on /submit.
+  const session = await auth();
+  if (!session) {
+    redirect(`/signin?callbackUrl=${encodeURIComponent("/submit")}`);
+  }
+
   // ?url= prefill (the needs_quote tracker CTA deep-links here). Treated as
   // untrusted text: it only seeds the textarea, which the user can edit.
   const { url } = await searchParams;
