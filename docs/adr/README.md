@@ -36,10 +36,10 @@ Research basis: deep-research run `wf_7f486c8c-80e` (2026-10-03). It fetched 24 
 | [0017](0017-event-driven-core.md) | Event-driven core: outbox, idempotency, ACID | yes | Accepted — implemented |
 | [0018](0018-realtime-and-caching.md) | Near-real-time status (SSE) and caching | no (poll fallback) | Accepted — implemented |
 | [0019](0019-test-strategy-redteam.md) | Test strategy: ADR-derived TDD and red-team gates | process | Accepted — process set; reference doc at `docs/architecture/testing-strategy.md` |
-| [0020](0020-identity-auth-roles.md) | Identity, auth and roles | red-team gap | Accepted — anonymous-token slice implemented; editor/admin RBAC wave not yet implemented |
+| [0020](0020-identity-auth-roles.md) | Identity, auth and roles | red-team gap | Accepted — anonymous-token + admin TOTP slices implemented; **public Google OAuth sign-in LIVE in prod (2026-10-09)**; editor/admin RBAC wave still partial |
 | [0021](0021-data-protection-lifecycle.md) | Data protection lifecycle | red-team gap | Proposed — pending advocate sign-off |
 | [0022](0022-observability-incident-response.md) | Observability and incident response | red-team gap | Proposed — runbooks at `docs/runbooks/**` now in place (AT-0022-4); alerting/code still open |
-| [0023](0023-adversarial-ai-abuse.md) | Adversarial AI and abuse | red-team gap | Proposed — implementation notes on file |
+| [0023](0023-adversarial-ai-abuse.md) | Adversarial AI and abuse | red-team gap | Proposed — **submission-surface controls LIVE in prod (2026-10-09): reCAPTCHA v3 + BFF→API trust gate**; auto-publish framing gate (AT-0023-7) still RED |
 | [0024](0024-trust-safety-moderation.md) | Trust and safety, and moderation | red-team gap | Proposed |
 | [0025](0025-editorial-operations-capacity.md) | Editorial operations and capacity | red-team gap | Accepted |
 | [0026](0026-open-source-boundary-licence.md) | Open-source boundary and licence | red-team gap | Accepted — LICENSE/SECURITY.md/CONTRIBUTING.md/CODE_OF_CONDUCT.md/TRADEMARKS.md landed (AT-0026-1); CI/infra ATs still open |
