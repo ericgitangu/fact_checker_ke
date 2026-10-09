@@ -50,6 +50,9 @@ export async function POST(
 
   const deviceToken = request.headers.get("x-device-token");
   const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:8080";
+  // BFF→API trust assertion (see apps/web/app/api/submissions/route.ts). No-op
+  // until BFF_PROXY_SECRET is set on both tiers.
+  const proxySecret = process.env.BFF_PROXY_SECRET;
 
   let upstream: Response;
   try {
@@ -58,6 +61,7 @@ export async function POST(
       headers: {
         "content-type": "application/json",
         ...(deviceToken ? { "x-device-token": deviceToken } : {}),
+        ...(proxySecret ? { "x-bff-proxy-secret": proxySecret } : {}),
       },
       body: JSON.stringify(parsed.data),
     });

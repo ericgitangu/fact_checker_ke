@@ -61,6 +61,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       const headers = new Headers(init?.headers);
       if (deviceToken) headers.set("X-Device-Token", deviceToken);
       if (idempotencyKey) headers.set("Idempotency-Key", idempotencyKey);
+      // BFF→API trust assertion: services/api is public, so this header is what
+      // proves the request came through our own BFF (which enforced the login +
+      // reCAPTCHA gate above) rather than a script POSTing straight to the API.
+      // No-op until BFF_PROXY_SECRET is set on both tiers (see services/api config).
+      const proxySecret = process.env.BFF_PROXY_SECRET;
+      if (proxySecret) headers.set("X-BFF-Proxy-Secret", proxySecret);
       return fetch(input, { ...init, headers });
     },
   });
