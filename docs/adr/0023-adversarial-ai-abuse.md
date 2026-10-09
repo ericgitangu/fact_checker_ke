@@ -1,6 +1,6 @@
 # ADR-0023: Adversarial AI and abuse
 
-**Status:** Proposed · **Date:** 2026-10-03 · Builds on ADR-0004 (pipeline) and ADR-0011 (cost controls)
+**Status:** Proposed — direction accepted (2026-10-04 pivot); **submission-surface controls LIVE in prod (2026-10-09): reCAPTCHA v3 + BFF→API trust gate** (see 2026-10-09 implementation note); auto-publish framing gate (AT-0023-7) still RED · **Date:** 2026-10-03 · Builds on ADR-0004 (pipeline) and ADR-0011 (cost controls)
 
 ## Problem
 ADR-0019 lists prompt injection as a red-team checklist item, not an architectural control. The pipeline ingests two kinds of untrusted text into LLM prompts — the submitter's claim/quote, and retrieved web content for RAG — either of which can carry injected instructions aimed at steering a verdict, exfiltrating the system prompt, or forging a citation. Separately, the submission endpoint is a cost-DoS surface (red-team C-3: 400 unique paraphrases can exhaust the QStash daily quota), the claim/opinion classifier has no quality gate for Sheng (red-team C-11), and nothing stops a creator from gaming their own rating (red-team C-14).
@@ -132,3 +132,13 @@ embedder).
 | ID | Behaviour | Status |
 |---|---|---|
 | AT-0023-7 | A Tier A/B/C auto-published assessment (either ingest source) passes a publish-time framing gate that rejects any person-indicting phrasing and requires claim-attributed (Tier-C mode a: open-question) rendering, enforced in code with no human in the loop; fetched metadata/description is wrapped in the same delimited untrusted blocks as a submitted quote. | RED |
+
+---
+## Implementation notes (bot protection + BFF→API trust gate, 2026-10-09 — LIVE)
+
+Debut hardening (2026-10-10 launch). Closes the §4 admission-control gap for the submission surface and a red-team finding that the public API bypasses the web-side human checks. Merged as PR #101, deployed to prod.
+
+- **reCAPTCHA v3 on submit / add-source / waitlist (§4 bot-protection).** Client mints a per-action token (`useRecaptcha().execute("<action>")`), sent as `X-Recaptcha-Token`; the BFF verifies it server-side (`apps/web/lib/recaptcha.ts`). **Env-gated fail policy:** NO-OP (all tokens pass) until `RECAPTCHA_SECRET_KEY` is set, then **fails closed** — a configured-but-unreachable verifier is treated as "could not prove human", never "allow". Added two Fable hardenings: `import "server-only"` (the secret can never reach the client bundle) and an env-gated `RECAPTCHA_ALLOWED_HOSTNAMES` cross-site-replay guard (v3 site keys are public, so an attacker embedding ours on another domain would still mint valid tokens — verifying the echoed `hostname` closes that).
+- **BFF→API trust assertion (red-team must-fix).** `services/api` is public (`INGRESS_TRAFFIC_ALL`, ADR-0015), so the login + reCAPTCHA gate on the three cost-spending write paths (`POST /v1/submissions`, `/v1/submissions/:id/sources`, `/v1/checks/:id/sources`) was bypassable by a script POSTing straight to the API. A Fastify `preHandler` hook now requires an `X-BFF-Proxy-Secret` header (constant-time compare via `timingSafeEqual`, mirroring `routes/maandamano.ts`) on exactly those routes; the web BFF stamps it from `BFF_PROXY_SECRET`. **Fail-OPEN when unset** (hook not installed — never breaks dev/test or a half-rolled deploy), **fail-CLOSED once provisioned on both tiers** (Cloud Run + Vercel). Cost stays independently bounded by the per-device quota + the $3/day submission breaker (ADR-0011/0029), so this closes the *identity-gate* bypass, not a cost hole. Persisted in Terraform (`secrets.tf` + `cloud_run.tf`).
+- **Verified empirically in prod (2026-10-09):** a direct `POST /v1/submissions` without the header returns `401 {"error":"bff_assertion_required"}` (api revision `fact-checker-ke-api-00030`, health 200). `services/api/src/__tests__/bff-proxy-gate.test.ts` exercises the real `buildApp` hook: 401 on missing/wrong secret, pass on match, `/v1/device` ungated, no-op when unset. `moon ci` green locally. (GitHub Actions CI is billing-locked repo-wide — see ADR-0020's 2026-10-09 note — so #101 was admin-merged on the green local gate.)
+- No change to §1–6 decisions; this is the admission-control/containment surface being made real for the submission path. AT-0023-7 (auto-publish framing gate) remains RED — separate work on the fetch/auto-publish path.
