@@ -16,7 +16,7 @@
     "gen:schema": "tsx scripts/export-json-schema.ts"
   },
   "dependencies": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
